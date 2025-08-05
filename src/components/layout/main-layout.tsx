@@ -18,6 +18,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { LayoutDashboard, Users, Package, Banknote, FileText, Settings } from 'lucide-react';
 import React from 'react';
 import { SativarLogo } from '@/components/sativar-logo';
+import { ModeToggle } from '@/components/mode-toggle';
 
 export function MainLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -89,7 +90,7 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
           <SidebarTrigger className="md:hidden" />
           <SativarLogo className="md:hidden" />
           <div className="flex items-center gap-2">
-            {/* Header Content can go here */}
+            <ModeToggle />
           </div>
         </header>
         <main className="flex-1 overflow-y-auto p-4 md:p-6">
