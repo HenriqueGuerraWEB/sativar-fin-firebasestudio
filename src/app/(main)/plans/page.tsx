@@ -22,7 +22,7 @@ export default function PlansPage() {
     return (
         <div className="flex flex-col gap-6">
             <div className="flex items-center justify-between">
-                <h1 className="text-3xl font-bold tracking-tight">Planos de Serviço</h1>
+                <h1 className="text-2xl font-semibold">Planos de Serviço</h1>
                 <Sheet>
                     <SheetTrigger asChild>
                         <Button size="sm" className="gap-1">

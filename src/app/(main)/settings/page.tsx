@@ -3,7 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 export default function SettingsPage() {
   return (
     <div className="flex flex-col gap-6">
-      <h1 className="text-3xl font-bold tracking-tight">Configurações</h1>
+      <h1 className="text-2xl font-semibold">Configurações</h1>
       <Card>
         <CardHeader>
           <CardTitle>Configurações da Conta</CardTitle>
