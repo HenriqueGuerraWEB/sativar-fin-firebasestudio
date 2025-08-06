@@ -180,7 +180,8 @@ export default function FinancePage() {
             return;
         }
         try {
-            await addDoc(collection(db, "expenseCategories"), { name: newCategoryName });
+            const newCategory = { name: newCategoryName };
+            const docRef = await addDoc(collection(db, "expenseCategories"), newCategory);
             toast({ title: "Sucesso!", description: `Categoria "${newCategoryName}" adicionada.` });
             setCurrentExpense(prev => ({ ...prev, category: newCategoryName }));
             setNewCategoryName("");
@@ -353,6 +354,9 @@ export default function FinancePage() {
                                                             <DropdownMenuLabel>Ações</DropdownMenuLabel>
                                                             <DropdownMenuItem onClick={() => handleUpdateStatus(expense.id, 'Paga')} disabled={expense.status === 'Paga'}>
                                                                 Marcar como Paga
+                                                            </DropdownMenuItem>
+                                                            <DropdownMenuItem onClick={() => handleUpdateStatus(expense.id, 'Pendente')} disabled={expense.status === 'Pendente'}>
+                                                                Marcar como Pendente
                                                             </DropdownMenuItem>
                                                             <AlertDialog>
                                                                 <AlertDialogTrigger asChild>
