@@ -108,7 +108,7 @@ const Sidebar = React.forwardRef<
             <Sheet open={openMobile} onOpenChange={setOpenMobile} {...props}>
                 <SheetContent
                     side="left"
-                    className="w-[18rem] bg-sidebar p-0 text-sidebar-foreground [&>button]:hidden"
+                    className="w-[var(--sidebar-width-icon)] bg-sidebar p-0 text-sidebar-foreground [&>button]:hidden"
                 >
                     <div className="flex h-full w-full flex-col">{children}</div>
                 </SheetContent>
