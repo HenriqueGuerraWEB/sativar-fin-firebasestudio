@@ -236,7 +236,7 @@ export default function ClientsPage() {
                                                                 <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
                                                                 <AlertDialogDescription>
                                                                     Essa ação não pode ser desfeita. Isso excluirá permanentemente o cliente.
-                                                                </adD>
+                                                                </AlertDialogDescription>
                                                             </AlertDialogHeader>
                                                             <AlertDialogFooter>
                                                                 <AlertDialogCancel>Cancelar</AlertDialogCancel>
