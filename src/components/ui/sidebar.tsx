@@ -141,7 +141,7 @@ const SidebarProvider = React.forwardRef<
               } as React.CSSProperties
             }
             className={cn(
-              "group/sidebar-wrapper flex min-h-svh w-full has-[[data-variant=inset]]:bg-sidebar",
+              "group/sidebar-wrapper flex min-h-svh w-full",
               className
             )}
             ref={ref}
@@ -216,9 +216,8 @@ const Sidebar = React.forwardRef<
       <aside
         ref={ref}
         className={cn(
-            "group peer hidden md:flex flex-col text-sidebar-foreground transition-all duration-300 ease-in-out",
-            "group-data-[collapsible=icon]:w-[--sidebar-width-icon]",
-            variant === "sidebar" && "w-[--sidebar-width] group-data-[side=left]:border-r group-data-[side=right]:border-l",
+            "group peer hidden md:flex flex-col bg-sidebar text-sidebar-foreground transition-all duration-300 ease-in-out border-r",
+            "w-[--sidebar-width] group-data-[collapsible=icon]:w-[--sidebar-width-icon]",
             className
         )}
         data-state={state}
@@ -229,7 +228,7 @@ const Sidebar = React.forwardRef<
       >
         <div
           data-sidebar="sidebar"
-          className="flex h-full w-full flex-col bg-sidebar"
+          className="flex h-full w-full flex-col"
         >
           {children}
         </div>
@@ -303,8 +302,8 @@ const SidebarInset = React.forwardRef<
       ref={ref}
       className={cn(
         "relative flex min-h-svh flex-1 flex-col bg-background transition-all duration-300 ease-in-out",
-        "md:peer-data-[state=expanded]:peer-data-[variant=sidebar]:ml-[--sidebar-width]",
-        "md:peer-data-[state=collapsed]:peer-data-[variant=sidebar]:ml-[--sidebar-width-icon]",
+        "md:peer-data-[state=expanded]:ml-[--sidebar-width]",
+        "md:peer-data-[state=collapsed]:ml-[--sidebar-width-icon]",
         className
       )}
       {...props}
@@ -555,7 +554,7 @@ const SidebarMenuButton = React.forwardRef<
     )
 
     if (!tooltip) {
-      return React.cloneElement(button, {}, <>{children}</>)
+      return button;
     }
     
     if (typeof tooltip === "string") {

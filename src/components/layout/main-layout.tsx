@@ -40,55 +40,60 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <SidebarProvider>
-      <Sidebar side="left" variant="sidebar" collapsible="icon">
-        <SidebarHeader>
-            <SativarLogo />
-        </SidebarHeader>
-        <SidebarContent>
-          <SidebarMenu>
-            {menuItems.map((item) => (
-              <SidebarMenuItem key={item.href}>
-                <Link href={item.href} passHref>
-                  <SidebarMenuButton asChild={false} isActive={isActive(item.href)} tooltip={item.label}>
-                    <item.icon />
-                    <span>{item.label}</span>
-                  </SidebarMenuButton>
-                </Link>
+      <div className="flex min-h-screen">
+        <Sidebar side="left" variant="sidebar" collapsible="icon">
+          <SidebarHeader>
+              <SativarLogo />
+          </SidebarHeader>
+          <SidebarContent>
+            <SidebarMenu>
+              {menuItems.map((item) => (
+                <SidebarMenuItem key={item.href}>
+                    <Link href={item.href}>
+                        <SidebarMenuButton
+                        isActive={isActive(item.href)}
+                        tooltip={item.label}
+                        >
+                            <item.icon />
+                            <span>{item.label}</span>
+                        </SidebarMenuButton>
+                    </Link>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarContent>
+          <SidebarFooter>
+            <SidebarMenu>
+              <SidebarMenuItem>
+                  <Link href="/settings">
+                    <SidebarMenuButton isActive={pathname.startsWith('/settings')} tooltip="Configurações">
+                        <Settings />
+                        <span>Configurações</span>
+                    </SidebarMenuButton>
+                  </Link>
               </SidebarMenuItem>
-            ))}
-          </SidebarMenu>
-        </SidebarContent>
-        <SidebarFooter>
-          <SidebarMenu>
-            <SidebarMenuItem>
-              <Link href="/settings" passHref>
-                <SidebarMenuButton asChild={false} isActive={pathname.startsWith('/settings')} tooltip="Configurações">
-                  <Settings />
-                  <span>Configurações</span>
-                </SidebarMenuButton>
-              </Link>
-            </SidebarMenuItem>
-          </SidebarMenu>
-        </SidebarFooter>
-      </Sidebar>
-      <SidebarInset>
-        <header className="flex h-14 items-center justify-between gap-4 border-b bg-background px-4 lg:h-[60px] lg:px-6">
-            <SidebarTrigger className="flex items-center gap-2 md:hidden">
-                <PanelLeft />
-                <SativarLogo />
-            </SidebarTrigger>
-          <div className="ml-auto flex items-center gap-4">
-            <ModeToggle />
-            <Avatar className="h-9 w-9">
-                <AvatarImage src="https://placehold.co/36x36.png" alt="@admin" data-ai-hint="person portrait" />
-                <AvatarFallback>AD</AvatarFallback>
-            </Avatar>
-          </div>
-        </header>
-        <main className="flex-1 overflow-y-auto p-4 md:p-8">
-            {children}
-        </main>
-      </SidebarInset>
+            </SidebarMenu>
+          </SidebarFooter>
+        </Sidebar>
+        <SidebarInset>
+          <header className="flex h-14 items-center justify-between gap-4 border-b bg-background px-4 lg:h-[60px] lg:px-6">
+              <SidebarTrigger className="flex items-center gap-2 md:hidden">
+                  <PanelLeft />
+                  <SativarLogo />
+              </SidebarTrigger>
+            <div className="ml-auto flex items-center gap-4">
+              <ModeToggle />
+              <Avatar className="h-9 w-9">
+                  <AvatarImage src="https://placehold.co/36x36.png" alt="@admin" data-ai-hint="person portrait" />
+                  <AvatarFallback>AD</AvatarFallback>
+              </Avatar>
+            </div>
+          </header>
+          <main className="flex-1 overflow-y-auto p-4 md:p-8">
+              {children}
+          </main>
+        </SidebarInset>
+      </div>
     </SidebarProvider>
   );
 }
