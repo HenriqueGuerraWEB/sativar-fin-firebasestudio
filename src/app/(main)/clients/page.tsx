@@ -14,7 +14,7 @@ import { Label } from "@/components/ui/label";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/firebase';
-import { collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc, query } from "firebase/firestore";
+import { collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc, query, Timestamp } from "firebase/firestore";
 import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -35,9 +35,10 @@ type Client = {
     notes: string;
     status: "Ativo" | "Inativo";
     planId?: string;
+    createdAt: Timestamp;
 };
 
-const emptyClient: Omit<Client, 'id' | 'status'> = {
+const emptyClient: Omit<Client, 'id' | 'status' | 'createdAt'> = {
     name: "",
     taxId: "",
     contactName: "",
@@ -54,7 +55,7 @@ export default function ClientsPage() {
     const [plans, setPlans] = useState<Plan[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isSheetOpen, setIsSheetOpen] = useState(false);
-    const [currentClient, setCurrentClient] = useState<Omit<Client, 'id' | 'status'> | Client>(emptyClient);
+    const [currentClient, setCurrentClient] = useState<Omit<Client, 'id' | 'status' | 'createdAt'> | Client>(emptyClient);
 
     const plansMap = useMemo(() => {
         return plans.reduce((acc, plan) => {
@@ -64,18 +65,8 @@ export default function ClientsPage() {
     }, [plans]);
 
      useEffect(() => {
-        setIsLoading(true);
         const clientQuery = query(collection(db, "clients"));
         const planQuery = query(collection(db, "plans"));
-
-        let clientDataLoaded = false;
-        let planDataLoaded = false;
-
-        const checkLoading = () => {
-            if (clientDataLoaded && planDataLoaded) {
-                setIsLoading(false);
-            }
-        };
 
         const unsubClients = onSnapshot(clientQuery, (querySnapshot) => {
             const clientsData: Client[] = [];
@@ -83,8 +74,7 @@ export default function ClientsPage() {
                 clientsData.push({ ...doc.data(), id: doc.id } as Client);
             });
             setClients(clientsData);
-            clientDataLoaded = true;
-            checkLoading();
+            if(isLoading && plans.length > 0) setIsLoading(false);
         }, (error) => {
             console.error("Error fetching clients: ", error);
             toast({
@@ -92,8 +82,7 @@ export default function ClientsPage() {
                 description: "Não foi possível carregar os clientes.",
                 variant: "destructive",
             });
-            clientDataLoaded = true;
-            checkLoading();
+            setIsLoading(false);
         });
 
         const unsubPlans = onSnapshot(planQuery, (querySnapshot) => {
@@ -103,8 +92,7 @@ export default function ClientsPage() {
                 plansData.push({ id: doc.id, name: data.name } as Plan);
             });
             setPlans(plansData);
-            planDataLoaded = true;
-            checkLoading();
+            if(isLoading) setIsLoading(false);
         }, (error) => {
              console.error("Error fetching plans: ", error);
              toast({
@@ -112,8 +100,7 @@ export default function ClientsPage() {
                 description: "Não foi possível carregar os planos.",
                 variant: "destructive",
             });
-            planDataLoaded = true;
-            checkLoading();
+            setIsLoading(false);
         });
 
 
@@ -121,7 +108,7 @@ export default function ClientsPage() {
             unsubClients();
             unsubPlans();
         };
-    }, [toast]);
+    }, [toast, isLoading, plans.length]);
 
     const formatPhoneNumber = (value: string) => {
         if (!value) return value;
@@ -170,6 +157,7 @@ export default function ClientsPage() {
                 await addDoc(collection(db, "clients"), {
                     ...currentClient,
                     status: "Ativo",
+                    createdAt: Timestamp.now()
                 });
                 toast({ title: "Sucesso", description: "Cliente adicionado com sucesso." });
             }

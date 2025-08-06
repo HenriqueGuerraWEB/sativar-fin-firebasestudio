@@ -9,14 +9,15 @@ import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts";
 import { DollarSign, Users, CreditCard, Activity } from "lucide-react";
 import { db } from '@/lib/firebase';
-import { collection, onSnapshot, query, where, Timestamp } from "firebase/firestore";
+import { collection, onSnapshot, query, where, Timestamp, getDocs } from "firebase/firestore";
 import { Skeleton } from '@/components/ui/skeleton';
-import { format, subMonths, getMonth, getYear } from 'date-fns';
+import { format, subMonths, getMonth, getYear, startOfMonth, endOfMonth, isWithinInterval } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
 type Client = {
     id: string;
     status: "Ativo" | "Inativo";
+    createdAt: Timestamp; // Assuming clients have a creation date
 };
 
 type Invoice = {
@@ -45,35 +46,43 @@ export default function DashboardPage() {
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
-        setIsLoading(true);
+        const fetchData = async () => {
+            setIsLoading(true);
+            try {
+                const clientsQuery = query(collection(db, "clients"));
+                const invoicesQuery = query(collection(db, "invoices"));
+                const expensesQuery = query(collection(db, "expenses"));
 
+                const [clientsSnapshot, invoicesSnapshot, expensesSnapshot] = await Promise.all([
+                    getDocs(clientsQuery),
+                    getDocs(invoicesQuery),
+                    getDocs(expensesQuery)
+                ]);
+
+                setClients(clientsSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Client)));
+                setInvoices(invoicesSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Invoice)));
+                setExpenses(expensesSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Expense)));
+
+            } catch (error) {
+                console.error("Failed to fetch dashboard data:", error);
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
+        fetchData();
+
+        // Set up real-time listeners after initial fast load
         const unsubClients = onSnapshot(query(collection(db, "clients")), (snapshot) => {
             setClients(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Client)));
         });
-
         const unsubInvoices = onSnapshot(query(collection(db, "invoices")), (snapshot) => {
-            setInvoices(snapshot.docs.map(doc => ({
-                id: doc.id,
-                clientName: doc.data().clientName,
-                dueDate: doc.data().dueDate,
-                amount: doc.data().amount,
-                status: doc.data().status,
-            } as Invoice)));
+            setInvoices(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Invoice)));
         });
-
         const unsubExpenses = onSnapshot(query(collection(db, "expenses")), (snapshot) => {
-            setExpenses(snapshot.docs.map(doc => ({
-                id: doc.id,
-                amount: doc.data().amount,
-                dueDate: doc.data().dueDate
-            } as Expense)));
+            setExpenses(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Expense)));
         });
 
-        Promise.all([
-         new Promise(resolve => onSnapshot(query(collection(db, "clients")), resolve)),
-         new Promise(resolve => onSnapshot(query(collection(db, "invoices")), resolve)),
-         new Promise(resolve => onSnapshot(query(collection(db, "expenses")), resolve))
-        ]).then(() => setIsLoading(false)).catch(() => setIsLoading(false));
 
         return () => {
             unsubClients();
@@ -83,18 +92,25 @@ export default function DashboardPage() {
     }, []);
 
     const activeClientsCount = useMemo(() => clients.filter(c => c.status === 'Ativo').length, [clients]);
+    
     const newClientsThisMonth = useMemo(() => {
-       // Assuming client creation timestamp is stored, which is not the case yet.
-       // Placeholder logic.
-       return clients.length > 2 ? 2 : clients.length;
+       const now = new Date();
+       const start = startOfMonth(now);
+       const end = endOfMonth(now);
+       return clients.filter(c => {
+         if (!c.createdAt) return false;
+         const createdAtDate = c.createdAt.toDate();
+         return isWithinInterval(createdAtDate, { start, end });
+       }).length;
     }, [clients]);
 
     const { monthlyRevenue, revenueChange, monthlyExpenses, expenseChange, expectedProfit, accountBalance } = useMemo(() => {
         const now = new Date();
         const currentMonth = getMonth(now);
         const currentYear = getYear(now);
-        const lastMonth = getMonth(subMonths(now, 1));
-        const lastMonthYear = getYear(subMonths(now, 1));
+        const lastMonthDate = subMonths(now, 1);
+        const lastMonth = getMonth(lastMonthDate);
+        const lastMonthYear = getYear(lastMonthDate);
 
         const paidInvoicesThisMonth = invoices.filter(inv => {
             const dueDate = inv.dueDate.toDate();
