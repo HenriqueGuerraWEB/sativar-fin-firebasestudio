@@ -81,6 +81,7 @@ function HeaderContent() {
 export function MainLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { user } = useAuth();
+  const { isMobile, setOpenMobile } = useSidebar();
 
   const menuItems = [
     { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -90,6 +91,12 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
     { href: '/finance', label: 'Financeiro', icon: Banknote },
     { href: '/invoices', label: 'Faturas', icon: FileText },
   ];
+
+  const handleLinkClick = () => {
+    if (isMobile) {
+      setOpenMobile(false);
+    }
+  };
 
   const isActive = (href: string) => {
     if (href === '/dashboard') {
@@ -113,7 +120,7 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
         <div className="flex h-screen w-full bg-background">
             <Sidebar>
                 <SidebarHeader>
-                    <Link href="/dashboard">
+                    <Link href="/dashboard" onClick={handleLinkClick}>
                        <SativarLogoIcon />
                     </Link>
                 </SidebarHeader>
@@ -121,7 +128,7 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
                 <SidebarMenu>
                     {menuItems.map((item) => (
                     <SidebarMenuItem key={item.href}>
-                        <Link href={item.href} passHref>
+                        <Link href={item.href} passHref onClick={handleLinkClick}>
                             <SidebarMenuButton
                                 isActive={isActive(item.href)}
                                 tooltip={item.label}
@@ -136,7 +143,7 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
                 <SidebarFooter>
                 <SidebarMenu>
                     <SidebarMenuItem>
-                        <Link href="/settings" passHref>
+                        <Link href="/settings" passHref onClick={handleLinkClick}>
                         <SidebarMenuButton isActive={isActive('/settings')} tooltip="Configurações">
                             <Settings />
                         </SidebarMenuButton>
