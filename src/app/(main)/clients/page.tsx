@@ -148,14 +148,14 @@ export default function ClientsPage() {
     };
     
     const handlePlanChange = (index: number, planId: string) => {
-        const newPlans = [...currentClient.plans];
+        const newPlans = [...(currentClient.plans || [])];
         newPlans[index].planId = planId;
         setCurrentClient(prev => ({...prev, plans: newPlans}));
     }
     
     const handleDateChange = (index: number, date: Date | undefined) => {
         if (date) {
-            const newPlans = [...currentClient.plans];
+            const newPlans = [...(currentClient.plans || [])];
             newPlans[index].planActivationDate = Timestamp.fromDate(date);
             setCurrentClient(prev => ({ ...prev, plans: newPlans }));
         }
@@ -163,11 +163,11 @@ export default function ClientsPage() {
     
     const addPlanToClient = () => {
         const newPlan: ClientPlan = { planId: '', planActivationDate: Timestamp.now() };
-        setCurrentClient(prev => ({...prev, plans: [...prev.plans, newPlan]}));
+        setCurrentClient(prev => ({...prev, plans: [...(prev.plans || []), newPlan]}));
     }
     
     const removePlanFromClient = (index: number) => {
-        const newPlans = currentClient.plans.filter((_, i) => i !== index);
+        const newPlans = (currentClient.plans || []).filter((_, i) => i !== index);
         setCurrentClient(prev => ({...prev, plans: newPlans}));
     }
 
@@ -223,7 +223,7 @@ export default function ClientsPage() {
     };
 
     const handleEdit = (client: Client) => {
-        setCurrentClient(client);
+        setCurrentClient({ ...client, plans: client.plans || [] });
         setIsSheetOpen(true);
     };
 
@@ -459,5 +459,3 @@ export default function ClientsPage() {
         </div>
     );
 }
-
-    
