@@ -125,24 +125,50 @@ export default function InvoicesPage() {
             const generationPromises: Promise<any>[] = [];
             const today = new Date();
 
-            activeClients.forEach(client => {
-                if (!client.planId || !client.planActivationDate) return;
+            for (const client of activeClients) {
+                if (!client.planId || !client.planActivationDate) continue;
 
                 const plan = plansMap[client.planId];
-                if (!plan) return;
+                if (!plan) continue;
 
-                const activationDate = client.planActivationDate.toDate();
-                let nextDueDate = new Date(activationDate);
+                const clientInvoices = clientInvoicesMap.get(client.id)?.sort((a, b) => b.dueDate.toMillis() - a.dueDate.toMillis()) || [];
+                const lastInvoice = clientInvoices.length > 0 ? clientInvoices[0] : null;
 
-                const clientInvoices = clientInvoicesMap.get(client.id)?.sort((a,b) => b.dueDate.toMillis() - a.dueDate.toMillis()) || [];
-                const lastInvoice = clientInvoices[0];
-
-                if (lastInvoice) {
-                     nextDueDate = lastInvoice.dueDate.toDate();
-                } else {
-                    // For first invoice, dueDate is activationDate. If past, generate.
-                     if (isBefore(nextDueDate, today)) {
+                let lastDueDate = lastInvoice ? lastInvoice.dueDate.toDate() : client.planActivationDate.toDate();
+                
+                // If there's no last invoice, the first "last due date" is the activation date itself.
+                // We should check if an invoice needs to be generated for this activation date.
+                if (!lastInvoice) {
+                    const clientHasInvoiceForActivationDate = clientInvoices.some(
+                        inv => format(inv.dueDate.toDate(), 'yyyy-MM-dd') === format(lastDueDate, 'yyyy-MM-dd')
+                    );
+                    
+                    if (!clientHasInvoiceForActivationDate && (isBefore(lastDueDate, today) || format(lastDueDate, 'yyyy-MM-dd') === format(today, 'yyyy-MM-dd'))) {
                          const newInvoice = {
+                            clientId: client.id,
+                            clientName: client.name,
+                            amount: plan.price,
+                            issueDate: Timestamp.now(),
+                            dueDate: Timestamp.fromDate(lastDueDate),
+                            status: 'Pendente' as const,
+                        };
+                        generationPromises.push(addDoc(collection(db, "invoices"), newInvoice));
+                        generatedCount++;
+                    }
+                }
+                
+                // Iteratively generate invoices until the client is up-to-date
+                while (true) {
+                    let nextDueDate: Date;
+                    switch (plan.recurrencePeriod) {
+                        case 'dias': nextDueDate = addDays(lastDueDate, plan.recurrenceValue); break;
+                        case 'meses': nextDueDate = addMonths(lastDueDate, plan.recurrenceValue); break;
+                        case 'anos': nextDueDate = addYears(lastDueDate, plan.recurrenceValue); break;
+                        default: throw new Error("Invalid recurrence period");
+                    }
+
+                    if (isBefore(nextDueDate, today) || format(nextDueDate, 'yyyy-MM-dd') === format(today, 'yyyy-MM-dd')) {
+                        const newInvoice = {
                             clientId: client.id,
                             clientName: client.name,
                             amount: plan.price,
@@ -150,40 +176,19 @@ export default function InvoicesPage() {
                             dueDate: Timestamp.fromDate(nextDueDate),
                             status: 'Pendente' as const,
                         };
-                         generationPromises.push(addDoc(collection(db, "invoices"), newInvoice));
-                         generatedCount++;
-                     }
-                }
-                
-                // Calculate the next date based on last invoice due date
-                if(lastInvoice){
-                    switch (plan.recurrencePeriod) {
-                        case 'dias': nextDueDate = addDays(nextDueDate, plan.recurrenceValue); break;
-                        case 'meses': nextDueDate = addMonths(nextDueDate, plan.recurrenceValue); break;
-                        case 'anos': nextDueDate = addYears(nextDueDate, plan.recurrenceValue); break;
+                        generationPromises.push(addDoc(collection(db, "invoices"), newInvoice));
+                        generatedCount++;
+                        lastDueDate = nextDueDate; // Update last due date for the next iteration
+                    } else {
+                        break; // Stop if the next due date is in the future
                     }
                 }
+            }
 
-
-                // If the calculated next due date is today or in the past, generate a new invoice
-                if (isBefore(nextDueDate, today) || format(nextDueDate, 'yyyy-MM-dd') === format(today, 'yyyy-MM-dd')) {
-                     const newInvoice = {
-                        clientId: client.id,
-                        clientName: client.name,
-                        amount: plan.price,
-                        issueDate: Timestamp.now(),
-                        dueDate: Timestamp.fromDate(nextDueDate),
-                        status: 'Pendente' as const,
-                    };
-                    generationPromises.push(addDoc(collection(db, "invoices"), newInvoice));
-                    generatedCount++;
-                }
-
-            });
 
             if (generatedCount > 0) {
                 await Promise.all(generationPromises);
-                toast({ title: "Sucesso!", description: `${generatedCount} novas faturas foram geradas.` });
+                toast({ title: "Sucesso!", description: `${generatedCount} nova(s) fatura(s) foram geradas.` });
             } else {
                 toast({ title: "Nenhuma ação necessária", description: "Todos os clientes estão com as faturas em dia." });
             }
