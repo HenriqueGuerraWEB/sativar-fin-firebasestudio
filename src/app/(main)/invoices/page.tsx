@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge, badgeVariants } from "@/components/ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
-import { MoreHorizontal, PlusCircle } from "lucide-react";
+import { MoreHorizontal, PlusCircle, Printer } from "lucide-react";
 import type { VariantProps } from 'class-variance-authority';
 import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/firebase';
@@ -257,6 +257,59 @@ Agradecemos a sua atenção.
             });
         }
     };
+    
+    const handlePrint = (invoice: Invoice) => {
+        const printWindow = window.open('', '', 'height=600,width=800');
+        if (printWindow) {
+            printWindow.document.write(`
+                <html>
+                    <head>
+                        <title>Fatura #${invoice.id.substring(0, 7).toUpperCase()}</title>
+                        <style>
+                            body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; line-height: 1.6; color: #333; }
+                            .container { max-width: 700px; margin: 2rem auto; padding: 2rem; border: 1px solid #ddd; border-radius: 8px; }
+                            h1, h2 { color: #000; }
+                            h1 { font-size: 2em; margin-bottom: 0; }
+                            .header { text-align: center; margin-bottom: 2rem; }
+                            .details-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 2rem;}
+                            .details-grid div { padding: 0.5rem; }
+                            .details-grid .label { font-weight: bold; }
+                            .total { text-align: right; font-size: 1.5em; font-weight: bold; margin-top: 2rem; }
+                            .footer { text-align: center; margin-top: 3rem; font-size: 0.9em; color: #777; }
+                            @media print {
+                                body { -webkit-print-color-adjust: exact; }
+                                .no-print { display: none; }
+                            }
+                        </style>
+                    </head>
+                    <body>
+                        <div class="container">
+                            <div class="header">
+                                <h1>Sativar</h1>
+                                <h2>Recibo de Pagamento</h2>
+                            </div>
+                            <div class="details-grid">
+                                <div><span class="label">Cliente:</span> ${invoice.clientName}</div>
+                                <div><span class="label">Nº da Fatura:</span> #${invoice.id.substring(0, 7).toUpperCase()}</div>
+                                <div><span class="label">Data de Emissão:</span> ${format(invoice.issueDate.toDate(), 'dd/MM/yyyy')}</div>
+                                <div><span class="label">Data de Vencimento:</span> ${format(invoice.dueDate.toDate(), 'dd/MM/yyyy')}</div>
+                            </div>
+                            <hr />
+                            <div class="total">
+                                <span>TOTAL:</span> ${invoice.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                            </div>
+                             <div class="footer">
+                                <p>Obrigado por sua preferência!</p>
+                            </div>
+                        </div>
+                    </body>
+                </html>
+            `);
+            printWindow.document.close();
+            printWindow.focus();
+            printWindow.print();
+        }
+    };
 
 
     const getStatusVariant = (status: Invoice['status']): VariantProps<typeof badgeVariants>['variant'] => {
@@ -330,7 +383,11 @@ Agradecemos a sua atenção.
                                     </TableCell>
                                     <TableCell className="text-right">{invoice.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</TableCell>
                                     <TableCell>
-                                        <div className="flex justify-end">
+                                        <div className="flex justify-end items-center gap-2">
+                                            <Button aria-haspopup="true" size="icon" variant="ghost" onClick={() => handlePrint(invoice)}>
+                                                <Printer className="h-4 w-4" />
+                                                <span className="sr-only">Imprimir</span>
+                                            </Button>
                                             <DropdownMenu>
                                                 <DropdownMenuTrigger asChild>
                                                     <Button aria-haspopup="true" size="icon" variant="ghost">
