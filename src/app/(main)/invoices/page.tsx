@@ -185,9 +185,9 @@ export default function InvoicesPage() {
             const invoicesSnapshot = await getDocs(query(collection(db, "invoices")));
             const allInvoices = invoicesSnapshot.docs.map(doc => doc.data() as Invoice);
 
+            const batch = writeBatch(db);
             let generatedCount = 0;
-            const generationPromises: Promise<any>[] = [];
-            const today = new Date();
+            const today = startOfDay(new Date());
 
             for (const client of activeClients) {
                 for (const clientPlan of client.plans) {
@@ -199,7 +199,8 @@ export default function InvoicesPage() {
                     // Handle one-time plans
                     if (plan.type === 'one-time') {
                         if (clientPlanInvoices.length === 0) {
-                            const newInvoice = {
+                            const newInvoiceRef = doc(collection(db, "invoices"));
+                            batch.set(newInvoiceRef, {
                                 clientId: client.id,
                                 clientName: client.name,
                                 amount: plan.price,
@@ -208,43 +209,37 @@ export default function InvoicesPage() {
                                 status: 'Pendente' as const,
                                 planId: clientPlan.planId,
                                 planName: plan.name,
-                            };
-                            generationPromises.push(addDoc(collection(db, "invoices"), newInvoice));
+                            });
                             generatedCount++;
                         }
-                        continue; // Move to the next plan
+                        continue;
                     }
                     
                     // Handle recurring plans
                     if (plan.type === 'recurring' && plan.recurrencePeriod && plan.recurrenceValue) {
-                        const sortedClientPlanInvoices = clientPlanInvoices.sort((a, b) => b.dueDate.toMillis() - a.dueDate.toMillis());
                         
-                        let lastBilledDueDate = sortedClientPlanInvoices.length > 0
-                            ? sortedClientPlanInvoices[0].dueDate.toDate()
+                        let lastBilledDueDate = clientPlanInvoices.length > 0
+                            ? clientPlanInvoices.sort((a, b) => b.dueDate.toMillis() - a.dueDate.toMillis())[0].dueDate.toDate()
                             : subDays(clientPlan.planActivationDate.toDate(), 1);
 
-                        // Ensure activation date itself is considered for billing if it's in the past and no invoice exists for it
+                        // Ensure activation date itself is considered for billing if it's in the past and no invoice exists
                         const activationDate = clientPlan.planActivationDate.toDate();
-                        if (isBefore(activationDate, today) || isEqual(startOfDay(activationDate), startOfDay(today))) {
-                             const invoiceForActivationExists = sortedClientPlanInvoices.some(
-                                inv => inv.dueDate && isEqual(startOfDay(inv.dueDate.toDate()), startOfDay(activationDate))
-                            );
-                            if (!invoiceForActivationExists && sortedClientPlanInvoices.length === 0) {
-                               const newInvoice = {
-                                    clientId: client.id,
-                                    clientName: client.name,
-                                    amount: plan.price,
-                                    issueDate: Timestamp.now(),
-                                    dueDate: Timestamp.fromDate(activationDate),
-                                    status: 'Pendente' as const,
-                                    planId: clientPlan.planId,
-                                    planName: plan.name,
-                                };
-                                generationPromises.push(addDoc(collection(db, "invoices"), newInvoice));
-                                generatedCount++;
-                                lastBilledDueDate = activationDate;
-                            }
+                        if ((isBefore(activationDate, today) || isEqual(startOfDay(activationDate), today)) && clientPlanInvoices.length === 0) {
+                           const newInvoiceRef = doc(collection(db, "invoices"));
+                           batch.set(newInvoiceRef, {
+                                clientId: client.id,
+                                clientName: client.name,
+                                amount: plan.price,
+                                issueDate: Timestamp.now(),
+                                dueDate: Timestamp.fromDate(activationDate),
+                                status: 'Pendente' as const,
+                                planId: clientPlan.planId,
+                                planName: plan.name,
+                            });
+                            generatedCount++;
+                            lastBilledDueDate = activationDate;
                         }
+
 
                         while (true) {
                             let nextDueDate: Date;
@@ -258,27 +253,19 @@ export default function InvoicesPage() {
                             if (isBefore(today, nextDueDate)) {
                                 break;
                             }
-
-                             const invoiceExists = sortedClientPlanInvoices.some(
-                                inv => inv.dueDate && isEqual(startOfDay(inv.dueDate.toDate()), startOfDay(nextDueDate))
-                            );
-
-                            if (!invoiceExists) {
-                                const newInvoice = {
-                                    clientId: client.id,
-                                    clientName: client.name,
-                                    amount: plan.price,
-                                    issueDate: Timestamp.now(),
-                                    dueDate: Timestamp.fromDate(nextDueDate),
-                                    status: 'Pendente' as const,
-                                    planId: clientPlan.planId,
-                                    planName: plan.name,
-                                };
-                                generationPromises.push(addDoc(collection(db, "invoices"), newInvoice));
-                                sortedClientPlanInvoices.push({ ...newInvoice, id: 'temp' } as any); // Add to local list for loop check
-                                generatedCount++;
-                            }
-
+                            
+                            const newInvoiceRef = doc(collection(db, "invoices"));
+                            batch.set(newInvoiceRef, {
+                                clientId: client.id,
+                                clientName: client.name,
+                                amount: plan.price,
+                                issueDate: Timestamp.now(),
+                                dueDate: Timestamp.fromDate(nextDueDate),
+                                status: 'Pendente' as const,
+                                planId: clientPlan.planId,
+                                planName: plan.name,
+                            });
+                            generatedCount++;
                             lastBilledDueDate = nextDueDate;
                         }
                     }
@@ -287,7 +274,7 @@ export default function InvoicesPage() {
 
 
             if (generatedCount > 0) {
-                await Promise.all(generationPromises);
+                await batch.commit();
                 toast({ title: "Sucesso!", description: `${generatedCount} nova(s) fatura(s) foram geradas.` });
             } else {
                 toast({ title: "Nenhuma ação necessária", description: "Todos os clientes estão com as faturas em dia." });
@@ -355,7 +342,9 @@ export default function InvoicesPage() {
     const handlePrepareReminder = async (invoice: Invoice) => {
         try {
             const clientRef = doc(db, 'clients', invoice.clientId);
-            const clientDoc = await getDoc(clientRef);
+            const planRef = doc(db, 'plans', invoice.planId);
+            
+            const [clientDoc, planDoc] = await Promise.all([getDoc(clientRef), getDoc(planRef)]);
 
             if (!clientDoc.exists() || !clientDoc.data().whatsapp) {
                 toast({
@@ -365,15 +354,21 @@ export default function InvoicesPage() {
                 });
                 return;
             }
+            if (!planDoc.exists()) {
+                toast({ title: 'Erro', description: 'Plano não encontrado para esta fatura.', variant: 'destructive'});
+                return;
+            }
             
             const clientData = clientDoc.data() as Client;
+            const planData = planDoc.data() as Plan;
             setClientForReminder(clientData);
             setSelectedInvoice(invoice);
 
             const dueDate = format(invoice.dueDate.toDate(), 'dd/MM/yyyy', { locale: ptBR });
             const amount = invoice.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
-            const text = `Olá, ${invoice.clientName}!\n\nEste é um lembrete sobre a fatura do seu plano pendente.\n\nValor: ${amount}\nVencimento: ${dueDate}\n\nAgradecemos a sua atenção.`.trim();
+            const serviceTypeText = planData.type === 'recurring' ? 'do seu plano' : 'do serviço';
+            const text = `Olá, ${invoice.clientName}!\n\nEste é um lembrete sobre a fatura ${serviceTypeText} pendente.\n\nValor: ${amount}\nVencimento: ${dueDate}\n\nAgradecemos a sua atenção.`.trim();
             
             setReminderText(text);
             setIsReminderModalOpen(true);
