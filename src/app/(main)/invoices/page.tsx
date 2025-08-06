@@ -13,7 +13,7 @@ import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/firebase';
 import { collection, onSnapshot, query, Timestamp, orderBy, addDoc, doc, updateDoc, getDocs, where, deleteDoc, getDoc } from "firebase/firestore";
 import { Skeleton } from '@/components/ui/skeleton';
-import { format, addDays, addMonths, addYears, isBefore, startOfDay, subDays } from 'date-fns';
+import { format, addDays, addMonths, addYears, isBefore, startOfDay, subDays, subMonths, subYears } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 
@@ -63,6 +63,7 @@ export default function InvoicesPage() {
             const updatePromises: Promise<void>[] = [];
 
             const updatedInvoices = invoicesData.map(invoice => {
+                if (!invoice.dueDate) return invoice; // Skip if dueDate is missing
                 const dueDate = invoice.dueDate.toDate();
                 if (invoice.status === 'Pendente' && isBefore(dueDate, today)) {
                     const invoiceRef = doc(db, "invoices", invoice.id);
@@ -72,9 +73,11 @@ export default function InvoicesPage() {
                 return invoice;
             });
             
-            Promise.all(updatePromises).then(() => {
-                 setInvoices(updatedInvoices.sort((a, b) => b.issueDate.toMillis() - a.issueDate.toMillis()));
-            });
+            if (updatePromises.length > 0) {
+                Promise.all(updatePromises).then(() => {
+                     // The state will be updated by the new data from the snapshot listener automatically
+                });
+            }
 
             setInvoices(updatedInvoices);
             setIsLoading(false);
@@ -144,11 +147,16 @@ export default function InvoicesPage() {
                 // Loop to generate all missing invoices until the client is up-to-date
                 while (true) {
                     let nextDueDate: Date;
+                    // Ensure lastBilledDueDate is a valid date before calculation
+                    if (!(lastBilledDueDate instanceof Date && !isNaN(lastBilledDueDate.valueOf()))) {
+                       lastBilledDueDate = subDays(client.planActivationDate.toDate(), 1);
+                    }
+
                     switch (plan.recurrencePeriod) {
                         case 'dias': nextDueDate = addDays(lastBilledDueDate, plan.recurrenceValue); break;
                         case 'meses': nextDueDate = addMonths(lastBilledDueDate, plan.recurrenceValue); break;
                         case 'anos': nextDueDate = addYears(lastBilledDueDate, plan.recurrenceValue); break;
-                        default: throw new Error("Invalid recurrence period");
+                        default: console.error("Invalid recurrence period for plan:", plan.id); continue;
                     }
 
                     // Stop if the next due date is in the future
@@ -158,7 +166,7 @@ export default function InvoicesPage() {
 
                     // Check if an invoice for this exact due date already exists
                     const invoiceExists = clientInvoices.some(
-                        inv => format(inv.dueDate.toDate(), 'yyyy-MM-dd') === format(nextDueDate, 'yyyy-MM-dd')
+                        inv => inv.dueDate && format(inv.dueDate.toDate(), 'yyyy-MM-dd') === format(nextDueDate, 'yyyy-MM-dd')
                     );
 
                     if (!invoiceExists) {
@@ -254,6 +262,11 @@ Agradecemos a sua atenção.
     
     const handlePrint = async (invoice: Invoice) => {
         try {
+            if (!invoice.clientId || !invoice.planId) {
+                toast({ title: 'Erro', description: 'Dados da fatura incompletos para impressão.', variant: 'destructive' });
+                return;
+            }
+
             const clientRef = doc(db, 'clients', invoice.clientId);
             const planRef = doc(db, 'plans', invoice.planId);
 
@@ -295,9 +308,9 @@ Agradecemos a sua atenção.
                                 @media print {
                                     body { -webkit-print-color-adjust: exact; }
                                 }
-                                .status-paid { background-color: #dcfce7; color: #166534; }
-                                .status-pending { background-color: #fef9c3; color: #854d0e; }
-                                .status-overdue { background-color: #fee2e2; color: #991b1b; }
+                                .status-Paga { background-color: #dcfce7; color: #166534; }
+                                .status-Pendente { background-color: #fef9c3; color: #854d0e; }
+                                .status-Vencida { background-color: #fee2e2; color: #991b1b; }
                             </style>
                         </head>
                         <body class="bg-gray-100 p-8">
@@ -323,7 +336,7 @@ Agradecemos a sua atenção.
                                         <p class="text-gray-600"><span class="font-medium">Data de Emissão:</span> ${format(invoice.issueDate.toDate(), 'dd/MM/yyyy')}</p>
                                         <p class="text-gray-600"><span class="font-medium">Data de Vencimento:</span> ${format(invoice.dueDate.toDate(), 'dd/MM/yyyy')}</p>
                                         <div class="mt-2">
-                                            <span class="px-3 py-1 text-sm font-semibold rounded-full status-${invoice.status === 'Paga' ? 'paid' : (invoice.status === 'Pendente' ? 'pending' : 'overdue')}">${invoice.status}</span>
+                                            <span class="px-3 py-1 text-sm font-semibold rounded-full status-${invoice.status}">${invoice.status}</span>
                                         </div>
                                     </div>
                                 </div>
@@ -439,8 +452,8 @@ Agradecemos a sua atenção.
                                 <TableRow key={invoice.id}>
                                     <TableCell className="font-medium">#{invoice.id.substring(0, 7).toUpperCase()}</TableCell>
                                     <TableCell>{invoice.clientName}</TableCell>
-                                    <TableCell>{format(invoice.issueDate.toDate(), 'dd/MM/yyyy')}</TableCell>
-                                    <TableCell>{format(invoice.dueDate.toDate(), 'dd/MM/yyyy')}</TableCell>
+                                    <TableCell>{invoice.issueDate ? format(invoice.issueDate.toDate(), 'dd/MM/yyyy') : 'N/A'}</TableCell>
+                                    <TableCell>{invoice.dueDate ? format(invoice.dueDate.toDate(), 'dd/MM/yyyy') : 'N/A'}</TableCell>
                                     <TableCell>
                                         <Badge variant={getStatusVariant(invoice.status)} className={getStatusClass(invoice.status)}>
                                             {invoice.status}
@@ -449,10 +462,12 @@ Agradecemos a sua atenção.
                                     <TableCell className="text-right">{invoice.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</TableCell>
                                     <TableCell>
                                         <div className="flex justify-end items-center gap-2">
-                                            <Button aria-haspopup="true" size="icon" variant="ghost" onClick={() => handlePrint(invoice)}>
-                                                <Printer className="h-4 w-4" />
-                                                <span className="sr-only">Imprimir</span>
-                                            </Button>
+                                            {invoice.status === 'Paga' && (
+                                                <Button aria-haspopup="true" size="icon" variant="ghost" onClick={() => handlePrint(invoice)}>
+                                                    <Printer className="h-4 w-4" />
+                                                    <span className="sr-only">Imprimir</span>
+                                                </Button>
+                                            )}
                                             <DropdownMenu>
                                                 <DropdownMenuTrigger asChild>
                                                     <Button aria-haspopup="true" size="icon" variant="ghost">
