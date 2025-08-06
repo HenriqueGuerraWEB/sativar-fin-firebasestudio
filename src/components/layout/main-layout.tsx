@@ -1,7 +1,8 @@
+
 "use client";
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import {
   SidebarProvider,
   Sidebar,
@@ -15,13 +16,17 @@ import {
   SidebarTrigger,
 } from '@/components/ui/sidebar';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { LayoutDashboard, Users, Package, Banknote, FileText, Settings, PanelLeft } from 'lucide-react';
+import { LayoutDashboard, Users, Package, Banknote, FileText, Settings, PanelLeft, LogOut } from 'lucide-react';
 import React from 'react';
 import { SativarLogo } from '@/components/sativar-logo';
 import { ModeToggle } from '@/components/mode-toggle';
+import { useAuth } from '@/hooks/use-auth';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '../ui/dropdown-menu';
 
 export function MainLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const { user, logout } = useAuth();
+  const router = useRouter();
 
   const menuItems = [
     { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -37,6 +42,25 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
     }
     return pathname.startsWith(href);
   }
+  
+  const handleLogout = async () => {
+    await logout();
+    router.push('/login');
+  }
+
+  const getInitials = (name: string | null | undefined) => {
+    if (!name) return 'U';
+    const names = name.split(' ');
+    if (names.length > 1) {
+        return `${names[0][0]}${names[names.length - 1][0]}`.toUpperCase();
+    }
+    return name.substring(0, 2).toUpperCase();
+  }
+
+
+  if (!user) {
+    return null; 
+  }
 
   return (
     <SidebarProvider>
@@ -48,7 +72,7 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
           <SidebarMenu>
             {menuItems.map((item) => (
               <SidebarMenuItem key={item.href}>
-                  <Link href={item.href}>
+                  <Link href={item.href} passHref>
                       <SidebarMenuButton
                           isActive={isActive(item.href)}
                           tooltip={item.label}
@@ -64,7 +88,7 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
         <SidebarFooter>
           <SidebarMenu>
             <SidebarMenuItem>
-                <Link href="/settings">
+                <Link href="/settings" passHref>
                   <SidebarMenuButton isActive={pathname.startsWith('/settings')} tooltip="Configurações">
                       <Settings />
                       <span>Configurações</span>
@@ -74,24 +98,41 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
           </SidebarMenu>
         </SidebarFooter>
       </Sidebar>
-      <SidebarInset>
-          <header className="flex h-14 items-center justify-between gap-4 border-b bg-background px-4 lg:h-[60px] lg:px-6">
-              <SidebarTrigger className="flex items-center gap-2 md:hidden">
-                  <PanelLeft />
-                  <SativarLogo />
-              </SidebarTrigger>
-              <div className="ml-auto flex items-center gap-4">
-              <ModeToggle />
-              <Avatar className="h-9 w-9">
-                  <AvatarImage src="https://placehold.co/36x36.png" alt="@admin" data-ai-hint="person portrait" />
-                  <AvatarFallback>AD</AvatarFallback>
-              </Avatar>
-              </div>
-          </header>
-          <main className="flex-1 overflow-y-auto p-4 md:p-8">
-              {children}
-          </main>
-      </SidebarInset>
+       <SidebarInset>
+            <header className="flex h-14 items-center justify-between gap-4 border-b bg-background px-4 lg:h-[60px] lg:px-6">
+                <SidebarTrigger className="flex items-center gap-2 md:hidden">
+                    <PanelLeft />
+                    <SativarLogo />
+                </SidebarTrigger>
+                <div className="ml-auto flex items-center gap-4">
+                <ModeToggle />
+                 <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                        <Avatar className="h-9 w-9 cursor-pointer">
+                            <AvatarImage src={user.photoURL ?? ''} alt={user.displayName ?? 'User'} data-ai-hint="person portrait" />
+                            <AvatarFallback>{getInitials(user.displayName)}</AvatarFallback>
+                        </Avatar>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                        <DropdownMenuLabel>Minha Conta</DropdownMenuLabel>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={() => router.push('/settings')}>
+                            <Settings className="mr-2 h-4 w-4" />
+                            <span>Configurações</span>
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={handleLogout}>
+                            <LogOut className="mr-2 h-4 w-4" />
+                            <span>Sair</span>
+                        </DropdownMenuItem>
+                    </DropdownMenuContent>
+                </DropdownMenu>
+                </div>
+            </header>
+            <main className="flex-1 overflow-y-auto p-4 md:p-8">
+                {children}
+            </main>
+        </SidebarInset>
     </SidebarProvider>
   );
 }
