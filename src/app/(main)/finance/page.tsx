@@ -8,7 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge, badgeVariants } from "@/components/ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { MoreHorizontal, PlusCircle, Sparkles, TrendingUp, TrendingDown, ArrowLeft, ArrowRight, ChevronsUpDown } from "lucide-react";
+import { MoreHorizontal, PlusCircle, Sparkles, TrendingUp, TrendingDown, ChevronsUpDown, Calendar as CalendarIcon } from "lucide-react";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger, SheetFooter } from "@/components/ui/sheet";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -17,12 +17,14 @@ import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/firebase';
 import { collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc, query, Timestamp, orderBy, getDocs } from "firebase/firestore";
 import { Skeleton } from '@/components/ui/skeleton';
-import { format, startOfDay, endOfDay, startOfMonth, endOfMonth, startOfYear, endOfYear, subDays, addDays, subMonths, addMonths, subYears, addYears, eachDayOfInterval, eachMonthOfInterval, getMonth, getYear } from 'date-fns';
+import { format, startOfDay, endOfDay, startOfMonth, endOfMonth, startOfYear, endOfYear, eachDayOfInterval, eachMonthOfInterval, getMonth, getYear } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import type { VariantProps } from 'class-variance-authority';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { cn } from '@/lib/utils';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
 
 
 type ExpenseCategory = {
@@ -203,17 +205,15 @@ export default function FinancePage() {
         return { totalIncome, totalExpenses, balance, transactions, chartData, start, end };
     }, [invoices, expenses, currentDate, cashFlowView]);
     
-    const handleDateChange = (direction: 'prev' | 'next') => {
-        let newDate;
-        if (cashFlowView === 'daily') newDate = direction === 'prev' ? subDays(currentDate, 1) : addDays(currentDate, 1);
-        if (cashFlowView === 'monthly') newDate = direction === 'prev' ? subMonths(currentDate, 1) : addMonths(currentDate, 1);
-        if (cashFlowView === 'yearly') newDate = direction === 'prev' ? subYears(currentDate, 1) : addYears(currentDate, 1);
-        setCurrentDate(newDate || new Date());
-    };
+    const handleDateSelect = (date: Date | undefined) => {
+        if (date) {
+            setCurrentDate(date);
+        }
+    }
     
     const formatCashFlowTitle = () => {
         if (cashFlowView === 'daily') return format(currentDate, 'PPP', { locale: ptBR });
-        if (cashFlowView === 'monthly') return format(currentDate, 'MMMM de yyyy', { locale: ptBR });
+        if (cashFlowView === 'monthly') return format(currentDate, 'MMMM \'de\' yyyy', { locale: ptBR });
         return format(currentDate, 'yyyy');
     };
 
@@ -285,7 +285,7 @@ export default function FinancePage() {
         }
         try {
             const newCategory = { name: newCategoryName };
-            const docRef = await addDoc(collection(db, "expenseCategories"), newCategory);
+            await addDoc(collection(db, "expenseCategories"), newCategory);
             toast({ title: "Sucesso!", description: `Categoria "${newCategoryName}" adicionada.` });
             setCurrentExpense(prev => ({ ...prev, category: newCategoryName }));
             setNewCategoryName("");
@@ -551,17 +551,52 @@ export default function FinancePage() {
                                             <TabsTrigger value="yearly">Anual</TabsTrigger>
                                         </TabsList>
                                     </Tabs>
-                                    <div className="flex items-center gap-1">
-                                        <Button variant="outline" size="icon" onClick={() => handleDateChange('prev')}><ArrowLeft className="h-4 w-4" /></Button>
-                                        <Button variant="outline" size="icon" onClick={() => handleDateChange('next')}><ArrowRight className="h-4 w-4" /></Button>
-                                    </div>
+                                    <Popover>
+                                        <PopoverTrigger asChild>
+                                            <Button variant="outline" className="w-[240px] justify-start text-left font-normal">
+                                                <CalendarIcon className="mr-2 h-4 w-4" />
+                                                <span>{formatCashFlowTitle()}</span>
+                                            </Button>
+                                        </PopoverTrigger>
+                                        <PopoverContent className="w-auto p-0" align="start">
+                                            {cashFlowView === 'daily' && (
+                                                <Calendar
+                                                    mode="single"
+                                                    selected={currentDate}
+                                                    onSelect={handleDateSelect}
+                                                    initialFocus
+                                                />
+                                            )}
+                                            {cashFlowView === 'monthly' && (
+                                                <Calendar
+                                                    mode="single"
+                                                    selected={currentDate}
+                                                    onSelect={handleDateSelect}
+                                                    views={["months", "years"]}
+                                                    captionLayout="dropdown-buttons"
+                                                    fromYear={2020}
+                                                    toYear={new Date().getFullYear()}
+                                                    locale={ptBR}
+                                                />
+                                            )}
+                                             {cashFlowView === 'yearly' && (
+                                                <Calendar
+                                                    mode="single"
+                                                    selected={currentDate}
+                                                    onSelect={handleDateSelect}
+                                                    views={["years"]}
+                                                    captionLayout="dropdown-buttons"
+                                                    fromYear={2020}
+                                                    toYear={new Date().getFullYear()}
+                                                    locale={ptBR}
+                                                />
+                                            )}
+                                        </PopoverContent>
+                                    </Popover>
                                 </div>
                             </div>
                         </CardHeader>
                         <CardContent className="space-y-6">
-                           <div className="text-center p-4 border rounded-lg">
-                                <h3 className="text-lg font-semibold capitalize text-muted-foreground">{formatCashFlowTitle()}</h3>
-                           </div>
                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
                                 <Card>
                                     <CardHeader>
@@ -601,8 +636,8 @@ export default function FinancePage() {
                                     <BarChart data={cashFlowReport.chartData}>
                                     <CartesianGrid strokeDasharray="3 3" />
                                     <XAxis dataKey="name" fontSize={12} tickLine={false} axisLine={false} />
-                                    <YAxis fontSize={12} tickLine={false} axisLine={false} tickFormatter={(value) => `R$${value/1000}k`}/>
-                                    <Tooltip />
+                                    <YAxis fontSize={12} tickLine={false} axisLine={false} tickFormatter={(value) => `R$${Number(value)/1000}k`}/>
+                                    <Tooltip formatter={(value: number) => value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} />
                                     <Legend />
                                     <Bar dataKey="Entradas" fill="#16a34a" radius={[4, 4, 0, 0]} />
                                     <Bar dataKey="Saídas" fill="#dc2626" radius={[4, 4, 0, 0]} />
@@ -656,4 +691,3 @@ export default function FinancePage() {
         </div>
     );
 }
-    
