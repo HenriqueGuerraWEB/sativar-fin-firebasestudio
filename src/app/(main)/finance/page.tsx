@@ -1,14 +1,14 @@
 
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge, badgeVariants } from "@/components/ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { MoreHorizontal, PlusCircle, Sparkles } from "lucide-react";
+import { MoreHorizontal, PlusCircle, Sparkles, TrendingUp, TrendingDown, ArrowLeft, ArrowRight, ChevronsUpDown } from "lucide-react";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger, SheetFooter } from "@/components/ui/sheet";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -17,9 +17,12 @@ import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/firebase';
 import { collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc, query, Timestamp, orderBy, getDocs } from "firebase/firestore";
 import { Skeleton } from '@/components/ui/skeleton';
-import { format } from 'date-fns';
+import { format, startOfDay, endOfDay, startOfMonth, endOfMonth, startOfYear, endOfYear, subDays, addDays, subMonths, addMonths, subYears, addYears, eachDayOfInterval, eachMonthOfInterval, getMonth, getYear } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import type { VariantProps } from 'class-variance-authority';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { cn } from '@/lib/utils';
 
 
 type ExpenseCategory = {
@@ -54,6 +57,20 @@ const emptyExpense: Omit<Expense, 'id' | 'status'> = {
     dueDate: Timestamp.now(),
 };
 
+type CashFlowData = {
+    name: string;
+    Entradas: number;
+    Saídas: number;
+};
+
+type Transaction = {
+    id: string;
+    date: Date;
+    description: string;
+    amount: number;
+    type: 'Entrada' | 'Saída';
+};
+
 export default function FinancePage() {
     const { toast } = useToast();
     const [expenses, setExpenses] = useState<Expense[]>([]);
@@ -65,6 +82,10 @@ export default function FinancePage() {
     const [isAnalyzing, setIsAnalyzing] = useState(false);
     const [isCategoryDialogOpen, setIsCategoryDialogOpen] = useState(false);
     const [newCategoryName, setNewCategoryName] = useState("");
+    
+    // State for cash flow date range
+    const [currentDate, setCurrentDate] = useState(new Date());
+    const [cashFlowView, setCashFlowView] = useState<'daily' | 'monthly' | 'yearly'>('monthly');
 
     useEffect(() => {
         const fetchInitialData = async () => {
@@ -116,6 +137,85 @@ export default function FinancePage() {
             unsubCategories();
         };
     }, [toast]);
+    
+    const cashFlowReport = useMemo(() => {
+        let start, end;
+        if (cashFlowView === 'daily') {
+            start = startOfDay(currentDate);
+            end = endOfDay(currentDate);
+        } else if (cashFlowView === 'monthly') {
+            start = startOfMonth(currentDate);
+            end = endOfMonth(currentDate);
+        } else { // yearly
+            start = startOfYear(currentDate);
+            end = endOfYear(currentDate);
+        }
+
+        const paidInvoices = invoices.filter(inv => inv.status === 'Paga' && inv.dueDate.toDate() >= start && inv.dueDate.toDate() <= end);
+        const paidExpenses = expenses.filter(exp => exp.status === 'Paga' && exp.dueDate.toDate() >= start && exp.dueDate.toDate() <= end);
+
+        const totalIncome = paidInvoices.reduce((sum, inv) => sum + inv.amount, 0);
+        const totalExpenses = paidExpenses.reduce((sum, exp) => sum + exp.amount, 0);
+        const balance = totalIncome - totalExpenses;
+
+        const transactions: Transaction[] = [
+            ...paidInvoices.map(inv => ({ id: inv.id, date: inv.dueDate.toDate(), description: `Fatura: ${inv.clientName}`, amount: inv.amount, type: 'Entrada' as const })),
+            ...paidExpenses.map(exp => ({ id: exp.id, date: exp.dueDate.toDate(), description: exp.description, amount: exp.amount, type: 'Saída' as const })),
+        ].sort((a, b) => b.date.getTime() - a.date.getTime());
+        
+        let chartData: CashFlowData[] = [];
+        if (cashFlowView === 'monthly') {
+            const days = eachDayOfInterval({ start, end });
+            chartData = days.map(day => ({
+                name: format(day, 'dd'),
+                Entradas: 0,
+                Saídas: 0,
+            }));
+        } else if (cashFlowView === 'yearly') {
+             const months = eachMonthOfInterval({ start, end });
+             chartData = months.map(month => ({
+                name: format(month, 'MMM', { locale: ptBR }),
+                Entradas: 0,
+                Saídas: 0,
+            }));
+        }
+
+        paidInvoices.forEach(inv => {
+            if (cashFlowView === 'monthly') {
+                const dayIndex = inv.dueDate.toDate().getDate() - 1;
+                if (chartData[dayIndex]) chartData[dayIndex].Entradas += inv.amount;
+            } else if (cashFlowView === 'yearly') {
+                const monthIndex = getMonth(inv.dueDate.toDate());
+                if (chartData[monthIndex]) chartData[monthIndex].Entradas += inv.amount;
+            }
+        });
+        paidExpenses.forEach(exp => {
+            if (cashFlowView === 'monthly') {
+                const dayIndex = exp.dueDate.toDate().getDate() - 1;
+                if(chartData[dayIndex]) chartData[dayIndex].Saídas += exp.amount;
+            } else if (cashFlowView === 'yearly') {
+                const monthIndex = getMonth(exp.dueDate.toDate());
+                if(chartData[monthIndex]) chartData[monthIndex].Saídas += exp.amount;
+            }
+        });
+
+
+        return { totalIncome, totalExpenses, balance, transactions, chartData, start, end };
+    }, [invoices, expenses, currentDate, cashFlowView]);
+    
+    const handleDateChange = (direction: 'prev' | 'next') => {
+        let newDate;
+        if (cashFlowView === 'daily') newDate = direction === 'prev' ? subDays(currentDate, 1) : addDays(currentDate, 1);
+        if (cashFlowView === 'monthly') newDate = direction === 'prev' ? subMonths(currentDate, 1) : addMonths(currentDate, 1);
+        if (cashFlowView === 'yearly') newDate = direction === 'prev' ? subYears(currentDate, 1) : addYears(currentDate, 1);
+        setCurrentDate(newDate || new Date());
+    };
+    
+    const formatCashFlowTitle = () => {
+        if (cashFlowView === 'daily') return format(currentDate, 'PPP', { locale: ptBR });
+        if (cashFlowView === 'monthly') return format(currentDate, 'MMMM de yyyy', { locale: ptBR });
+        return format(currentDate, 'yyyy');
+    };
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const { id, value } = e.target;
@@ -185,7 +285,7 @@ export default function FinancePage() {
         }
         try {
             const newCategory = { name: newCategoryName };
-            await addDoc(collection(db, "expenseCategories"), newCategory);
+            const docRef = await addDoc(collection(db, "expenseCategories"), newCategory);
             toast({ title: "Sucesso!", description: `Categoria "${newCategoryName}" adicionada.` });
             setCurrentExpense(prev => ({ ...prev, category: newCategoryName }));
             setNewCategoryName("");
@@ -417,7 +517,7 @@ export default function FinancePage() {
                             <CardDescription>Visualize as faturas pendentes e pagas dos clientes.</CardDescription>
                         </CardHeader>
                         <CardContent>
-                            <Table>
+                             <Table>
                                 <TableHeader>
                                     <TableRow>
                                         <TableHead>Cliente</TableHead>
@@ -454,16 +554,122 @@ export default function FinancePage() {
                 <TabsContent value="cashflow">
                     <Card>
                         <CardHeader>
-                            <CardTitle>Fluxo de Caixa</CardTitle>
-                            <CardDescription>Relatório de entradas e saídas.</CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="flex items-center justify-center h-48">
-                                <p className="text-center text-muted-foreground">O relatório de fluxo de caixa será implementado em breve.</p>
+                             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                                <div>
+                                    <CardTitle>Fluxo de Caixa</CardTitle>
+                                    <CardDescription>Relatório de entradas e saídas.</CardDescription>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                     <Tabs defaultValue="monthly" onValueChange={(value) => setCashFlowView(value as any)} className="w-auto">
+                                        <TabsList>
+                                            <TabsTrigger value="daily">Diário</TabsTrigger>
+                                            <TabsTrigger value="monthly">Mensal</TabsTrigger>
+                                            <TabsTrigger value="yearly">Anual</TabsTrigger>
+                                        </TabsList>
+                                    </Tabs>
+                                    <div className="flex items-center gap-1">
+                                        <Button variant="outline" size="icon" onClick={() => handleDateChange('prev')}><ArrowLeft className="h-4 w-4" /></Button>
+                                        <Button variant="outline" size="icon" onClick={() => handleDateChange('next')}><ArrowRight className="h-4 w-4" /></Button>
+                                    </div>
+                                </div>
                             </div>
+                        </CardHeader>
+                        <CardContent className="space-y-6">
+                           <div className="text-center p-4 border rounded-lg">
+                                <h3 className="text-lg font-semibold capitalize text-muted-foreground">{formatCashFlowTitle()}</h3>
+                           </div>
+                           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
+                                <Card>
+                                    <CardHeader>
+                                        <CardTitle className="text-base font-medium flex items-center justify-center gap-2 text-green-600">
+                                            <TrendingUp className="h-5 w-5" /> Entradas
+                                        </CardTitle>
+                                    </CardHeader>
+                                    <CardContent>
+                                        <p className="text-2xl font-bold">{cashFlowReport.totalIncome.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
+                                    </CardContent>
+                                </Card>
+                                <Card>
+                                     <CardHeader>
+                                        <CardTitle className="text-base font-medium flex items-center justify-center gap-2 text-red-600">
+                                            <TrendingDown className="h-5 w-5" /> Saídas
+                                        </CardTitle>
+                                    </CardHeader>
+                                    <CardContent>
+                                        <p className="text-2xl font-bold">{cashFlowReport.totalExpenses.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
+                                    </CardContent>
+                                </Card>
+                                 <Card>
+                                     <CardHeader>
+                                        <CardTitle className="text-base font-medium flex items-center justify-center gap-2 text-blue-600">
+                                            <ChevronsUpDown className="h-5 w-5" /> Saldo
+                                        </CardTitle>
+                                    </CardHeader>
+                                    <CardContent>
+                                        <p className={cn("text-2xl font-bold", cashFlowReport.balance >= 0 ? "text-green-700" : "text-red-700")}>{cashFlowReport.balance.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
+                                    </CardContent>
+                                </Card>
+                           </div>
+                           
+                           {cashFlowView !== 'daily' && (
+                            <div className="h-[350px]">
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <BarChart data={cashFlowReport.chartData}>
+                                    <CartesianGrid strokeDasharray="3 3" />
+                                    <XAxis dataKey="name" fontSize={12} tickLine={false} axisLine={false} />
+                                    <YAxis fontSize={12} tickLine={false} axisLine={false} tickFormatter={(value) => `R$${value/1000}k`}/>
+                                    <Tooltip />
+                                    <Legend />
+                                    <Bar dataKey="Entradas" fill="#16a34a" radius={[4, 4, 0, 0]} />
+                                    <Bar dataKey="Saídas" fill="#dc2626" radius={[4, 4, 0, 0]} />
+                                    </BarChart>
+                                </ResponsiveContainer>
+                            </div>
+                           )}
+
+                           <div>
+                               <h4 className="text-lg font-semibold mb-4">Transações do Período</h4>
+                               <Table>
+                                   <TableHeader>
+                                       <TableRow>
+                                           <TableHead>Data</TableHead>
+                                           <TableHead>Descrição</TableHead>
+                                           <TableHead>Tipo</TableHead>
+                                           <TableHead className="text-right">Valor</TableHead>
+                                       </TableRow>
+                                   </TableHeader>
+                                   <TableBody>
+                                        {isLoading ? Array.from({length: 4}).map((_, i) => (
+                                            <TableRow key={i}>
+                                                <TableCell><Skeleton className="h-5 w-24" /></TableCell>
+                                                <TableCell><Skeleton className="h-5 w-40" /></TableCell>
+                                                <TableCell><Skeleton className="h-6 w-20" /></TableCell>
+                                                <TableCell className="text-right"><Skeleton className="h-5 w-20 ml-auto" /></TableCell>
+                                            </TableRow>
+                                        )) : cashFlowReport.transactions.length > 0 ? cashFlowReport.transactions.map(t => (
+                                           <TableRow key={t.id}>
+                                                <TableCell>{format(t.date, 'dd/MM/yyyy')}</TableCell>
+                                                <TableCell>{t.description}</TableCell>
+                                                <TableCell>
+                                                    <Badge variant={t.type === 'Entrada' ? 'secondary' : 'destructive'} className={t.type === 'Entrada' ? getInvoiceStatusClass('Paga') : getInvoiceStatusClass('Vencida')}>
+                                                        {t.type}
+                                                    </Badge>
+                                                </TableCell>
+                                                <TableCell className="text-right">{t.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</TableCell>
+                                           </TableRow>
+                                       )) : (
+                                        <TableRow>
+                                            <TableCell colSpan={4} className="text-center h-24">Nenhuma transação encontrada para este período.</TableCell>
+                                        </TableRow>
+                                       )}
+                                   </TableBody>
+                               </Table>
+                           </div>
                         </CardContent>
                     </Card>
                 </TabsContent>
             </Tabs>
         </div>
     );
+}
+    
