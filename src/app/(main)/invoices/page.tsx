@@ -1,6 +1,7 @@
+
 "use client";
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -9,18 +10,50 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
 import { MoreHorizontal, PlusCircle } from "lucide-react";
 import type { VariantProps } from 'class-variance-authority';
 import { badgeVariants } from '@/components/ui/badge';
+import { useToast } from '@/hooks/use-toast';
+import { db } from '@/lib/firebase';
+import { collection, onSnapshot, query, Timestamp, orderBy } from "firebase/firestore";
+import { Skeleton } from '@/components/ui/skeleton';
+import { format } from 'date-fns';
 
-const invoices = [
-    { id: "INV-001", client: "Inovatech Soluções", amount: 2500.00, issueDate: "01/07/2025", dueDate: "01/08/2025", status: "Paga" },
-    { id: "INV-002", client: "Global-Trade Inc.", amount: 4800.00, issueDate: "02/07/2025", dueDate: "02/08/2025", status: "Paga" },
-    { id: "INV-003", client: "Quantum Dynamics", amount: 1200.00, issueDate: "25/07/2025", dueDate: "25/08/2025", status: "Pendente" },
-    { id: "INV-004", client: "Nexus-Enterprises", amount: 3000.00, issueDate: "20/06/2025", dueDate: "20/07/2025", status: "Vencida" },
-    { id: "INV-005", client: "Inovatech Soluções", amount: 2500.00, issueDate: "01/08/2025", dueDate: "01/09/2025", status: "Pendente" },
-];
+type Invoice = {
+    id: string;
+    clientName: string;
+    amount: number;
+    issueDate: Timestamp;
+    dueDate: Timestamp;
+    status: 'Paga' | 'Pendente' | 'Vencida';
+};
 
 export default function InvoicesPage() {
+    const { toast } = useToast();
+    const [invoices, setInvoices] = useState<Invoice[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+    
+    useEffect(() => {
+        setIsLoading(true);
+        const q = query(collection(db, "invoices"), orderBy("issueDate", "desc"));
+        const unsubscribe = onSnapshot(q, (querySnapshot) => {
+            const invoicesData: Invoice[] = [];
+            querySnapshot.forEach((doc) => {
+                invoicesData.push({ ...doc.data(), id: doc.id } as Invoice);
+            });
+            setInvoices(invoicesData);
+            setIsLoading(false);
+        }, (error) => {
+            console.error("Error fetching invoices: ", error);
+            toast({
+                title: "Erro",
+                description: "Não foi possível carregar as faturas.",
+                variant: "destructive",
+            });
+            setIsLoading(false);
+        });
 
-    const getStatusVariant = (status: string): VariantProps<typeof badgeVariants>['variant'] => {
+        return () => unsubscribe();
+    }, [toast]);
+
+    const getStatusVariant = (status: Invoice['status']): VariantProps<typeof badgeVariants>['variant'] => {
         switch (status) {
             case 'Paga': return 'secondary';
             case 'Pendente': return 'outline';
@@ -59,12 +92,22 @@ export default function InvoicesPage() {
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {invoices.map(invoice => (
+                            {isLoading ? Array.from({length: 5}).map((_, i) => (
+                                <TableRow key={i}>
+                                    <TableCell><Skeleton className="h-5 w-20" /></TableCell>
+                                    <TableCell><Skeleton className="h-5 w-32" /></TableCell>
+                                    <TableCell><Skeleton className="h-5 w-24" /></TableCell>
+                                    <TableCell><Skeleton className="h-5 w-24" /></TableCell>
+                                    <TableCell><Skeleton className="h-6 w-16" /></TableCell>
+                                    <TableCell className="text-right"><Skeleton className="h-5 w-20 ml-auto" /></TableCell>
+                                    <TableCell><Skeleton className="h-8 w-8 ml-auto" /></TableCell>
+                                </TableRow>
+                            )) : invoices.map(invoice => (
                                 <TableRow key={invoice.id}>
-                                    <TableCell className="font-medium">{invoice.id}</TableCell>
-                                    <TableCell>{invoice.client}</TableCell>
-                                    <TableCell>{invoice.issueDate}</TableCell>
-                                    <TableCell>{invoice.dueDate}</TableCell>
+                                    <TableCell className="font-medium">{invoice.id.substring(0, 8)}</TableCell>
+                                    <TableCell>{invoice.clientName}</TableCell>
+                                    <TableCell>{format(invoice.issueDate.toDate(), 'dd/MM/yyyy')}</TableCell>
+                                    <TableCell>{format(invoice.dueDate.toDate(), 'dd/MM/yyyy')}</TableCell>
                                     <TableCell><Badge variant={getStatusVariant(invoice.status)}>{invoice.status}</Badge></TableCell>
                                     <TableCell className="text-right">{invoice.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</TableCell>
                                     <TableCell>
@@ -95,3 +138,4 @@ export default function InvoicesPage() {
         </div>
     );
 }
+

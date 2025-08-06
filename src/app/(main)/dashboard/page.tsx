@@ -1,35 +1,193 @@
+
 "use client"
 
+import React, { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts";
 import { DollarSign, Users, CreditCard, Activity } from "lucide-react";
+import { db } from '@/lib/firebase';
+import { collection, onSnapshot, query, where, Timestamp } from "firebase/firestore";
+import { Skeleton } from '@/components/ui/skeleton';
+import { format, subMonths, getMonth, getYear } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 
-const chartData = [
-  { month: "Fev", revenue: 18600, expenses: 8000 },
-  { month: "Mar", revenue: 20500, expenses: 9500 },
-  { month: "Abr", revenue: 23900, expenses: 11200 },
-  { month: "Mai", revenue: 19800, expenses: 10100 },
-  { month: "Jun", revenue: 25400, expenses: 12300 },
-  { month: "Jul", revenue: 29000, expenses: 13000 },
-];
+type Client = {
+    id: string;
+    status: "Ativo" | "Inativo";
+};
+
+type Invoice = {
+    id: string;
+    clientName: string;
+    dueDate: Timestamp;
+    amount: number;
+    status: 'Paga' | 'Pendente' | 'Vencida';
+};
+
+type Expense = {
+    id: string;
+    amount: number;
+    dueDate: Timestamp;
+};
 
 const chartConfig = {
   revenue: { label: "Receita", color: "hsl(var(--chart-1))" },
   expenses: { label: "Despesas", color: "hsl(var(--chart-2))" },
 };
 
-const invoices = [
-    { client: "Inovatech Soluções", dueDate: "Hoje", amount: "R$ 2.500,00", status: "A vencer" },
-    { client: "Global-Trade Inc.", dueDate: "Hoje", amount: "R$ 4.800,00", status: "A vencer" },
-    { client: "Quantum Dynamics", dueDate: "Vencida (3 dias)", amount: "R$ 1.200,00", status: "Vencida" },
-    { client: "Nexus-Enterprises", dueDate: "Vencida (7 dias)", amount: "R$ 3.000,00", status: "Vencida" },
-];
-
-
 export default function DashboardPage() {
+    const [clients, setClients] = useState<Client[]>([]);
+    const [invoices, setInvoices] = useState<Invoice[]>([]);
+    const [expenses, setExpenses] = useState<Expense[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+
+    useEffect(() => {
+        setIsLoading(true);
+
+        const unsubClients = onSnapshot(query(collection(db, "clients")), (snapshot) => {
+            setClients(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Client)));
+        });
+
+        const unsubInvoices = onSnapshot(query(collection(db, "invoices")), (snapshot) => {
+            setInvoices(snapshot.docs.map(doc => ({
+                id: doc.id,
+                clientName: doc.data().clientName,
+                dueDate: doc.data().dueDate,
+                amount: doc.data().amount,
+                status: doc.data().status,
+            } as Invoice)));
+        });
+
+        const unsubExpenses = onSnapshot(query(collection(db, "expenses")), (snapshot) => {
+            setExpenses(snapshot.docs.map(doc => ({
+                id: doc.id,
+                amount: doc.data().amount,
+                dueDate: doc.data().dueDate
+            } as Expense)));
+        });
+
+        Promise.all([
+         new Promise(resolve => onSnapshot(query(collection(db, "clients")), resolve)),
+         new Promise(resolve => onSnapshot(query(collection(db, "invoices")), resolve)),
+         new Promise(resolve => onSnapshot(query(collection(db, "expenses")), resolve))
+        ]).then(() => setIsLoading(false)).catch(() => setIsLoading(false));
+
+        return () => {
+            unsubClients();
+            unsubInvoices();
+            unsubExpenses();
+        };
+    }, []);
+
+    const activeClientsCount = useMemo(() => clients.filter(c => c.status === 'Ativo').length, [clients]);
+    const newClientsThisMonth = useMemo(() => {
+       // Assuming client creation timestamp is stored, which is not the case yet.
+       // Placeholder logic.
+       return clients.length > 2 ? 2 : clients.length;
+    }, [clients]);
+
+    const { monthlyRevenue, revenueChange, monthlyExpenses, expenseChange, expectedProfit, accountBalance } = useMemo(() => {
+        const now = new Date();
+        const currentMonth = getMonth(now);
+        const currentYear = getYear(now);
+        const lastMonth = getMonth(subMonths(now, 1));
+        const lastMonthYear = getYear(subMonths(now, 1));
+
+        const paidInvoicesThisMonth = invoices.filter(inv => {
+            const dueDate = inv.dueDate.toDate();
+            return inv.status === 'Paga' && getMonth(dueDate) === currentMonth && getYear(dueDate) === currentYear;
+        });
+        const monthlyRevenue = paidInvoicesThisMonth.reduce((sum, inv) => sum + inv.amount, 0);
+
+        const paidInvoicesLastMonth = invoices.filter(inv => {
+            const dueDate = inv.dueDate.toDate();
+            return inv.status === 'Paga' && getMonth(dueDate) === lastMonth && getYear(dueDate) === lastMonthYear;
+        });
+        const lastMonthRevenue = paidInvoicesLastMonth.reduce((sum, inv) => sum + inv.amount, 0);
+        const revenueChange = lastMonthRevenue > 0 ? ((monthlyRevenue - lastMonthRevenue) / lastMonthRevenue) * 100 : monthlyRevenue > 0 ? 100 : 0;
+
+        const expensesThisMonth = expenses.filter(exp => {
+            const dueDate = exp.dueDate.toDate();
+            return getMonth(dueDate) === currentMonth && getYear(dueDate) === currentYear;
+        });
+        const monthlyExpenses = expensesThisMonth.reduce((sum, exp) => sum + exp.amount, 0);
+        
+        const expensesLastMonth = expenses.filter(exp => {
+            const dueDate = exp.dueDate.toDate();
+            return getMonth(dueDate) === lastMonth && getYear(dueDate) === lastMonthYear;
+        });
+        const lastMonthExpenses = expensesLastMonth.reduce((sum, exp) => sum + exp.amount, 0);
+
+        const expenseChange = lastMonthExpenses > 0 ? ((monthlyExpenses - lastMonthExpenses) / lastMonthExpenses) * 100 : monthlyExpenses > 0 ? 100 : 0;
+
+        const expectedProfit = monthlyRevenue - monthlyExpenses;
+        const accountBalance = 54320.10; // Placeholder
+
+        return { monthlyRevenue, revenueChange, monthlyExpenses, expenseChange, expectedProfit, accountBalance };
+
+    }, [invoices, expenses]);
+
+    const chartData = useMemo(() => {
+        const data = Array.from({ length: 6 }).map((_, i) => {
+            const date = subMonths(new Date(), 5 - i);
+            return {
+                month: format(date, 'MMM', { locale: ptBR }),
+                year: getYear(date),
+                revenue: 0,
+                expenses: 0,
+            };
+        });
+
+        invoices.forEach(invoice => {
+            if (invoice.status === 'Paga') {
+                const date = invoice.dueDate.toDate();
+                const monthStr = format(date, 'MMM', { locale: ptBR });
+                const year = getYear(date);
+                const entry = data.find(d => d.month === monthStr && d.year === year);
+                if (entry) {
+                    entry.revenue += invoice.amount;
+                }
+            }
+        });
+
+        expenses.forEach(expense => {
+            const date = expense.dueDate.toDate();
+            const monthStr = format(date, 'MMM', { locale: ptBR });
+             const year = getYear(date);
+            const entry = data.find(d => d.month === monthStr && d.year === year);
+            if (entry) {
+                entry.expenses += expense.amount;
+            }
+        });
+
+        return data;
+    }, [invoices, expenses]);
+
+    const importantNotices = useMemo(() => {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const tomorrow = new Date(today);
+        tomorrow.setDate(tomorrow.getDate() + 1);
+
+        const dueToday = invoices.filter(inv => {
+            const dueDate = inv.dueDate.toDate();
+            return inv.status === 'Pendente' && dueDate >= today && dueDate < tomorrow;
+        }).map(inv => ({...inv, friendlyDueDate: "Hoje" }));
+
+        const overdue = invoices.filter(inv => inv.status === 'Vencida').map(inv => {
+             const diffTime = Math.abs(today.getTime() - inv.dueDate.toDate().getTime());
+             const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+             return {...inv, friendlyDueDate: `Vencida (${diffDays} dias)`};
+        });
+        
+        return [...dueToday, ...overdue].sort((a,b) => a.dueDate.toMillis() - b.dueDate.toMillis()).slice(0, 4);
+
+    }, [invoices]);
+
+
   return (
     <div className="flex flex-col gap-8">
         <div>
@@ -43,8 +201,8 @@ export default function DashboardPage() {
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">R$ 29.000,00</div>
-            <p className="text-xs text-muted-foreground">+15.2% em relação ao mês passado</p>
+            {isLoading ? <Skeleton className="h-8 w-3/4" /> : <div className="text-2xl font-bold">{monthlyRevenue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</div>}
+            {isLoading ? <Skeleton className="h-4 w-1/2 mt-1" /> : <p className="text-xs text-muted-foreground">{revenueChange.toFixed(1)}% em relação ao mês passado</p>}
           </CardContent>
         </Card>
         <Card>
@@ -53,8 +211,8 @@ export default function DashboardPage() {
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">42</div>
-            <p className="text-xs text-muted-foreground">+2 novos este mês</p>
+             {isLoading ? <Skeleton className="h-8 w-1/4" /> : <div className="text-2xl font-bold">{activeClientsCount}</div>}
+             {isLoading ? <Skeleton className="h-4 w-1/2 mt-1" /> : <p className="text-xs text-muted-foreground">+{newClientsThisMonth} novos este mês</p>}
           </CardContent>
         </Card>
         <Card>
@@ -63,8 +221,8 @@ export default function DashboardPage() {
             <CreditCard className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">R$ 13.000,00</div>
-            <p className="text-xs text-muted-foreground">+8% em relação ao mês passado</p>
+            {isLoading ? <Skeleton className="h-8 w-3/4" /> : <div className="text-2xl font-bold">{monthlyExpenses.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</div>}
+            {isLoading ? <Skeleton className="h-4 w-1/2 mt-1" /> : <p className="text-xs text-muted-foreground">{expenseChange.toFixed(1)}% em relação ao mês passado</p>}
           </CardContent>
         </Card>
         <Card>
@@ -73,8 +231,8 @@ export default function DashboardPage() {
             <Activity className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">R$ 16.000,00</div>
-            <p className="text-xs text-muted-foreground">Saldo em conta: R$ 54.320,10</p>
+             {isLoading ? <Skeleton className="h-8 w-3/4" /> : <div className="text-2xl font-bold">{expectedProfit.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</div>}
+             {isLoading ? <Skeleton className="h-4 w-1/2 mt-1" /> : <p className="text-xs text-muted-foreground">Saldo em conta: {accountBalance.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>}
           </CardContent>
         </Card>
       </div>
@@ -86,6 +244,7 @@ export default function DashboardPage() {
             <CardDescription>Últimos 6 meses</CardDescription>
           </CardHeader>
           <CardContent>
+            {isLoading ? <Skeleton className="h-[300px] w-full" /> : (
             <ChartContainer config={chartConfig} className="h-[300px] w-full">
                 <BarChart accessibilityLayer data={chartData}>
                   <CartesianGrid vertical={false} />
@@ -96,6 +255,7 @@ export default function DashboardPage() {
                   <Bar dataKey="expenses" fill="var(--color-expenses)" radius={4} />
                 </BarChart>
             </ChartContainer>
+            )}
           </CardContent>
         </Card>
         <Card className="lg:col-span-2">
@@ -113,13 +273,19 @@ export default function DashboardPage() {
                     </TableRow>
                 </TableHeader>
                 <TableBody>
-                    {invoices.map((invoice) => (
-                        <TableRow key={invoice.client}>
-                            <TableCell className="font-medium">{invoice.client}</TableCell>
+                    {isLoading ? Array.from({ length: 4 }).map((_, i) => (
+                        <TableRow key={i}>
+                            <TableCell><Skeleton className="h-5 w-24" /></TableCell>
+                            <TableCell><Skeleton className="h-5 w-20" /></TableCell>
+                            <TableCell className="text-right"><Skeleton className="h-5 w-16 ml-auto" /></TableCell>
+                        </TableRow>
+                    )) : importantNotices.map((invoice) => (
+                        <TableRow key={invoice.id}>
+                            <TableCell className="font-medium">{invoice.clientName}</TableCell>
                             <TableCell>
-                                <Badge variant={invoice.status === 'Vencida' ? 'destructive' : 'secondary'}>{invoice.dueDate}</Badge>
+                                <Badge variant={invoice.status === 'Vencida' ? 'destructive' : 'secondary'}>{invoice.friendlyDueDate}</Badge>
                             </TableCell>
-                            <TableCell className="text-right">{invoice.amount}</TableCell>
+                            <TableCell className="text-right">{invoice.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</TableCell>
                         </TableRow>
                     ))}
                 </TableBody>

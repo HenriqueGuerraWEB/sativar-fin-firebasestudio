@@ -68,13 +68,23 @@ export default function ClientsPage() {
         const clientQuery = query(collection(db, "clients"));
         const planQuery = query(collection(db, "plans"));
 
+        let clientDataLoaded = false;
+        let planDataLoaded = false;
+
+        const checkLoading = () => {
+            if (clientDataLoaded && planDataLoaded) {
+                setIsLoading(false);
+            }
+        };
+
         const unsubClients = onSnapshot(clientQuery, (querySnapshot) => {
             const clientsData: Client[] = [];
             querySnapshot.forEach((doc) => {
                 clientsData.push({ ...doc.data(), id: doc.id } as Client);
             });
             setClients(clientsData);
-            if(plans.length > 0) setIsLoading(false);
+            clientDataLoaded = true;
+            checkLoading();
         }, (error) => {
             console.error("Error fetching clients: ", error);
             toast({
@@ -82,7 +92,8 @@ export default function ClientsPage() {
                 description: "Não foi possível carregar os clientes.",
                 variant: "destructive",
             });
-            setIsLoading(false);
+            clientDataLoaded = true;
+            checkLoading();
         });
 
         const unsubPlans = onSnapshot(planQuery, (querySnapshot) => {
@@ -92,7 +103,8 @@ export default function ClientsPage() {
                 plansData.push({ id: doc.id, name: data.name } as Plan);
             });
             setPlans(plansData);
-             if(clients.length > 0 || querySnapshot.empty) setIsLoading(false);
+            planDataLoaded = true;
+            checkLoading();
         }, (error) => {
              console.error("Error fetching plans: ", error);
              toast({
@@ -100,7 +112,8 @@ export default function ClientsPage() {
                 description: "Não foi possível carregar os planos.",
                 variant: "destructive",
             });
-            setIsLoading(false);
+            planDataLoaded = true;
+            checkLoading();
         });
 
 

@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -12,27 +12,123 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTr
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useToast } from '@/hooks/use-toast';
+import { db } from '@/lib/firebase';
+import { collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc, query, Timestamp, orderBy } from "firebase/firestore";
+import { Skeleton } from '@/components/ui/skeleton';
+import { format } from 'date-fns';
 
-const expenses = [
-    { id: "1", description: "Salário - Designer", category: "Recursos Humanos", amount: 4500.00, dueDate: "05/08/2025", status: "Paga" },
-    { id: "2", description: "Assinatura Figma", category: "Ferramentas", amount: 250.00, dueDate: "10/08/2025", status: "Pendente" },
-    { id: "3", description: "Aluguel Escritório", category: "Infraestrutura", amount: 3000.00, dueDate: "15/08/2025", status: "Pendente" },
-];
+type Expense = {
+    id: string;
+    description: string;
+    category: 'Recursos Humanos' | 'Marketing' | 'Infraestrutura' | 'Ferramentas' | 'Outros';
+    amount: number;
+    dueDate: Timestamp;
+    status: 'Paga' | 'Pendente';
+};
 
-const income = [
-    { id: "1", description: "Pagamento Fatura #123 - Inovatech", amount: 2500.00, date: "01/08/2025" },
-    { id: "2", description: "Pagamento Fatura #124 - Global-Trade", amount: 4800.00, date: "02/08/2025" },
-];
+type Income = {
+    id: string;
+    description: string;
+    amount: number;
+    date: Timestamp;
+};
+
+const emptyExpense: Omit<Expense, 'id' | 'status'> = {
+    description: "",
+    category: "Outros",
+    amount: 0,
+    dueDate: Timestamp.now(),
+};
 
 export default function FinancePage() {
+    const { toast } = useToast();
+    const [expenses, setExpenses] = useState<Expense[]>([]);
+    const [income, setIncome] = useState<Income[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+    const [isSheetOpen, setIsSheetOpen] = useState(false);
+    const [currentExpense, setCurrentExpense] = useState<Omit<Expense, 'id' | 'status'>>(emptyExpense);
     const [isAnalyzing, setIsAnalyzing] = useState(false);
 
+    useEffect(() => {
+        setIsLoading(true);
+        const expenseQuery = query(collection(db, "expenses"), orderBy("dueDate", "desc"));
+        const incomeQuery = query(collection(db, "income"), orderBy("date", "desc"));
+
+        const unsubExpenses = onSnapshot(expenseQuery, (snapshot) => {
+            setExpenses(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Expense)));
+            if (!income.length && snapshot.empty) setIsLoading(false)
+        }, (error) => {
+            console.error("Error fetching expenses:", error);
+            toast({ title: "Erro", description: "Não foi possível carregar as despesas.", variant: "destructive" });
+            setIsLoading(false);
+        });
+
+        const unsubIncome = onSnapshot(incomeQuery, (snapshot) => {
+            setIncome(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Income)));
+            setIsLoading(false);
+        }, (error) => {
+            console.error("Error fetching income:", error);
+            toast({ title: "Erro", description: "Não foi possível carregar as receitas.", variant: "destructive" });
+            setIsLoading(false);
+        });
+
+        return () => {
+            unsubExpenses();
+            unsubIncome();
+        };
+    }, [toast, income.length]);
+
+    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const { id, value } = e.target;
+        if (id === 'dueDate') {
+            setCurrentExpense(prev => ({ ...prev, [id]: Timestamp.fromDate(new Date(value)) }));
+        } else if (id === 'amount') {
+             setCurrentExpense(prev => ({ ...prev, [id]: parseFloat(value) || 0 }));
+        } else {
+            setCurrentExpense(prev => ({ ...prev, [id]: value }));
+        }
+    };
+    
+    const handleSelectChange = (value: Expense['category']) => {
+        setCurrentExpense(prev => ({...prev, category: value}));
+    }
+
+    const handleSaveExpense = async () => {
+        if (!currentExpense.description || !currentExpense.amount) {
+            toast({ title: "Erro", description: "Descrição e Valor são obrigatórios.", variant: "destructive" });
+            return;
+        }
+
+        try {
+            await addDoc(collection(db, "expenses"), {
+                ...currentExpense,
+                status: "Pendente",
+            });
+            toast({ title: "Sucesso", description: "Despesa adicionada com sucesso." });
+            setIsSheetOpen(false);
+            setCurrentExpense(emptyExpense);
+        } catch (error) {
+            console.error("Error saving expense:", error);
+            toast({ title: "Erro", description: "Não foi possível salvar a despesa.", variant: "destructive" });
+        }
+    };
+    
     const handleAnalyze = () => {
         setIsAnalyzing(true);
+        // Simulate AI analysis
         setTimeout(() => {
+            setCurrentExpense({
+                description: "Assinatura Adobe Creative Cloud",
+                category: "Ferramentas",
+                amount: 280.00,
+                dueDate: Timestamp.now(),
+            })
             setIsAnalyzing(false);
+            toast({ title: "Recibo analisado!", description: "Os dados foram preenchidos." });
         }, 2000);
     }
+
 
     return (
         <div className="flex flex-col gap-8">
@@ -41,9 +137,9 @@ export default function FinancePage() {
                     <h1 className="text-3xl font-bold tracking-tight">Financeiro</h1>
                     <p className="text-muted-foreground">Acompanhe as finanças da sua empresa.</p>
                 </div>
-                 <Sheet>
+                 <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
                     <SheetTrigger asChild>
-                        <Button size="sm" className="gap-1">
+                        <Button size="sm" className="gap-1" onClick={() => setCurrentExpense(emptyExpense)}>
                             <PlusCircle className="h-4 w-4" />
                             Lançar Despesa
                         </Button>
@@ -67,34 +163,34 @@ export default function FinancePage() {
                             </div>
                             <div className="grid grid-cols-4 items-center gap-4">
                                 <Label htmlFor="description" className="text-right">Descrição</Label>
-                                <Input id="description" className="col-span-3" />
+                                <Input id="description" value={currentExpense.description} onChange={handleInputChange} className="col-span-3" />
                             </div>
                              <div className="grid grid-cols-4 items-center gap-4">
                                 <Label htmlFor="category" className="text-right">Categoria</Label>
-                                <Select>
+                                <Select value={currentExpense.category} onValueChange={handleSelectChange}>
                                     <SelectTrigger className="col-span-3">
                                         <SelectValue placeholder="Selecione uma categoria" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="rh">Recursos Humanos</SelectItem>
-                                        <SelectItem value="marketing">Marketing</SelectItem>
-                                        <SelectItem value="infra">Infraestrutura</SelectItem>
-                                        <SelectItem value="tools">Ferramentas</SelectItem>
-                                        <SelectItem value="others">Outros</SelectItem>
+                                        <SelectItem value="Recursos Humanos">Recursos Humanos</SelectItem>
+                                        <SelectItem value="Marketing">Marketing</SelectItem>
+                                        <SelectItem value="Infraestrutura">Infraestrutura</SelectItem>
+                                        <SelectItem value="Ferramentas">Ferramentas</SelectItem>
+                                        <SelectItem value="Outros">Outros</SelectItem>
                                     </SelectContent>
                                 </Select>
                             </div>
                             <div className="grid grid-cols-4 items-center gap-4">
                                 <Label htmlFor="amount" className="text-right">Valor (R$)</Label>
-                                <Input id="amount" type="number" className="col-span-3" />
+                                <Input id="amount" type="number" value={currentExpense.amount} onChange={handleInputChange} className="col-span-3" />
                             </div>
                             <div className="grid grid-cols-4 items-center gap-4">
                                 <Label htmlFor="dueDate" className="text-right">Vencimento</Label>
-                                <Input id="dueDate" type="date" className="col-span-3" />
+                                <Input id="dueDate" type="date" onChange={handleInputChange} className="col-span-3" defaultValue={format(currentExpense.dueDate.toDate(), 'yyyy-MM-dd')} />
                             </div>
                         </div>
                         <SheetFooter>
-                            <Button type="submit">Salvar Despesa</Button>
+                            <Button onClick={handleSaveExpense}>Salvar Despesa</Button>
                         </SheetFooter>
                     </SheetContent>
                 </Sheet>
@@ -124,11 +220,19 @@ export default function FinancePage() {
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                    {expenses.map(expense => (
+                                    {isLoading ? Array.from({length: 3}).map((_, i) => (
+                                        <TableRow key={i}>
+                                            <TableCell><Skeleton className="h-5 w-32" /></TableCell>
+                                            <TableCell><Skeleton className="h-5 w-24" /></TableCell>
+                                            <TableCell><Skeleton className="h-5 w-20" /></TableCell>
+                                            <TableCell><Skeleton className="h-6 w-16" /></TableCell>
+                                            <TableCell className="text-right"><Skeleton className="h-5 w-20 ml-auto" /></TableCell>
+                                        </TableRow>
+                                    )) : expenses.map(expense => (
                                         <TableRow key={expense.id}>
                                             <TableCell className="font-medium">{expense.description}</TableCell>
                                             <TableCell><Badge variant="outline">{expense.category}</Badge></TableCell>
-                                            <TableCell>{expense.dueDate}</TableCell>
+                                            <TableCell>{format(expense.dueDate.toDate(), 'dd/MM/yyyy')}</TableCell>
                                             <TableCell><Badge variant={expense.status === 'Paga' ? 'secondary' : 'destructive'}>{expense.status}</Badge></TableCell>
                                             <TableCell className="text-right">{expense.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</TableCell>
                                         </TableRow>
@@ -154,10 +258,16 @@ export default function FinancePage() {
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                    {income.map(item => (
+                                   {isLoading ? Array.from({length: 2}).map((_, i) => (
+                                        <TableRow key={i}>
+                                            <TableCell><Skeleton className="h-5 w-48" /></TableCell>
+                                            <TableCell><Skeleton className="h-5 w-24" /></TableCell>
+                                            <TableCell className="text-right"><Skeleton className="h-5 w-20 ml-auto" /></TableCell>
+                                        </TableRow>
+                                    )) : income.map(item => (
                                         <TableRow key={item.id}>
                                             <TableCell className="font-medium">{item.description}</TableCell>
-                                            <TableCell>{item.date}</TableCell>
+                                            <TableCell>{format(item.date.toDate(), 'dd/MM/yyyy')}</TableCell>
                                             <TableCell className="text-right">{item.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</TableCell>
                                         </TableRow>
                                     ))}
