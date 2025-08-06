@@ -88,14 +88,13 @@ export default function InvoicesPage() {
     const handleGenerateInvoices = async () => {
         setIsGenerating(true);
         try {
-            // 1. Fetch all active clients with a plan and activation date
-            const clientsQuery = query(collection(db, "clients"), 
-                where("status", "==", "Ativo"), 
-                where("planId", "!=", null),
-                where("planActivationDate", "!=", null)
-            );
+            // 1. Fetch all active clients 
+            const clientsQuery = query(collection(db, "clients"), where("status", "==", "Ativo"));
             const clientsSnapshot = await getDocs(clientsQuery);
-            const activeClients = clientsSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Client));
+            // Filter clients that have a plan and activation date in code
+            const activeClients = clientsSnapshot.docs
+                .map(doc => ({ ...doc.data(), id: doc.id } as Client))
+                .filter(client => client.planId && client.planActivationDate);
 
             if (activeClients.length === 0) {
                 toast({ title: "Nenhuma ação necessária", description: "Não há clientes ativos com planos e data de ativação para gerar faturas." });
@@ -338,5 +337,7 @@ Agradecemos a sua atenção.
         </div>
     );
 }
+
+    
 
     
