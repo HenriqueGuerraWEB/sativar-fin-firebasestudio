@@ -312,15 +312,6 @@ export default function FinancePage() {
         }, 2000);
     }
     
-    const getInvoiceStatusVariant = (status: Invoice['status']): VariantProps<typeof badgeVariants>['variant'] => {
-        switch (status) {
-            case 'Paga': return 'secondary';
-            case 'Pendente': return 'outline';
-            case 'Vencida': return 'destructive';
-            default: return 'default';
-        }
-    }
-
     const getInvoiceStatusClass = (status: Invoice['status']) => {
         switch (status) {
             case 'Paga': return 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-400';
@@ -513,16 +504,15 @@ export default function FinancePage() {
                  <TabsContent value="income">
                      <Card>
                         <CardHeader>
-                            <CardTitle>Contas a Receber</CardTitle>
-                            <CardDescription>Visualize as faturas pendentes e pagas dos clientes.</CardDescription>
+                            <CardTitle>Entradas Recebidas</CardTitle>
+                            <CardDescription>Visualize o histórico de faturas pagas pelos clientes.</CardDescription>
                         </CardHeader>
                         <CardContent>
                              <Table>
                                 <TableHeader>
                                     <TableRow>
                                         <TableHead>Cliente</TableHead>
-                                        <TableHead>Vencimento</TableHead>
-                                        <TableHead>Status</TableHead>
+                                        <TableHead>Data do Pagamento</TableHead>
                                         <TableHead className="text-right">Valor</TableHead>
                                     </TableRow>
                                 </TableHeader>
@@ -531,18 +521,12 @@ export default function FinancePage() {
                                         <TableRow key={i}>
                                             <TableCell><Skeleton className="h-5 w-32" /></TableCell>
                                             <TableCell><Skeleton className="h-5 w-24" /></TableCell>
-                                            <TableCell><Skeleton className="h-6 w-20" /></TableCell>
                                             <TableCell className="text-right"><Skeleton className="h-5 w-20 ml-auto" /></TableCell>
                                         </TableRow>
-                                    )) : invoices.map(invoice => (
+                                    )) : invoices.filter(invoice => invoice.status === 'Paga').map(invoice => (
                                         <TableRow key={invoice.id}>
                                             <TableCell className="font-medium">{invoice.clientName}</TableCell>
                                             <TableCell>{format(invoice.dueDate.toDate(), 'dd/MM/yyyy')}</TableCell>
-                                            <TableCell>
-                                                <Badge variant={getInvoiceStatusVariant(invoice.status)} className={getInvoiceStatusClass(invoice.status)}>
-                                                    {invoice.status}
-                                                </Badge>
-                                            </TableCell>
                                             <TableCell className="text-right">{invoice.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</TableCell>
                                         </TableRow>
                                     ))}
