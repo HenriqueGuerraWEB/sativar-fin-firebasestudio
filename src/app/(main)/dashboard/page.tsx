@@ -32,6 +32,7 @@ type Expense = {
     id: string;
     amount: number;
     dueDate: Timestamp;
+    status: 'Paga' | 'Pendente';
 };
 
 const chartConfig = {
@@ -113,34 +114,45 @@ export default function DashboardPage() {
         const lastMonthYear = getYear(lastMonthDate);
 
         const paidInvoicesThisMonth = invoices.filter(inv => {
+            if (inv.status !== 'Paga' || !inv.dueDate) return false;
             const dueDate = inv.dueDate.toDate();
-            return inv.status === 'Paga' && getMonth(dueDate) === currentMonth && getYear(dueDate) === currentYear;
+            return getMonth(dueDate) === currentMonth && getYear(dueDate) === currentYear;
         });
         const monthlyRevenue = paidInvoicesThisMonth.reduce((sum, inv) => sum + inv.amount, 0);
 
         const paidInvoicesLastMonth = invoices.filter(inv => {
+            if (inv.status !== 'Paga' || !inv.dueDate) return false;
             const dueDate = inv.dueDate.toDate();
-            return inv.status === 'Paga' && getMonth(dueDate) === lastMonth && getYear(dueDate) === lastMonthYear;
+            return getMonth(dueDate) === lastMonth && getYear(dueDate) === lastMonthYear;
         });
         const lastMonthRevenue = paidInvoicesLastMonth.reduce((sum, inv) => sum + inv.amount, 0);
         const revenueChange = lastMonthRevenue > 0 ? ((monthlyRevenue - lastMonthRevenue) / lastMonthRevenue) * 100 : monthlyRevenue > 0 ? 100 : 0;
 
-        const expensesThisMonth = expenses.filter(exp => {
+        const paidExpensesThisMonth = expenses.filter(exp => {
+            if (exp.status !== 'Paga' || !exp.dueDate) return false;
             const dueDate = exp.dueDate.toDate();
             return getMonth(dueDate) === currentMonth && getYear(dueDate) === currentYear;
         });
-        const monthlyExpenses = expensesThisMonth.reduce((sum, exp) => sum + exp.amount, 0);
+        const monthlyExpenses = paidExpensesThisMonth.reduce((sum, exp) => sum + exp.amount, 0);
         
-        const expensesLastMonth = expenses.filter(exp => {
+        const paidExpensesLastMonth = expenses.filter(exp => {
+            if (exp.status !== 'Paga' || !exp.dueDate) return false;
             const dueDate = exp.dueDate.toDate();
             return getMonth(dueDate) === lastMonth && getYear(dueDate) === lastMonthYear;
         });
-        const lastMonthExpenses = expensesLastMonth.reduce((sum, exp) => sum + exp.amount, 0);
+        const lastMonthExpenses = paidExpensesLastMonth.reduce((sum, exp) => sum + exp.amount, 0);
 
         const expenseChange = lastMonthExpenses > 0 ? ((monthlyExpenses - lastMonthExpenses) / lastMonthExpenses) * 100 : monthlyExpenses > 0 ? 100 : 0;
 
         const expectedProfit = monthlyRevenue - monthlyExpenses;
-        const accountBalance = 54320.10; // Placeholder
+        
+        const totalRevenue = invoices
+            .filter(inv => inv.status === 'Paga')
+            .reduce((sum, inv) => sum + inv.amount, 0);
+        const totalExpenses = expenses
+            .filter(exp => exp.status === 'Paga')
+            .reduce((sum, exp) => sum + exp.amount, 0);
+        const accountBalance = totalRevenue - totalExpenses;
 
         return { monthlyRevenue, revenueChange, monthlyExpenses, expenseChange, expectedProfit, accountBalance };
 
@@ -170,12 +182,14 @@ export default function DashboardPage() {
         });
 
         expenses.forEach(expense => {
-            const date = expense.dueDate.toDate();
-            const monthStr = format(date, 'MMM', { locale: ptBR });
-             const year = getYear(date);
-            const entry = data.find(d => d.month === monthStr && d.year === year);
-            if (entry) {
-                entry.expenses += expense.amount;
+            if (expense.status === 'Paga') {
+                const date = expense.dueDate.toDate();
+                const monthStr = format(date, 'MMM', { locale: ptBR });
+                const year = getYear(date);
+                const entry = data.find(d => d.month === monthStr && d.year === year);
+                if (entry) {
+                    entry.expenses += expense.amount;
+                }
             }
         });
 
@@ -218,7 +232,7 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             {isLoading ? <Skeleton className="h-8 w-3/4" /> : <div className="text-2xl font-bold">{monthlyRevenue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</div>}
-            {isLoading ? <Skeleton className="h-4 w-1/2 mt-1" /> : <p className="text-xs text-muted-foreground">{revenueChange.toFixed(1)}% em relação ao mês passado</p>}
+            {isLoading ? <Skeleton className="h-4 w-1/2 mt-1" /> : <p className="text-xs text-muted-foreground">{revenueChange >= 0 ? '+' : ''}{revenueChange.toFixed(1)}% em relação ao mês passado</p>}
           </CardContent>
         </Card>
         <Card>
@@ -238,12 +252,12 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             {isLoading ? <Skeleton className="h-8 w-3/4" /> : <div className="text-2xl font-bold">{monthlyExpenses.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</div>}
-            {isLoading ? <Skeleton className="h-4 w-1/2 mt-1" /> : <p className="text-xs text-muted-foreground">{expenseChange.toFixed(1)}% em relação ao mês passado</p>}
+            {isLoading ? <Skeleton className="h-4 w-1/2 mt-1" /> : <p className="text-xs text-muted-foreground">{expenseChange >= 0 ? '+' : ''}{expenseChange.toFixed(1)}% em relação ao mês passado</p>}
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Lucro Previsto</CardTitle>
+            <CardTitle className="text-sm font-medium">Lucro do Mês</CardTitle>
             <Activity className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -257,7 +271,7 @@ export default function DashboardPage() {
         <Card className="lg:col-span-3">
           <CardHeader>
             <CardTitle>Receita vs. Despesas</CardTitle>
-            <CardDescription>Últimos 6 meses</CardDescription>
+            <CardDescription>Últimos 6 meses (valores pagos)</CardDescription>
           </CardHeader>
           <CardContent>
             {isLoading ? <Skeleton className="h-[300px] w-full" /> : (
@@ -312,3 +326,6 @@ export default function DashboardPage() {
     </div>
   );
 }
+
+
+    
