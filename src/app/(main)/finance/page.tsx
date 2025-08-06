@@ -14,7 +14,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/firebase';
-import { collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc, query, Timestamp, orderBy } from "firebase/firestore";
+import { collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc, query, Timestamp, orderBy, getDocs } from "firebase/firestore";
 import { Skeleton } from '@/components/ui/skeleton';
 import { format } from 'date-fns';
 
@@ -51,40 +51,46 @@ export default function FinancePage() {
     const [isAnalyzing, setIsAnalyzing] = useState(false);
 
     useEffect(() => {
-        setIsLoading(true);
+        const fetchInitialData = async () => {
+            setIsLoading(true);
+            try {
+                const expenseQuery = query(collection(db, "expenses"), orderBy("dueDate", "desc"));
+                const incomeQuery = query(collection(db, "income"), orderBy("date", "desc"));
+
+                const [expenseSnapshot, incomeSnapshot] = await Promise.all([
+                    getDocs(expenseQuery),
+                    getDocs(incomeQuery)
+                ]);
+
+                setExpenses(expenseSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Expense)));
+                setIncome(incomeSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Income)));
+
+            } catch (error) {
+                console.error("Error fetching initial data:", error);
+                toast({ title: "Erro", description: "Não foi possível carregar os dados financeiros.", variant: "destructive" });
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
+        fetchInitialData();
+
         const expenseQuery = query(collection(db, "expenses"), orderBy("dueDate", "desc"));
         const incomeQuery = query(collection(db, "income"), orderBy("date", "desc"));
 
         const unsubExpenses = onSnapshot(expenseQuery, (snapshot) => {
             setExpenses(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Expense)));
-            if (isLoading) { // Only change loading state if we haven't heard from income yet
-                const unsubIncome = onSnapshot(incomeQuery, (snapshot) => {
-                    setIncome(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Income)));
-                    setIsLoading(false);
-                }, (error) => {
-                    console.error("Error fetching income:", error);
-                    toast({ title: "Erro", description: "Não foi possível carregar as receitas.", variant: "destructive" });
-                    setIsLoading(false);
-                });
-                return () => unsubIncome();
-            }
-        }, (error) => {
-            console.error("Error fetching expenses:", error);
-            toast({ title: "Erro", description: "Não foi possível carregar as despesas.", variant: "destructive" });
-            setIsLoading(false);
         });
-
 
         const unsubIncome = onSnapshot(incomeQuery, (snapshot) => {
             setIncome(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Income)));
         });
 
-
         return () => {
             unsubExpenses();
             unsubIncome();
         };
-    }, [toast, isLoading]);
+    }, [toast]);
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const { id, value } = e.target;
@@ -147,7 +153,7 @@ export default function FinancePage() {
                 </div>
                  <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
                     <SheetTrigger asChild>
-                        <Button size="sm" className="gap-1" onClick={() => setCurrentExpense(emptyExpense)}>
+                        <Button size="sm" className="gap-1" onClick={() => { setCurrentExpense(emptyExpense); setIsSheetOpen(true); }}>
                             <PlusCircle className="h-4 w-4" />
                             Lançar Despesa
                         </Button>
