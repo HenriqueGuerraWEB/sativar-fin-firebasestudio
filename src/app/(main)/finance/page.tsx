@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge, badgeVariants } from "@/components/ui/badge";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { MoreHorizontal, PlusCircle, Sparkles } from "lucide-react";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger, SheetFooter } from "@/components/ui/sheet";
 import { Input } from "@/components/ui/input";
@@ -177,32 +177,6 @@ export default function FinancePage() {
             });
         }
     };
-    
-    const handleUpdateInvoiceStatus = async (invoiceId: string, status: Invoice['status']) => {
-        try {
-            const invoiceRef = doc(db, "invoices", invoiceId);
-            await updateDoc(invoiceRef, { status });
-            toast({ title: "Sucesso", description: `Fatura marcada como ${status}.`});
-        } catch (error) {
-            console.error("Error updating status: ", error);
-            toast({ title: "Erro", description: "Não foi possível atualizar o status da fatura.", variant: "destructive" });
-        }
-    };
-
-    const handleDeleteInvoice = async (invoiceId: string) => {
-        try {
-            await deleteDoc(doc(db, "invoices", invoiceId));
-            toast({ title: "Sucesso", description: "Fatura excluída com sucesso." });
-        } catch (error) {
-            console.error("Error deleting invoice: ", error);
-            toast({
-                title: "Erro",
-                description: "Não foi possível excluir a fatura.",
-                variant: "destructive",
-            });
-        }
-    };
-
 
     const handleSaveNewCategory = async () => {
         if (!newCategoryName.trim()) {
@@ -211,7 +185,7 @@ export default function FinancePage() {
         }
         try {
             const newCategory = { name: newCategoryName };
-            const docRef = await addDoc(collection(db, "expenseCategories"), newCategory);
+            await addDoc(collection(db, "expenseCategories"), newCategory);
             toast({ title: "Sucesso!", description: `Categoria "${newCategoryName}" adicionada.` });
             setCurrentExpense(prev => ({ ...prev, category: newCategoryName }));
             setNewCategoryName("");
@@ -450,7 +424,6 @@ export default function FinancePage() {
                                         <TableHead>Vencimento</TableHead>
                                         <TableHead>Status</TableHead>
                                         <TableHead className="text-right">Valor</TableHead>
-                                        <TableHead><span className="sr-only">Ações</span></TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
@@ -460,7 +433,6 @@ export default function FinancePage() {
                                             <TableCell><Skeleton className="h-5 w-24" /></TableCell>
                                             <TableCell><Skeleton className="h-6 w-20" /></TableCell>
                                             <TableCell className="text-right"><Skeleton className="h-5 w-20 ml-auto" /></TableCell>
-                                            <TableCell><Skeleton className="h-8 w-8 ml-auto" /></TableCell>
                                         </TableRow>
                                     )) : invoices.map(invoice => (
                                         <TableRow key={invoice.id}>
@@ -472,47 +444,6 @@ export default function FinancePage() {
                                                 </Badge>
                                             </TableCell>
                                             <TableCell className="text-right">{invoice.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</TableCell>
-                                            <TableCell>
-                                                <div className="flex justify-end">
-                                                    <DropdownMenu>
-                                                        <DropdownMenuTrigger asChild>
-                                                            <Button aria-haspopup="true" size="icon" variant="ghost">
-                                                                <MoreHorizontal className="h-4 w-4" />
-                                                                <span className="sr-only">Toggle menu</span>
-                                                            </Button>
-                                                        </DropdownMenuTrigger>
-                                                        <DropdownMenuContent align="end">
-                                                            <DropdownMenuLabel>Ações</DropdownMenuLabel>
-                                                            <DropdownMenuItem onClick={() => handleUpdateInvoiceStatus(invoice.id, 'Paga')} disabled={invoice.status === 'Paga'}>
-                                                                Marcar como Paga
-                                                            </DropdownMenuItem>
-                                                            <DropdownMenuItem onClick={() => handleUpdateInvoiceStatus(invoice.id, 'Pendente')} disabled={invoice.status === 'Pendente' || invoice.status === 'Vencida'}>
-                                                                Marcar como Pendente
-                                                            </DropdownMenuItem>
-                                                            <DropdownMenuSeparator />
-                                                            <AlertDialog>
-                                                                <AlertDialogTrigger asChild>
-                                                                    <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive focus:text-destructive focus:bg-destructive/10">
-                                                                        Excluir
-                                                                    </DropdownMenuItem>
-                                                                </AlertDialogTrigger>
-                                                                <AlertDialogContent>
-                                                                    <AlertDialogHeader>
-                                                                        <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
-                                                                        <AlertDialogDescription>
-                                                                            Essa ação não pode ser desfeita. Isso excluirá permanentemente a fatura.
-                                                                        </AlertDialogDescription>
-                                                                    </AlertDialogHeader>
-                                                                    <AlertDialogFooter>
-                                                                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                                                        <AlertDialogAction onClick={() => handleDeleteInvoice(invoice.id)}>Excluir</AlertDialogAction>
-                                                                    </AlertDialogFooter>
-                                                                </AlertDialogContent>
-                                                            </AlertDialog>
-                                                        </DropdownMenuContent>
-                                                    </DropdownMenu>
-                                                </div>
-                                            </TableCell>
                                         </TableRow>
                                     ))}
                                 </TableBody>
@@ -536,5 +467,3 @@ export default function FinancePage() {
             </Tabs>
         </div>
     );
-
-    
