@@ -11,17 +11,20 @@ import { MoreHorizontal, PlusCircle } from "lucide-react";
 import type { VariantProps } from 'class-variance-authority';
 import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/firebase';
-import { collection, onSnapshot, query, Timestamp, orderBy, addDoc, doc, updateDoc, getDocs } from "firebase/firestore";
+import { collection, onSnapshot, query, Timestamp, orderBy, addDoc, doc, updateDoc, getDocs, where } from "firebase/firestore";
 import { Skeleton } from '@/components/ui/skeleton';
-import { format } from 'date-fns';
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger, SheetFooter } from "@/components/ui/sheet";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { format, endOfMonth, startOfMonth } from 'date-fns';
+
+type Plan = {
+    id: string;
+    price: number;
+}
 
 type Client = {
     id: string;
     name: string;
+    planId?: string;
+    status: 'Ativo' | 'Inativo';
 }
 
 type Invoice = {
@@ -34,27 +37,31 @@ type Invoice = {
     status: 'Paga' | 'Pendente' | 'Vencida';
 };
 
-const emptyInvoice: Omit<Invoice, 'id' | 'issueDate' | 'status'> = {
-    clientId: '',
-    clientName: '',
-    amount: 0,
-    dueDate: Timestamp.now(),
-}
-
 export default function InvoicesPage() {
     const { toast } = useToast();
     const [invoices, setInvoices] = useState<Invoice[]>([]);
-    const [clients, setClients] = useState<Client[]>([]);
     const [isLoading, setIsLoading] = useState(true);
-    const [isSheetOpen, setIsSheetOpen] = useState(false);
-    const [currentInvoice, setCurrentInvoice] = useState(emptyInvoice);
+    const [isGenerating, setIsGenerating] = useState(false);
     
     useEffect(() => {
         setIsLoading(true);
         const q = query(collection(db, "invoices"), orderBy("issueDate", "desc"));
         const unsubscribe = onSnapshot(q, (querySnapshot) => {
             const invoicesData: Invoice[] = querySnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Invoice));
-            setInvoices(invoicesData);
+            
+            const updatedInvoices = invoicesData.map(invoice => {
+                const today = new Date();
+                today.setHours(0,0,0,0);
+                const dueDate = invoice.dueDate.toDate();
+                if (invoice.status === 'Pendente' && dueDate < today) {
+                    const invoiceRef = doc(db, "invoices", invoice.id);
+                    updateDoc(invoiceRef, { status: 'Vencida' });
+                    return {...invoice, status: 'Vencida'};
+                }
+                return invoice;
+            });
+            
+            setInvoices(updatedInvoices);
             setIsLoading(false);
         }, (error) => {
             console.error("Error fetching invoices: ", error);
@@ -66,55 +73,80 @@ export default function InvoicesPage() {
             setIsLoading(false);
         });
 
-        const fetchClients = async () => {
-            const clientQuery = query(collection(db, "clients"));
-            const clientSnapshot = await getDocs(clientQuery);
-            const clientsData = clientSnapshot.docs.map(doc => ({ id: doc.id, name: doc.data().name } as Client));
-            setClients(clientsData);
-        }
-        
-        fetchClients();
-
         return () => unsubscribe();
     }, [toast]);
-
-    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const { id, value } = e.target;
-        if (id === 'dueDate') {
-            setCurrentInvoice(prev => ({ ...prev, [id]: Timestamp.fromDate(new Date(value)) }));
-        } else if (id === 'amount') {
-             const numValue = parseFloat(value);
-             setCurrentInvoice(prev => ({ ...prev, [id]: isNaN(numValue) ? 0 : numValue }));
-        }
-    };
     
-    const handleClientSelect = (clientId: string) => {
-        const client = clients.find(c => c.id === clientId);
-        if (client) {
-            setCurrentInvoice(prev => ({ ...prev, clientId: client.id, clientName: client.name }));
+    const handleGenerateInvoices = async () => {
+        setIsGenerating(true);
+        try {
+            // 1. Fetch all active clients with a plan
+            const clientsQuery = query(collection(db, "clients"), where("status", "==", "Ativo"), where("planId", "!=", null));
+            const clientsSnapshot = await getDocs(clientsQuery);
+            const activeClients = clientsSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Client));
+
+            if (activeClients.length === 0) {
+                toast({ title: "Nenhuma ação necessária", description: "Não há clientes ativos com planos para gerar faturas." });
+                return;
+            }
+
+            // 2. Fetch all plans
+            const plansQuery = query(collection(db, "plans"));
+            const plansSnapshot = await getDocs(plansQuery);
+            const plansMap = plansSnapshot.docs.reduce((acc, doc) => {
+                acc[doc.id] = { ...doc.data(), id: doc.id } as Plan;
+                return acc;
+            }, {} as Record<string, Plan>);
+
+            // 3. Fetch invoices for the current month
+            const now = new Date();
+            const startOfCurrentMonth = startOfMonth(now);
+            const endOfCurrentMonth = endOfMonth(now);
+            const invoicesQuery = query(collection(db, "invoices"), 
+                where("issueDate", ">=", Timestamp.fromDate(startOfCurrentMonth)),
+                where("issueDate", "<=", Timestamp.fromDate(endOfCurrentMonth))
+            );
+            const invoicesSnapshot = await getDocs(invoicesQuery);
+            const existingInvoicesClientIds = new Set(invoicesSnapshot.docs.map(doc => doc.data().clientId));
+
+            // 4. Determine which clients need invoices
+            const clientsToInvoice = activeClients.filter(client => !existingInvoicesClientIds.has(client.id));
+
+            if (clientsToInvoice.length === 0) {
+                toast({ title: "Nenhuma ação necessária", description: "Todos os clientes ativos já possuem faturas para o mês corrente." });
+                return;
+            }
+
+            // 5. Create new invoices
+            const generationPromises = clientsToInvoice.map(client => {
+                const plan = plansMap[client.planId!];
+                if (!plan) {
+                    console.warn(`Plano com ID ${client.planId} não encontrado para o cliente ${client.name}.`);
+                    return Promise.resolve(null);
+                }
+
+                const newInvoice = {
+                    clientId: client.id,
+                    clientName: client.name,
+                    amount: plan.price,
+                    issueDate: Timestamp.now(),
+                    dueDate: Timestamp.fromDate(endOfMonth(new Date())),
+                    status: 'Pendente' as const,
+                };
+                return addDoc(collection(db, "invoices"), newInvoice);
+            });
+
+            await Promise.all(generationPromises);
+
+            toast({ title: "Sucesso!", description: `${clientsToInvoice.length} novas faturas foram geradas com sucesso.` });
+
+        } catch (error) {
+            console.error("Error generating invoices:", error);
+            toast({ title: "Erro", description: "Ocorreu um erro ao gerar as faturas.", variant: "destructive" });
+        } finally {
+            setIsGenerating(false);
         }
     }
 
-    const handleSaveInvoice = async () => {
-        if (!currentInvoice.clientId || currentInvoice.amount <= 0) {
-            toast({ title: "Erro", description: "Cliente e Valor (maior que zero) são obrigatórios.", variant: "destructive" });
-            return;
-        }
-
-        try {
-            await addDoc(collection(db, "invoices"), {
-                ...currentInvoice,
-                status: "Pendente",
-                issueDate: Timestamp.now(),
-            });
-            toast({ title: "Sucesso", description: "Fatura gerada com sucesso." });
-            setIsSheetOpen(false);
-            setCurrentInvoice(emptyInvoice);
-        } catch (error) {
-            console.error("Error saving invoice: ", error);
-            toast({ title: "Erro", description: "Não foi possível gerar a fatura.", variant: "destructive" });
-        }
-    };
 
     const handleUpdateStatus = async (invoiceId: string, status: Invoice['status']) => {
         try {
@@ -153,48 +185,10 @@ export default function InvoicesPage() {
                     <h1 className="text-3xl font-bold tracking-tight">Faturas</h1>
                     <p className="text-muted-foreground">Gerencie e visualize todas as faturas.</p>
                 </div>
-                 <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
-                    <SheetTrigger asChild>
-                        <Button size="sm" className="gap-1" onClick={() => setCurrentInvoice(emptyInvoice)}>
-                            <PlusCircle className="h-4 w-4" />
-                            Gerar Fatura
-                        </Button>
-                    </SheetTrigger>
-                    <SheetContent>
-                        <SheetHeader>
-                            <SheetTitle>Gerar nova fatura</SheetTitle>
-                            <SheetDescription>
-                                Preencha os detalhes da fatura.
-                            </SheetDescription>
-                        </SheetHeader>
-                        <div className="grid gap-4 py-4">
-                             <div className="grid grid-cols-4 items-center gap-4">
-                                <Label htmlFor="client" className="text-right">Cliente</Label>
-                                <Select onValueChange={handleClientSelect} value={currentInvoice.clientId}>
-                                    <SelectTrigger className="col-span-3">
-                                        <SelectValue placeholder="Selecione um cliente" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {clients.map(client => (
-                                            <SelectItem key={client.id} value={client.id}>{client.name}</SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                            <div className="grid grid-cols-4 items-center gap-4">
-                                <Label htmlFor="amount" className="text-right">Valor (R$)</Label>
-                                <Input id="amount" type="number" value={currentInvoice.amount} onChange={handleInputChange} className="col-span-3" />
-                            </div>
-                            <div className="grid grid-cols-4 items-center gap-4">
-                                <Label htmlFor="dueDate" className="text-right">Vencimento</Label>
-                                <Input id="dueDate" type="date" onChange={handleInputChange} className="col-span-3" defaultValue={format(currentInvoice.dueDate.toDate(), 'yyyy-MM-dd')} />
-                            </div>
-                        </div>
-                        <SheetFooter>
-                            <Button onClick={handleSaveInvoice}>Salvar Fatura</Button>
-                        </SheetFooter>
-                    </SheetContent>
-                </Sheet>
+                 <Button size="sm" className="gap-1" onClick={handleGenerateInvoices} disabled={isGenerating}>
+                    <PlusCircle className="h-4 w-4" />
+                    {isGenerating ? 'Gerando...' : 'Gerar Faturas Pendentes'}
+                </Button>
             </div>
             <Card>
                 <CardHeader>
@@ -249,7 +243,6 @@ export default function InvoicesPage() {
                                                     <DropdownMenuLabel>Ações</DropdownMenuLabel>
                                                     <DropdownMenuItem onClick={() => handleUpdateStatus(invoice.id, 'Paga')} disabled={invoice.status === 'Paga'}>Marcar como Paga</DropdownMenuItem>
                                                     <DropdownMenuItem onClick={() => handleUpdateStatus(invoice.id, 'Pendente')} disabled={invoice.status === 'Pendente'}>Marcar como Pendente</DropdownMenuItem>
-                                                    <DropdownMenuItem onClick={() => handleUpdateStatus(invoice.id, 'Vencida')} disabled={invoice.status === 'Vencida'}>Marcar como Vencida</DropdownMenuItem>
                                                     <DropdownMenuSeparator />
                                                     <DropdownMenuItem>Ver Detalhes</DropdownMenuItem>
                                                     <DropdownMenuItem>Enviar Lembrete</DropdownMenuItem>
@@ -267,5 +260,3 @@ export default function InvoicesPage() {
         </div>
     );
 }
-
-    
