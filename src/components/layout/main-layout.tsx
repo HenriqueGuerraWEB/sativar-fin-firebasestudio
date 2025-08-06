@@ -103,7 +103,9 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
             <div className="flex flex-1 overflow-hidden">
                 <Sidebar>
                     <SidebarHeader>
-                       <SativarLogoIcon />
+                        <Link href="/dashboard">
+                           <SativarLogoIcon />
+                        </Link>
                     </SidebarHeader>
                     <SidebarContent>
                     <SidebarMenu>
