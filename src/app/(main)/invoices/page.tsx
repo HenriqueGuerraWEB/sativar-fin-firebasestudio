@@ -612,9 +612,11 @@ Agradecemos a sua atenção.
                     <Accordion type="multiple" className="w-full">
                         {Object.entries(groupedInvoices).map(([clientId, { clientName, invoices: clientInvoices }]) => (
                             <AccordionItem value={clientId} key={clientId}>
-                                <AccordionTrigger className="flex w-full justify-between items-center p-4 hover:bg-muted/50 rounded-lg">
-                                    <span className="font-medium text-lg">{clientName}</span>
-                                    <div className='flex items-center gap-4'>
+                                <div className="flex w-full justify-between items-center p-4 hover:bg-muted/50 rounded-lg">
+                                    <AccordionTrigger className="flex-1 text-left">
+                                        <span className="font-medium text-lg">{clientName}</span>
+                                    </AccordionTrigger>
+                                    <div className='flex items-center gap-4 pl-4'>
                                         <Badge variant="outline">{clientInvoices.length} fatura(s)</Badge>
                                         <AlertDialog>
                                             <AlertDialogTrigger asChild>
@@ -636,9 +638,8 @@ Agradecemos a sua atenção.
                                                 </AlertDialogFooter>
                                             </AlertDialogContent>
                                         </AlertDialog>
-                                        <ChevronDown className="h-4 w-4 shrink-0 transition-transform duration-200" />
                                     </div>
-                                </AccordionTrigger>
+                                </div>
                                 <AccordionContent>
                                     <Table>
                                         <TableHeader>
@@ -784,5 +785,7 @@ Agradecemos a sua atenção.
         </div>
     );
 }
+
+    
 
     
