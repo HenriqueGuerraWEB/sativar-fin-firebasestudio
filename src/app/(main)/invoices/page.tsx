@@ -7,11 +7,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge, badgeVariants } from "@/components/ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
-import { MoreHorizontal, PlusCircle, Printer, Calendar as CalendarIcon, ChevronDown, Shapes } from "lucide-react";
+import { MoreHorizontal, PlusCircle, Printer, Calendar as CalendarIcon, ChevronDown, Shapes, Trash2 } from "lucide-react";
 import type { VariantProps } from 'class-variance-authority';
 import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/firebase';
-import { collection, onSnapshot, query, Timestamp, orderBy, addDoc, doc, updateDoc, getDocs, where, deleteDoc, getDoc } from "firebase/firestore";
+import { collection, onSnapshot, query, Timestamp, orderBy, addDoc, doc, updateDoc, getDocs, where, deleteDoc, getDoc, writeBatch } from "firebase/firestore";
 import { Skeleton } from '@/components/ui/skeleton';
 import { format, addDays, addMonths, addYears, isBefore, startOfDay, subDays, subMonths, subYears, isEqual } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -392,6 +392,27 @@ Agradecemos a sua atenção.
             });
         }
     };
+
+    const handleDeleteUnpaidInvoices = async (invoicesToDelete: Invoice[]) => {
+        const unpaidInvoices = invoicesToDelete.filter(inv => inv.status !== 'Paga');
+        if (unpaidInvoices.length === 0) {
+            toast({ title: "Nenhuma ação necessária", description: "Não há faturas pendentes ou vencidas para excluir." });
+            return;
+        }
+
+        try {
+            const batch = writeBatch(db);
+            unpaidInvoices.forEach(invoice => {
+                const invoiceRef = doc(db, "invoices", invoice.id);
+                batch.delete(invoiceRef);
+            });
+            await batch.commit();
+            toast({ title: "Sucesso!", description: `${unpaidInvoices.length} fatura(s) foram excluídas.`});
+        } catch (error) {
+             console.error("Error deleting unpaid invoices: ", error);
+            toast({ title: "Erro", description: "Não foi possível excluir as faturas.", variant: "destructive" });
+        }
+    }
     
     const handlePrint = async (invoice: Invoice) => {
         try {
@@ -595,6 +616,26 @@ Agradecemos a sua atenção.
                                     <span className="font-medium text-lg">{clientName}</span>
                                     <div className='flex items-center gap-4'>
                                         <Badge variant="outline">{clientInvoices.length} fatura(s)</Badge>
+                                        <AlertDialog>
+                                            <AlertDialogTrigger asChild>
+                                                <Button variant="ghost" size="sm" className="gap-1 text-destructive hover:text-destructive hover:bg-destructive/10" onClick={(e) => e.stopPropagation()}>
+                                                    <Trash2 className="h-4 w-4" />
+                                                    Excluir não pagas
+                                                </Button>
+                                            </AlertDialogTrigger>
+                                            <AlertDialogContent onClick={(e) => e.stopPropagation()}>
+                                                <AlertDialogHeader>
+                                                    <AlertDialogTitle>Excluir faturas não pagas?</AlertDialogTitle>
+                                                    <AlertDialogDescription>
+                                                        Esta ação não pode ser desfeita. Todas as faturas com status &quot;Pendente&quot; ou &quot;Vencida&quot; para <b>{clientName}</b> serão permanentemente excluídas. Faturas pagas não serão afetadas.
+                                                    </AlertDialogDescription>
+                                                </AlertDialogHeader>
+                                                <AlertDialogFooter>
+                                                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                                    <AlertDialogAction onClick={() => handleDeleteUnpaidInvoices(clientInvoices)}>Sim, Excluir</AlertDialogAction>
+                                                </AlertDialogFooter>
+                                            </AlertDialogContent>
+                                        </AlertDialog>
                                         <ChevronDown className="h-4 w-4 shrink-0 transition-transform duration-200" />
                                     </div>
                                 </AccordionTrigger>
@@ -743,3 +784,5 @@ Agradecemos a sua atenção.
         </div>
     );
 }
+
+    
