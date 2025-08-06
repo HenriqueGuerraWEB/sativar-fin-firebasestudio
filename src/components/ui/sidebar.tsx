@@ -299,23 +299,12 @@ const SidebarMenuButton = React.forwardRef<
         data-sidebar="menu-button"
         data-size={size}
         data-active={isActive}
-        className={cn(sidebarMenuButtonVariants({ variant, size, className }), "group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:!p-2" )}
+        className={cn(sidebarMenuButtonVariants({ variant, size, className }))}
         {...props}
       >
         {children}
-        <span className="sr-only">
-          {typeof tooltip === 'string' ? tooltip : ''}
-        </span>
       </Comp>
     )
-    
-    // Hide text label when collapsed
-    React.useEffect(() => {
-        const textLabel = (ref as React.RefObject<HTMLButtonElement>)?.current?.querySelector('span');
-        if (textLabel) {
-            textLabel.classList.add('hidden');
-        }
-    }, [ref]);
 
     if (!tooltip) {
       return button;

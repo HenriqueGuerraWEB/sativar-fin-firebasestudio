@@ -12,7 +12,7 @@ export const SativarLogo = ({ className }: { className?: string }) => (
 );
 
 export const SativarLogoIcon = ({ className }: { className?: string }) => (
-    <div className="hidden items-center gap-2 group-data-[collapsible=icon]:flex">
+    <div className="flex items-center gap-2 group-data-[collapsible=icon]:flex">
         <Package2 className={cn("h-6 w-6 text-brand", className)} />
     </div>
 );

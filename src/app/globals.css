@@ -37,7 +37,7 @@
     --sidebar-accent-foreground: 210 20% 98%;
     --sidebar-border: 215 27.9% 16.9%;
     --sidebar-ring: 215 27.9% 16.9%;
-    --brand-color: 142 56% 52%;
+    --brand-color: 142 76% 48%;
   }
 
   .dark {
@@ -73,7 +73,7 @@
     --sidebar-accent-foreground: 210 20% 98%;
     --sidebar-border: 215 27.9% 16.9%;
     --sidebar-ring: 215 27.9% 16.9%;
-    --brand-color: 142 56% 52%;
+    --brand-color: 142 76% 48%;
   }
 }
 
