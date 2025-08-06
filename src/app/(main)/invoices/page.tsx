@@ -54,6 +54,8 @@ type CompanySettings = {
     email: string;
     website: string;
     logoDataUrl: string;
+    cpf: string;
+    cnpj: string;
 };
 
 
@@ -312,6 +314,16 @@ Agradecemos a sua atenção.
             const logoHtml = company?.logoDataUrl 
                 ? `<img src="${company.logoDataUrl}" alt="Company Logo" style="max-height: 60px; max-width: 200px;" />` 
                 : `<h1 class="text-3xl font-bold text-gray-800">${company?.name || 'Sua Empresa'}</h1>`;
+            
+            const companyDetailsHtml = [
+                company?.address?.replace(/\n/g, '<br>'),
+                company?.phone,
+                company?.email,
+                company?.website,
+                company?.cpf ? `CPF: ${company.cpf}` : '',
+                company?.cnpj ? `CNPJ: ${company.cnpj}` : ''
+            ].filter(Boolean).join('<br>');
+
 
             const printWindow = window.open('', '', 'height=800,width=800');
             if (printWindow) {
@@ -333,10 +345,10 @@ Agradecemos a sua atenção.
                         </head>
                         <body class="bg-gray-100 p-8">
                             <div class="max-w-4xl mx-auto bg-white rounded-lg shadow-lg p-12">
-                                <div class="grid grid-cols-2 items-center mb-12">
+                                <div class="grid grid-cols-2 items-start mb-12">
                                     <div>
                                         ${logoHtml}
-                                        ${company ? `<p class="text-gray-500 mt-2">${company.address.replace(/\n/g, '<br>')}</p>` : ''}
+                                        ${company ? `<div class="text-gray-500 mt-4 text-sm">${companyDetailsHtml}</div>` : ''}
                                     </div>
                                     <div class="text-right">
                                         <h2 class="text-4xl font-bold text-gray-700">FATURA</h2>

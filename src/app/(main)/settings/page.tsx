@@ -20,6 +20,8 @@ type CompanySettings = {
     email: string;
     website: string;
     logoDataUrl: string;
+    cpf: string;
+    cnpj: string;
 };
 
 const emptySettings: CompanySettings = {
@@ -29,6 +31,8 @@ const emptySettings: CompanySettings = {
     email: '',
     website: '',
     logoDataUrl: '',
+    cpf: '',
+    cnpj: '',
 };
 
 export default function SettingsPage() {
@@ -129,6 +133,16 @@ export default function SettingsPage() {
                             <div className="grid gap-2">
                                 <Label htmlFor="name">Nome da Empresa</Label>
                                 <Input id="name" value={settings.name} onChange={handleInputChange} placeholder="Sua Empresa LTDA" />
+                            </div>
+                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div className="grid gap-2">
+                                    <Label htmlFor="cpf">CPF</Label>
+                                    <Input id="cpf" value={settings.cpf} onChange={handleInputChange} placeholder="000.000.000-00" />
+                                </div>
+                                <div className="grid gap-2">
+                                    <Label htmlFor="cnpj">CNPJ</Label>
+                                    <Input id="cnpj" value={settings.cnpj} onChange={handleInputChange} placeholder="00.000.000/0000-00" />
+                                </div>
                             </div>
                             <div className="grid gap-2">
                                 <Label htmlFor="address">Endereço</Label>
