@@ -14,7 +14,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
-import { Sheet, SheetContent } from "./sheet"
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "./sheet"
 
 
 const SIDEBAR_WIDTH_ICON = "3.5rem"
@@ -110,6 +110,9 @@ const Sidebar = React.forwardRef<
                     side="left"
                     className="w-[var(--sidebar-width-icon)] bg-sidebar p-0 text-sidebar-foreground [&>button]:hidden"
                 >
+                    <SheetHeader>
+                        <SheetTitle className="sr-only">Menu Principal</SheetTitle>
+                    </SheetHeader>
                     <div className="flex h-full w-full flex-col">{children}</div>
                 </SheetContent>
             </Sheet>
