@@ -78,45 +78,45 @@ function HeaderContent() {
     );
 }
 
-export function MainLayout({ children }: { children: React.ReactNode }) {
-  const pathname = usePathname();
-  const { user } = useAuth();
-  const { isMobile, setOpenMobile } = useSidebar();
 
-  const menuItems = [
-    { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { href: '/clients', label: 'Clientes', icon: Users },
-    { href: '/plans', label: 'Planos', icon: Package },
-    { href: '/settings/categories', label: 'Categorias', icon: Shapes },
-    { href: '/finance', label: 'Financeiro', icon: Banknote },
-    { href: '/invoices', label: 'Faturas', icon: FileText },
-  ];
+function MainLayoutContent({ children }: { children: React.ReactNode }) {
+    const pathname = usePathname();
+    const { user } = useAuth();
+    const { isMobile, setOpenMobile } = useSidebar();
 
-  const handleLinkClick = () => {
-    if (isMobile) {
-      setOpenMobile(false);
+    const menuItems = [
+      { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+      { href: '/clients', label: 'Clientes', icon: Users },
+      { href: '/plans', label: 'Planos', icon: Package },
+      { href: '/settings/categories', label: 'Categorias', icon: Shapes },
+      { href: '/finance', label: 'Financeiro', icon: Banknote },
+      { href: '/invoices', label: 'Faturas', icon: FileText },
+    ];
+  
+    const handleLinkClick = () => {
+      if (isMobile) {
+        setOpenMobile(false);
+      }
+    };
+  
+    const isActive = (href: string) => {
+      if (href === '/dashboard') {
+          return pathname === href;
+      }
+      if (['/clients', '/plans', '/finance', '/invoices', '/settings'].includes(href)) {
+          return pathname.startsWith(href);
+      }
+       if (href === '/settings/categories') {
+          return pathname === href;
+      }
+      return false;
     }
-  };
-
-  const isActive = (href: string) => {
-    if (href === '/dashboard') {
-        return pathname === href;
+  
+    if (!user) {
+      return null; 
     }
-    if (['/clients', '/plans', '/finance', '/invoices', '/settings'].includes(href)) {
-        return pathname.startsWith(href);
-    }
-     if (href === '/settings/categories') {
-        return pathname === href;
-    }
-    return false;
-  }
 
-  if (!user) {
-    return null; 
-  }
-
-  return (
-    <SidebarProvider>
+    return (
         <div className="flex h-screen w-full bg-background">
             <Sidebar>
                 <SidebarHeader>
@@ -161,6 +161,19 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
                 </main>
             </div>
         </div>
-    </SidebarProvider>
-  );
+    )
 }
+
+export function MainLayout({ children }: { children: React.ReactNode }) {
+    const { user } = useAuth();
+  
+    if (!user) {
+      return null; 
+    }
+  
+    return (
+      <SidebarProvider>
+          <MainLayoutContent>{children}</MainLayoutContent>
+      </SidebarProvider>
+    );
+  }
