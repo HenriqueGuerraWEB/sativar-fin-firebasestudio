@@ -36,13 +36,17 @@ type Plan = {
     recurrencePeriod: 'dias' | 'meses' | 'anos';
 }
 
+type ClientPlan = {
+    planId: string;
+    planActivationDate: Timestamp;
+};
+
 type Client = {
     id: string;
     name: string;
     email: string;
-    planId?: string;
+    plans: ClientPlan[];
     status: 'Ativo' | 'Inativo';
-    planActivationDate?: Timestamp;
 }
 
 type Invoice = {
@@ -54,6 +58,7 @@ type Invoice = {
     dueDate: Timestamp;
     status: 'Paga' | 'Pendente' | 'Vencida';
     planId: string;
+    planName?: string;
     paymentDate?: Timestamp;
     paymentMethod?: 'Pix' | 'Cartão de Crédito' | 'Cartão de Débito';
     paymentNotes?: string;
@@ -154,12 +159,12 @@ export default function InvoicesPage() {
     const handleGenerateInvoices = async () => {
         setIsGenerating(true);
         try {
-            // 1. Fetch all active clients that have a plan
+            // 1. Fetch all active clients that have plans
             const clientsQuery = query(collection(db, "clients"), where("status", "==", "Ativo"));
             const clientsSnapshot = await getDocs(clientsQuery);
             const activeClients = clientsSnapshot.docs
                 .map(doc => ({ ...doc.data(), id: doc.id } as Client))
-                .filter(client => client.planId && client.planActivationDate);
+                .filter(client => client.plans && client.plans.length > 0);
 
             if (activeClients.length === 0) {
                 toast({ title: "Nenhuma ação necessária", description: "Não há clientes ativos com planos para gerar faturas." });
@@ -190,59 +195,57 @@ export default function InvoicesPage() {
             const today = new Date();
 
             for (const client of activeClients) {
-                if (!client.planId || !client.planActivationDate) continue;
+                for (const clientPlan of client.plans) {
+                    const plan = plansMap[clientPlan.planId];
+                    if (!plan) continue;
 
-                const plan = plansMap[client.planId];
-                if (!plan) continue;
+                    const clientPlanInvoices = (clientInvoicesMap.get(client.id) || [])
+                        .filter(inv => inv.planId === clientPlan.planId)
+                        .sort((a, b) => b.dueDate.toMillis() - a.dueDate.toMillis());
+                    
+                    let lastBilledDueDate = clientPlanInvoices.length > 0 
+                        ? clientPlanInvoices[0].dueDate.toDate()
+                        : subDays(clientPlan.planActivationDate.toDate(), 1);
+                    
+                    while (true) {
+                        let nextDueDate: Date;
+                        if (!(lastBilledDueDate instanceof Date && !isNaN(lastBilledDueDate.valueOf()))) {
+                           lastBilledDueDate = subDays(clientPlan.planActivationDate.toDate(), 1);
+                        }
 
-                const clientInvoices = clientInvoicesMap.get(client.id)?.sort((a, b) => b.dueDate.toMillis() - a.dueDate.toMillis()) || [];
-                
-                let lastBilledDueDate = clientInvoices.length > 0 
-                    ? clientInvoices[0].dueDate.toDate()
-                    : subDays(client.planActivationDate.toDate(), 1); // Start checking from day before activation
-                
-                // Loop to generate all missing invoices until the client is up-to-date
-                while (true) {
-                    let nextDueDate: Date;
-                    // Ensure lastBilledDueDate is a valid date before calculation
-                    if (!(lastBilledDueDate instanceof Date && !isNaN(lastBilledDueDate.valueOf()))) {
-                       lastBilledDueDate = subDays(client.planActivationDate.toDate(), 1);
+                        switch (plan.recurrencePeriod) {
+                            case 'dias': nextDueDate = addDays(lastBilledDueDate, plan.recurrenceValue); break;
+                            case 'meses': nextDueDate = addMonths(lastBilledDueDate, plan.recurrenceValue); break;
+                            case 'anos': nextDueDate = addYears(lastBilledDueDate, plan.recurrenceValue); break;
+                            default: console.error("Invalid recurrence period for plan:", plan.id); continue;
+                        }
+
+                        if (isBefore(today, nextDueDate)) {
+                            break; 
+                        }
+
+                        const invoiceExists = clientPlanInvoices.some(
+                            inv => inv.dueDate && format(inv.dueDate.toDate(), 'yyyy-MM-dd') === format(nextDueDate, 'yyyy-MM-dd')
+                        );
+
+                        if (!invoiceExists) {
+                            const newInvoice = {
+                                clientId: client.id,
+                                clientName: client.name,
+                                amount: plan.price,
+                                issueDate: Timestamp.now(),
+                                dueDate: Timestamp.fromDate(nextDueDate),
+                                status: 'Pendente' as const,
+                                planId: clientPlan.planId,
+                                planName: plan.name,
+                            };
+                            generationPromises.push(addDoc(collection(db, "invoices"), newInvoice));
+                            clientPlanInvoices.push({ ...newInvoice, id: 'temp' });
+                            generatedCount++;
+                        }
+
+                        lastBilledDueDate = nextDueDate;
                     }
-
-                    switch (plan.recurrencePeriod) {
-                        case 'dias': nextDueDate = addDays(lastBilledDueDate, plan.recurrenceValue); break;
-                        case 'meses': nextDueDate = addMonths(lastBilledDueDate, plan.recurrenceValue); break;
-                        case 'anos': nextDueDate = addYears(lastBilledDueDate, plan.recurrenceValue); break;
-                        default: console.error("Invalid recurrence period for plan:", plan.id); continue;
-                    }
-
-                    // Stop if the next due date is in the future
-                    if (isBefore(today, nextDueDate)) {
-                        break; 
-                    }
-
-                    // Check if an invoice for this exact due date already exists
-                    const invoiceExists = clientInvoices.some(
-                        inv => inv.dueDate && format(inv.dueDate.toDate(), 'yyyy-MM-dd') === format(nextDueDate, 'yyyy-MM-dd')
-                    );
-
-                    if (!invoiceExists) {
-                        const newInvoice = {
-                            clientId: client.id,
-                            clientName: client.name,
-                            amount: plan.price,
-                            issueDate: Timestamp.now(),
-                            dueDate: Timestamp.fromDate(nextDueDate),
-                            status: 'Pendente' as const,
-                            planId: client.planId,
-                        };
-                        generationPromises.push(addDoc(collection(db, "invoices"), newInvoice));
-                        // Add to clientInvoices for the next loop iteration check
-                        clientInvoices.push({ ...newInvoice, id: 'temp' }); 
-                        generatedCount++;
-                    }
-
-                    lastBilledDueDate = nextDueDate; // Update last due date for the next iteration
                 }
             }
 
@@ -566,6 +569,7 @@ Agradecemos a sua atenção.
                                         <TableHeader>
                                             <TableRow>
                                                 <TableHead>Fatura</TableHead>
+                                                <TableHead>Plano</TableHead>
                                                 <TableHead>Data do Pagamento</TableHead>
                                                 <TableHead>Vencimento</TableHead>
                                                 <TableHead>Status</TableHead>
@@ -577,6 +581,7 @@ Agradecemos a sua atenção.
                                             {clientInvoices.map(invoice => (
                                                 <TableRow key={invoice.id}>
                                                     <TableCell className="font-medium">#{invoice.id.substring(0, 7).toUpperCase()}</TableCell>
+                                                    <TableCell>{invoice.planName || 'N/A'}</TableCell>
                                                     <TableCell>{invoice.paymentDate ? format(invoice.paymentDate.toDate(), 'dd/MM/yyyy') : 'N/A'}</TableCell>
                                                     <TableCell>{invoice.dueDate ? format(invoice.dueDate.toDate(), 'dd/MM/yyyy') : 'N/A'}</TableCell>
                                                     <TableCell>
@@ -704,3 +709,5 @@ Agradecemos a sua atenção.
         </div>
     );
 }
+
+    
