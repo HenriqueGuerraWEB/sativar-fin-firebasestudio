@@ -1,8 +1,9 @@
+
 "use client";
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { MoreHorizontal, PlusCircle } from "lucide-react";
@@ -10,15 +11,118 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTr
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from '@/components/ui/textarea';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { useToast } from '@/hooks/use-toast';
+import { db } from '@/lib/firebase';
+import { collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc, query } from "firebase/firestore";
+import { Skeleton } from '@/components/ui/skeleton';
 
-const plans = [
-    { id: "1", name: "SEO Essencial", description: "Otimização básica para motores de busca.", price: 800.00 },
-    { id: "2", name: "Gestão de Mídias Sociais", description: "Criação e agendamento de posts.", price: 1200.00 },
-    { id: "3", name: "Tráfego Pago - Starter", description: "Campanhas no Google Ads e Meta Ads.", price: 1500.00 },
-    { id: "4", name: "Plano Completo de Marketing", description: "SEO, Mídias Sociais, Tráfego Pago e Email Marketing.", price: 3500.00 },
-];
+type Plan = {
+    id: string;
+    name: string;
+    description: string;
+    price: number;
+};
+
+const emptyPlan: Omit<Plan, 'id'> = {
+    name: "",
+    description: "",
+    price: 0,
+};
 
 export default function PlansPage() {
+    const { toast } = useToast();
+    const [plans, setPlans] = useState<Plan[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+    const [isSheetOpen, setIsSheetOpen] = useState(false);
+    const [currentPlan, setCurrentPlan] = useState<Omit<Plan, 'id'> | Plan>(emptyPlan);
+
+    useEffect(() => {
+        setIsLoading(true);
+        const q = query(collection(db, "plans"));
+        const unsubscribe = onSnapshot(q, (querySnapshot) => {
+            const plansData: Plan[] = [];
+            querySnapshot.forEach((doc) => {
+                plansData.push({ ...doc.data(), id: doc.id } as Plan);
+            });
+            setPlans(plansData);
+            setIsLoading(false);
+        }, (error) => {
+            console.error("Error fetching plans: ", error);
+            toast({
+                title: "Erro",
+                description: "Não foi possível carregar os planos.",
+                variant: "destructive",
+            });
+            setIsLoading(false);
+        });
+
+        return () => unsubscribe();
+    }, [toast]);
+
+    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+        const { id, value } = e.target;
+        setCurrentPlan(prev => ({ ...prev, [id]: id === 'price' ? parseFloat(value) || 0 : value }));
+    };
+
+    const handleSavePlan = async () => {
+        if (!currentPlan.name || !currentPlan.price) {
+            toast({
+                title: "Erro",
+                description: "Nome e Preço são campos obrigatórios.",
+                variant: "destructive",
+            });
+            return;
+        }
+
+        try {
+            if ('id' in currentPlan) {
+                // Edit
+                const planRef = doc(db, "plans", currentPlan.id);
+                const { id, ...planData } = currentPlan;
+                await updateDoc(planRef, planData);
+                toast({ title: "Sucesso", description: "Plano atualizado com sucesso." });
+            } else {
+                // Add
+                await addDoc(collection(db, "plans"), currentPlan);
+                toast({ title: "Sucesso", description: "Plano adicionado com sucesso." });
+            }
+            setIsSheetOpen(false);
+            setCurrentPlan(emptyPlan);
+        } catch (error) {
+            console.error("Error saving plan: ", error);
+            toast({
+                title: "Erro",
+                description: "Não foi possível salvar o plano.",
+                variant: "destructive",
+            });
+        }
+    };
+
+    const handleAddNew = () => {
+        setCurrentPlan(emptyPlan);
+        setIsSheetOpen(true);
+    };
+
+    const handleEdit = (plan: Plan) => {
+        setCurrentPlan(plan);
+        setIsSheetOpen(true);
+    };
+
+    const handleDelete = async (planId: string) => {
+        try {
+            await deleteDoc(doc(db, "plans", planId));
+            toast({ title: "Sucesso", description: "Plano excluído com sucesso." });
+        } catch (error) {
+            console.error("Error deleting plan: ", error);
+            toast({
+                title: "Erro",
+                description: "Não foi possível excluir o plano.",
+                variant: "destructive",
+            });
+        }
+    };
+
     return (
         <div className="flex flex-col gap-8">
             <div className="flex items-start justify-between">
@@ -26,16 +130,16 @@ export default function PlansPage() {
                     <h1 className="text-3xl font-bold tracking-tight">Planos de Serviço</h1>
                     <p className="text-muted-foreground">Gerencie seus planos de serviço.</p>
                 </div>
-                <Sheet>
+                <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
                     <SheetTrigger asChild>
-                        <Button size="sm" className="gap-1">
+                        <Button size="sm" className="gap-1" onClick={handleAddNew}>
                             <PlusCircle className="h-4 w-4" />
                             Novo Plano
                         </Button>
                     </SheetTrigger>
                     <SheetContent>
                         <SheetHeader>
-                            <SheetTitle>Criar novo plano</SheetTitle>
+                            <SheetTitle>{'id' in currentPlan ? 'Editar Plano' : 'Criar novo plano'}</SheetTitle>
                             <SheetDescription>
                                 Defina os detalhes do novo plano de serviço.
                             </SheetDescription>
@@ -43,19 +147,19 @@ export default function PlansPage() {
                         <div className="grid gap-4 py-4">
                             <div className="grid grid-cols-4 items-center gap-4">
                                 <Label htmlFor="name" className="text-right">Nome</Label>
-                                <Input id="name" className="col-span-3" />
+                                <Input id="name" value={currentPlan.name} onChange={handleInputChange} className="col-span-3" />
                             </div>
                             <div className="grid grid-cols-4 items-start gap-4">
                                 <Label htmlFor="description" className="text-right pt-2">Descrição</Label>
-                                <Textarea id="description" className="col-span-3" />
+                                <Textarea id="description" value={currentPlan.description} onChange={handleInputChange} className="col-span-3" />
                             </div>
                             <div className="grid grid-cols-4 items-center gap-4">
                                 <Label htmlFor="price" className="text-right">Preço (R$)</Label>
-                                <Input id="price" type="number" className="col-span-3" />
+                                <Input id="price" type="number" value={currentPlan.price} onChange={handleInputChange} className="col-span-3" />
                             </div>
                         </div>
                         <SheetFooter>
-                            <Button type="submit">Salvar Plano</Button>
+                            <Button onClick={handleSavePlan}>Salvar Plano</Button>
                         </SheetFooter>
                     </SheetContent>
                 </Sheet>
@@ -74,7 +178,18 @@ export default function PlansPage() {
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {plans.map(plan => (
+                            {isLoading ? (
+                                Array.from({ length: 4 }).map((_, index) => (
+                                <TableRow key={index}>
+                                    <TableCell>
+                                        <Skeleton className="h-5 w-32" />
+                                        <Skeleton className="mt-2 h-4 w-48" />
+                                    </TableCell>
+                                    <TableCell className="text-right"><Skeleton className="h-5 w-20 ml-auto" /></TableCell>
+                                    <TableCell><Skeleton className="h-8 w-8 ml-auto" /></TableCell>
+                                </TableRow>
+                                ))
+                            ) : plans.map(plan => (
                                 <TableRow key={plan.id}>
                                     <TableCell className="font-medium">
                                         <div>{plan.name}</div>
@@ -94,9 +209,24 @@ export default function PlansPage() {
                                                 </DropdownMenuTrigger>
                                                 <DropdownMenuContent align="end">
                                                     <DropdownMenuLabel>Ações</DropdownMenuLabel>
-                                                    <DropdownMenuItem>Editar</DropdownMenuItem>
-                                                    <DropdownMenuItem>Vincular a Cliente</DropdownMenuItem>
-                                                    <DropdownMenuItem className="text-destructive">Excluir</DropdownMenuItem>
+                                                    <DropdownMenuItem onClick={() => handleEdit(plan)}>Editar</DropdownMenuItem>
+                                                    <AlertDialog>
+                                                        <AlertDialogTrigger asChild>
+                                                            <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive focus:text-destructive focus:bg-destructive/10">Excluir</DropdownMenuItem>
+                                                        </AlertDialogTrigger>
+                                                        <AlertDialogContent>
+                                                            <AlertDialogHeader>
+                                                                <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
+                                                                <AlertDialogDescription>
+                                                                    Essa ação não pode ser desfeita. Isso excluirá permanentemente o plano.
+                                                                </AlertDialogDescription>
+                                                            </AlertDialogHeader>
+                                                            <AlertDialogFooter>
+                                                                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                                                <AlertDialogAction onClick={() => handleDelete(plan.id)}>Excluir</AlertDialogAction>
+                                                            </AlertDialogFooter>
+                                                        </AlertDialogContent>
+                                                    </AlertDialog>
                                                 </DropdownMenuContent>
                                             </DropdownMenu>
                                         </div>
@@ -110,3 +240,4 @@ export default function PlansPage() {
         </div>
     );
 }
+
