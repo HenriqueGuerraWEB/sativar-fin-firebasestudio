@@ -11,15 +11,17 @@ import { MoreHorizontal, PlusCircle, Printer } from "lucide-react";
 import type { VariantProps } from 'class-variance-authority';
 import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/firebase';
-import { collection, onSnapshot, query, Timestamp, orderBy, addDoc, doc, updateDoc, getDocs, where, deleteDoc } from "firebase/firestore";
+import { collection, onSnapshot, query, Timestamp, orderBy, addDoc, doc, updateDoc, getDocs, where, deleteDoc, getDoc } from "firebase/firestore";
 import { Skeleton } from '@/components/ui/skeleton';
-import { format, addDays, addMonths, addYears, isBefore, startOfDay, endOfMonth } from 'date-fns';
+import { format, addDays, addMonths, addYears, isBefore, startOfDay, subDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 
 
 type Plan = {
     id: string;
+    name: string;
+    description: string;
     price: number;
     recurrenceValue: number;
     recurrencePeriod: 'dias' | 'meses' | 'anos';
@@ -28,6 +30,7 @@ type Plan = {
 type Client = {
     id: string;
     name: string;
+    email: string;
     planId?: string;
     status: 'Ativo' | 'Inativo';
     planActivationDate?: Timestamp;
@@ -41,6 +44,7 @@ type Invoice = {
     issueDate: Timestamp;
     dueDate: Timestamp;
     status: 'Paga' | 'Pendente' | 'Vencida';
+    planId: string;
 };
 
 export default function InvoicesPage() {
@@ -132,42 +136,32 @@ export default function InvoicesPage() {
                 if (!plan) continue;
 
                 const clientInvoices = clientInvoicesMap.get(client.id)?.sort((a, b) => b.dueDate.toMillis() - a.dueDate.toMillis()) || [];
-                const lastInvoice = clientInvoices.length > 0 ? clientInvoices[0] : null;
-
-                let lastDueDate = lastInvoice ? lastInvoice.dueDate.toDate() : client.planActivationDate.toDate();
                 
-                // If there's no last invoice, the first "last due date" is the activation date itself.
-                // We should check if an invoice needs to be generated for this activation date.
-                if (!lastInvoice) {
-                    const clientHasInvoiceForActivationDate = clientInvoices.some(
-                        inv => format(inv.dueDate.toDate(), 'yyyy-MM-dd') === format(lastDueDate, 'yyyy-MM-dd')
-                    );
-                    
-                    if (!clientHasInvoiceForActivationDate && (isBefore(lastDueDate, today) || format(lastDueDate, 'yyyy-MM-dd') === format(today, 'yyyy-MM-dd'))) {
-                         const newInvoice = {
-                            clientId: client.id,
-                            clientName: client.name,
-                            amount: plan.price,
-                            issueDate: Timestamp.now(),
-                            dueDate: Timestamp.fromDate(lastDueDate),
-                            status: 'Pendente' as const,
-                        };
-                        generationPromises.push(addDoc(collection(db, "invoices"), newInvoice));
-                        generatedCount++;
-                    }
-                }
+                let lastBilledDueDate = clientInvoices.length > 0 
+                    ? clientInvoices[0].dueDate.toDate()
+                    : subDays(client.planActivationDate.toDate(), 1); // Start checking from day before activation
                 
-                // Iteratively generate invoices until the client is up-to-date
+                // Loop to generate all missing invoices until the client is up-to-date
                 while (true) {
                     let nextDueDate: Date;
                     switch (plan.recurrencePeriod) {
-                        case 'dias': nextDueDate = addDays(lastDueDate, plan.recurrenceValue); break;
-                        case 'meses': nextDueDate = addMonths(lastDueDate, plan.recurrenceValue); break;
-                        case 'anos': nextDueDate = addYears(lastDueDate, plan.recurrenceValue); break;
+                        case 'dias': nextDueDate = addDays(lastBilledDueDate, plan.recurrenceValue); break;
+                        case 'meses': nextDueDate = addMonths(lastBilledDueDate, plan.recurrenceValue); break;
+                        case 'anos': nextDueDate = addYears(lastBilledDueDate, plan.recurrenceValue); break;
                         default: throw new Error("Invalid recurrence period");
                     }
 
-                    if (isBefore(nextDueDate, today) || format(nextDueDate, 'yyyy-MM-dd') === format(today, 'yyyy-MM-dd')) {
+                    // Stop if the next due date is in the future
+                    if (isBefore(today, nextDueDate)) {
+                        break; 
+                    }
+
+                    // Check if an invoice for this exact due date already exists
+                    const invoiceExists = clientInvoices.some(
+                        inv => format(inv.dueDate.toDate(), 'yyyy-MM-dd') === format(nextDueDate, 'yyyy-MM-dd')
+                    );
+
+                    if (!invoiceExists) {
                         const newInvoice = {
                             clientId: client.id,
                             clientName: client.name,
@@ -175,13 +169,13 @@ export default function InvoicesPage() {
                             issueDate: Timestamp.now(),
                             dueDate: Timestamp.fromDate(nextDueDate),
                             status: 'Pendente' as const,
+                            planId: client.planId,
                         };
                         generationPromises.push(addDoc(collection(db, "invoices"), newInvoice));
                         generatedCount++;
-                        lastDueDate = nextDueDate; // Update last due date for the next iteration
-                    } else {
-                        break; // Stop if the next due date is in the future
                     }
+
+                    lastBilledDueDate = nextDueDate; // Update last due date for the next iteration
                 }
             }
 
@@ -258,56 +252,127 @@ Agradecemos a sua atenção.
         }
     };
     
-    const handlePrint = (invoice: Invoice) => {
-        const printWindow = window.open('', '', 'height=600,width=800');
-        if (printWindow) {
-            printWindow.document.write(`
-                <html>
-                    <head>
-                        <title>Fatura #${invoice.id.substring(0, 7).toUpperCase()}</title>
-                        <style>
-                            body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; line-height: 1.6; color: #333; }
-                            .container { max-width: 700px; margin: 2rem auto; padding: 2rem; border: 1px solid #ddd; border-radius: 8px; }
-                            h1, h2 { color: #000; }
-                            h1 { font-size: 2em; margin-bottom: 0; }
-                            .header { text-align: center; margin-bottom: 2rem; }
-                            .details-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 2rem;}
-                            .details-grid div { padding: 0.5rem; }
-                            .details-grid .label { font-weight: bold; }
-                            .total { text-align: right; font-size: 1.5em; font-weight: bold; margin-top: 2rem; }
-                            .footer { text-align: center; margin-top: 3rem; font-size: 0.9em; color: #777; }
-                            @media print {
-                                body { -webkit-print-color-adjust: exact; }
-                                .no-print { display: none; }
-                            }
-                        </style>
-                    </head>
-                    <body>
-                        <div class="container">
-                            <div class="header">
-                                <h1>Sativar</h1>
-                                <h2>Recibo de Pagamento</h2>
+    const handlePrint = async (invoice: Invoice) => {
+        try {
+            const clientRef = doc(db, 'clients', invoice.clientId);
+            const planRef = doc(db, 'plans', invoice.planId);
+
+            const [clientDoc, planDoc] = await Promise.all([
+                getDoc(clientRef),
+                getDoc(planRef),
+            ]);
+
+            if (!clientDoc.exists() || !planDoc.exists()) {
+                toast({ title: 'Erro', description: 'Não foi possível encontrar os dados do cliente ou do plano.', variant: 'destructive' });
+                return;
+            }
+
+            const client = clientDoc.data() as Client;
+            const plan = planDoc.data() as Plan;
+            const dueDate = invoice.dueDate.toDate();
+            let startDate: Date;
+
+            switch (plan.recurrencePeriod) {
+                case 'dias': startDate = subDays(dueDate, plan.recurrenceValue); break;
+                case 'meses': startDate = subMonths(dueDate, plan.recurrenceValue); break;
+                case 'anos': startDate = subYears(dueDate, plan.recurrenceValue); break;
+                default: startDate = dueDate;
+            }
+            startDate = addDays(startDate, 1); // Start from the day after the last period ended
+
+            const billingPeriod = `${format(startDate, 'dd/MM/yyyy')} - ${format(dueDate, 'dd/MM/yyyy')}`;
+
+            const printWindow = window.open('', '', 'height=800,width=800');
+            if (printWindow) {
+                printWindow.document.write(`
+                    <html>
+                        <head>
+                            <title>Fatura #${invoice.id.substring(0, 7).toUpperCase()}</title>
+                            <script src="https://cdn.tailwindcss.com"></script>
+                            <style>
+                                @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+                                body { font-family: 'Inter', sans-serif; color: #111827; }
+                                @media print {
+                                    body { -webkit-print-color-adjust: exact; }
+                                }
+                                .status-paid { background-color: #dcfce7; color: #166534; }
+                                .status-pending { background-color: #fef9c3; color: #854d0e; }
+                                .status-overdue { background-color: #fee2e2; color: #991b1b; }
+                            </style>
+                        </head>
+                        <body class="bg-gray-100 p-8">
+                            <div class="max-w-4xl mx-auto bg-white rounded-lg shadow-lg p-12">
+                                <div class="grid grid-cols-2 items-center mb-12">
+                                    <div>
+                                        <h1 class="text-3xl font-bold text-gray-800">Sativar</h1>
+                                        <p class="text-gray-500">Rua Exemplo, 123<br>Cidade, Estado, 12345-678</p>
+                                    </div>
+                                    <div class="text-right">
+                                        <h2 class="text-4xl font-bold text-gray-700">FATURA</h2>
+                                        <p class="text-gray-500 mt-1">#${invoice.id.substring(0, 7).toUpperCase()}</p>
+                                    </div>
+                                </div>
+                                <div class="grid grid-cols-2 gap-8 mb-10">
+                                    <div>
+                                        <h3 class="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-2">Cobrança para</h3>
+                                        <p class="font-bold text-lg text-gray-800">${invoice.clientName}</p>
+                                        <p class="text-gray-600">${client.email}</p>
+                                    </div>
+                                    <div class="text-right">
+                                        <h3 class="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-2">Detalhes da Fatura</h3>
+                                        <p class="text-gray-600"><span class="font-medium">Data de Emissão:</span> ${format(invoice.issueDate.toDate(), 'dd/MM/yyyy')}</p>
+                                        <p class="text-gray-600"><span class="font-medium">Data de Vencimento:</span> ${format(invoice.dueDate.toDate(), 'dd/MM/yyyy')}</p>
+                                        <div class="mt-2">
+                                            <span class="px-3 py-1 text-sm font-semibold rounded-full status-${invoice.status === 'Paga' ? 'paid' : (invoice.status === 'Pendente' ? 'pending' : 'overdue')}">${invoice.status}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="overflow-x-auto rounded-lg border border-gray-200">
+                                    <table class="w-full text-left">
+                                        <thead class="bg-gray-50">
+                                            <tr>
+                                                <th class="p-4 text-sm font-semibold text-gray-600">Descrição</th>
+                                                <th class="p-4 text-sm font-semibold text-gray-600 text-center">Período de Serviço</th>
+                                                <th class="p-4 text-sm font-semibold text-gray-600 text-right">Valor</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr class="border-b border-gray-200">
+                                                <td class="p-4">
+                                                    <p class="font-medium text-gray-800">${plan.name}</p>
+                                                    <p class="text-sm text-gray-500">${plan.description}</p>
+                                                </td>
+                                                <td class="p-4 text-center text-gray-600">${billingPeriod}</td>
+                                                <td class="p-4 text-right font-medium text-gray-800">${invoice.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                                <div class="grid grid-cols-2 mt-10">
+                                    <div>
+                                        <h4 class="font-semibold text-gray-800">Obrigado por sua preferência!</h4>
+                                        <p class="text-sm text-gray-500">Sativar Inc.</p>
+                                    </div>
+                                    <div class="text-right">
+                                        <p class="text-sm text-gray-500 mb-1">Total</p>
+                                        <p class="text-3xl font-bold text-gray-900">${invoice.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
+                                    </div>
+                                </div>
                             </div>
-                            <div class="details-grid">
-                                <div><span class="label">Cliente:</span> ${invoice.clientName}</div>
-                                <div><span class="label">Nº da Fatura:</span> #${invoice.id.substring(0, 7).toUpperCase()}</div>
-                                <div><span class="label">Data de Emissão:</span> ${format(invoice.issueDate.toDate(), 'dd/MM/yyyy')}</div>
-                                <div><span class="label">Data de Vencimento:</span> ${format(invoice.dueDate.toDate(), 'dd/MM/yyyy')}</div>
-                            </div>
-                            <hr />
-                            <div class="total">
-                                <span>TOTAL:</span> ${invoice.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                            </div>
-                             <div class="footer">
-                                <p>Obrigado por sua preferência!</p>
-                            </div>
-                        </div>
-                    </body>
-                </html>
-            `);
-            printWindow.document.close();
-            printWindow.focus();
-            printWindow.print();
+                        </body>
+                    </html>
+                `);
+                printWindow.document.close();
+                printWindow.focus();
+                
+                setTimeout(() => { // Timeout to ensure styles are loaded
+                    printWindow.print();
+                    printWindow.close();
+                }, 500);
+            }
+        } catch (error) {
+            console.error("Error preparing print data:", error);
+            toast({ title: 'Erro', description: 'Não foi possível gerar o recibo para impressão.', variant: 'destructive' });
         }
     };
 
