@@ -47,6 +47,16 @@ type Invoice = {
     planId: string;
 };
 
+type CompanySettings = {
+    name: string;
+    address: string;
+    phone: string;
+    email: string;
+    website: string;
+    logoDataUrl: string;
+};
+
+
 export default function InvoicesPage() {
     const { toast } = useToast();
     const [invoices, setInvoices] = useState<Invoice[]>([]);
@@ -269,10 +279,12 @@ Agradecemos a sua atenção.
 
             const clientRef = doc(db, 'clients', invoice.clientId);
             const planRef = doc(db, 'plans', invoice.planId);
+            const settingsRef = doc(db, 'settings', 'company');
 
-            const [clientDoc, planDoc] = await Promise.all([
+            const [clientDoc, planDoc, settingsDoc] = await Promise.all([
                 getDoc(clientRef),
                 getDoc(planRef),
+                getDoc(settingsRef)
             ]);
 
             if (!clientDoc.exists() || !planDoc.exists()) {
@@ -282,6 +294,8 @@ Agradecemos a sua atenção.
 
             const client = clientDoc.data() as Client;
             const plan = planDoc.data() as Plan;
+            const company = settingsDoc.exists() ? settingsDoc.data() as CompanySettings : null;
+
             const dueDate = invoice.dueDate.toDate();
             let startDate: Date;
 
@@ -294,6 +308,10 @@ Agradecemos a sua atenção.
             startDate = addDays(startDate, 1); // Start from the day after the last period ended
 
             const billingPeriod = `${format(startDate, 'dd/MM/yyyy')} - ${format(dueDate, 'dd/MM/yyyy')}`;
+            
+            const logoHtml = company?.logoDataUrl 
+                ? `<img src="${company.logoDataUrl}" alt="Company Logo" style="max-height: 60px; max-width: 200px;" />` 
+                : `<h1 class="text-3xl font-bold text-gray-800">${company?.name || 'Sua Empresa'}</h1>`;
 
             const printWindow = window.open('', '', 'height=800,width=800');
             if (printWindow) {
@@ -317,8 +335,8 @@ Agradecemos a sua atenção.
                             <div class="max-w-4xl mx-auto bg-white rounded-lg shadow-lg p-12">
                                 <div class="grid grid-cols-2 items-center mb-12">
                                     <div>
-                                        <h1 class="text-3xl font-bold text-gray-800">Sativar</h1>
-                                        <p class="text-gray-500">Rua Exemplo, 123<br>Cidade, Estado, 12345-678</p>
+                                        ${logoHtml}
+                                        ${company ? `<p class="text-gray-500 mt-2">${company.address.replace(/\n/g, '<br>')}</p>` : ''}
                                     </div>
                                     <div class="text-right">
                                         <h2 class="text-4xl font-bold text-gray-700">FATURA</h2>
@@ -364,7 +382,7 @@ Agradecemos a sua atenção.
                                 <div class="grid grid-cols-2 mt-10">
                                     <div>
                                         <h4 class="font-semibold text-gray-800">Obrigado por sua preferência!</h4>
-                                        <p class="text-sm text-gray-500">Sativar Inc.</p>
+                                        ${company ? `<p class="text-sm text-gray-500">${company.name}</p>` : ''}
                                     </div>
                                     <div class="text-right">
                                         <p class="text-sm text-gray-500 mb-1">Total</p>
