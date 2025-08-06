@@ -3,13 +3,12 @@
 
 import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
+import { Badge, badgeVariants } from "@/components/ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { MoreHorizontal, PlusCircle } from "lucide-react";
 import type { VariantProps } from 'class-variance-authority';
-import { badgeVariants } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/firebase';
 import { collection, onSnapshot, query, Timestamp, orderBy } from "firebase/firestore";
@@ -34,10 +33,7 @@ export default function InvoicesPage() {
         setIsLoading(true);
         const q = query(collection(db, "invoices"), orderBy("issueDate", "desc"));
         const unsubscribe = onSnapshot(q, (querySnapshot) => {
-            const invoicesData: Invoice[] = [];
-            querySnapshot.forEach((doc) => {
-                invoicesData.push({ ...doc.data(), id: doc.id } as Invoice);
-            });
+            const invoicesData: Invoice[] = querySnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Invoice));
             setInvoices(invoicesData);
             setIsLoading(false);
         }, (error) => {
@@ -59,6 +55,15 @@ export default function InvoicesPage() {
             case 'Pendente': return 'outline';
             case 'Vencida': return 'destructive';
             default: return 'default';
+        }
+    }
+
+    const getStatusClass = (status: Invoice['status']) => {
+        switch (status) {
+            case 'Paga': return 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-400';
+            case 'Pendente': return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-400';
+            case 'Vencida': return 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-400';
+            default: return '';
         }
     }
 
@@ -104,11 +109,15 @@ export default function InvoicesPage() {
                                 </TableRow>
                             )) : invoices.map(invoice => (
                                 <TableRow key={invoice.id}>
-                                    <TableCell className="font-medium">{invoice.id.substring(0, 8)}</TableCell>
+                                    <TableCell className="font-medium">#{invoice.id.substring(0, 7).toUpperCase()}</TableCell>
                                     <TableCell>{invoice.clientName}</TableCell>
                                     <TableCell>{format(invoice.issueDate.toDate(), 'dd/MM/yyyy')}</TableCell>
                                     <TableCell>{format(invoice.dueDate.toDate(), 'dd/MM/yyyy')}</TableCell>
-                                    <TableCell><Badge variant={getStatusVariant(invoice.status)}>{invoice.status}</Badge></TableCell>
+                                    <TableCell>
+                                        <Badge variant={getStatusVariant(invoice.status)} className={getStatusClass(invoice.status)}>
+                                            {invoice.status}
+                                        </Badge>
+                                    </TableCell>
                                     <TableCell className="text-right">{invoice.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</TableCell>
                                     <TableCell>
                                         <div className="flex justify-end">
@@ -139,3 +148,4 @@ export default function InvoicesPage() {
     );
 }
 
+    

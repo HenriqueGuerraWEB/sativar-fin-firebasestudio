@@ -46,10 +46,7 @@ export default function PlansPage() {
         setIsLoading(true);
         const q = query(collection(db, "plans"));
         const unsubscribe = onSnapshot(q, (querySnapshot) => {
-            const plansData: Plan[] = [];
-            querySnapshot.forEach((doc) => {
-                plansData.push({ ...doc.data(), id: doc.id } as Plan);
-            });
+            const plansData: Plan[] = querySnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Plan));
             setPlans(plansData);
             setIsLoading(false);
         }, (error) => {
@@ -67,7 +64,12 @@ export default function PlansPage() {
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
         const { id, value } = e.target;
-        setCurrentPlan(prev => ({ ...prev, [id]: id === 'price' || id === 'recurrenceValue' ? parseFloat(value) || 0 : value }));
+        const numValue = id === 'price' || id === 'recurrenceValue' ? parseFloat(value) : 0;
+        
+        setCurrentPlan(prev => ({ 
+            ...prev, 
+            [id]: id === 'price' || id === 'recurrenceValue' ? (isNaN(numValue) ? 0 : numValue) : value 
+        }));
     };
     
     const handleSelectChange = (value: 'dias' | 'meses' | 'anos') => {
@@ -75,10 +77,10 @@ export default function PlansPage() {
     }
 
     const handleSavePlan = async () => {
-        if (!currentPlan.name || !currentPlan.price) {
+        if (!currentPlan.name || currentPlan.price <= 0) {
             toast({
-                title: "Erro",
-                description: "Nome e Preço são campos obrigatórios.",
+                title: "Erro de Validação",
+                description: "Nome e Preço (maior que zero) são campos obrigatórios.",
                 variant: "destructive",
             });
             return;
@@ -92,13 +94,11 @@ export default function PlansPage() {
             };
 
             if ('id' in currentPlan) {
-                // Edit
                 const planRef = doc(db, "plans", currentPlan.id);
-                const { id, ...data } = currentPlan;
+                const { id, ...data } = planData;
                 await updateDoc(planRef, data);
                 toast({ title: "Sucesso", description: "Plano atualizado com sucesso." });
             } else {
-                // Add
                 await addDoc(collection(db, "plans"), planData);
                 toast({ title: "Sucesso", description: "Plano adicionado com sucesso." });
             }
@@ -141,7 +141,7 @@ export default function PlansPage() {
     const formatRecurrence = (plan: Plan) => {
         if (!plan.recurrenceValue || !plan.recurrencePeriod) return 'N/A';
         const period = plan.recurrenceValue === 1 
-            ? plan.recurrencePeriod.slice(0, -1) // mes, ano, dia
+            ? plan.recurrencePeriod.slice(0, -1) 
             : plan.recurrencePeriod;
         return `${plan.recurrenceValue} ${period}`;
     }
@@ -220,7 +220,7 @@ export default function PlansPage() {
                         </TableHeader>
                         <TableBody>
                             {isLoading ? (
-                                Array.from({ length: 4 }).map((_, index) => (
+                                Array.from({ length: 3 }).map((_, index) => (
                                 <TableRow key={index}>
                                     <TableCell>
                                         <Skeleton className="h-5 w-32" />
@@ -283,3 +283,5 @@ export default function PlansPage() {
         </div>
     );
 }
+
+    

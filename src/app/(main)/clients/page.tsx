@@ -14,7 +14,7 @@ import { Label } from "@/components/ui/label";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/firebase';
-import { collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc, query, Timestamp } from "firebase/firestore";
+import { collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc, query, Timestamp, getDocs } from "firebase/firestore";
 import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -65,16 +65,22 @@ export default function ClientsPage() {
     }, [plans]);
 
      useEffect(() => {
+        setIsLoading(true);
         const clientQuery = query(collection(db, "clients"));
         const planQuery = query(collection(db, "plans"));
 
         const unsubClients = onSnapshot(clientQuery, (querySnapshot) => {
-            const clientsData: Client[] = [];
-            querySnapshot.forEach((doc) => {
-                clientsData.push({ ...doc.data(), id: doc.id } as Client);
-            });
+            const clientsData: Client[] = querySnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Client));
             setClients(clientsData);
-            if(isLoading && plans.length > 0) setIsLoading(false);
+            if (!plans.length) {
+                getDocs(planQuery).then(planSnapshot => {
+                    const plansData = planSnapshot.docs.map(doc => ({ id: doc.id, name: doc.data().name } as Plan));
+                    setPlans(plansData);
+                    setIsLoading(false);
+                });
+            } else {
+                setIsLoading(false);
+            }
         }, (error) => {
             console.error("Error fetching clients: ", error);
             toast({
@@ -86,13 +92,8 @@ export default function ClientsPage() {
         });
 
         const unsubPlans = onSnapshot(planQuery, (querySnapshot) => {
-            const plansData: Plan[] = [];
-            querySnapshot.forEach((doc) => {
-                const data = doc.data();
-                plansData.push({ id: doc.id, name: data.name } as Plan);
-            });
+            const plansData: Plan[] = querySnapshot.docs.map(doc => ({ id: doc.id, name: doc.data().name } as Plan));
             setPlans(plansData);
-            if(isLoading) setIsLoading(false);
         }, (error) => {
              console.error("Error fetching plans: ", error);
              toast({
@@ -100,7 +101,6 @@ export default function ClientsPage() {
                 description: "Não foi possível carregar os planos.",
                 variant: "destructive",
             });
-            setIsLoading(false);
         });
 
 
@@ -108,7 +108,7 @@ export default function ClientsPage() {
             unsubClients();
             unsubPlans();
         };
-    }, [toast, isLoading, plans.length]);
+    }, [toast, plans.length]);
 
     const formatPhoneNumber = (value: string) => {
         if (!value) return value;
@@ -147,13 +147,11 @@ export default function ClientsPage() {
 
         try {
             if ('id' in currentClient) {
-                // Edit
                 const clientRef = doc(db, "clients", currentClient.id);
                 const { id, ...clientData } = currentClient;
                 await updateDoc(clientRef, clientData);
                 toast({ title: "Sucesso", description: "Cliente atualizado com sucesso." });
             } else {
-                // Add
                 await addDoc(collection(db, "clients"), {
                     ...currentClient,
                     status: "Ativo",
@@ -356,3 +354,5 @@ export default function ClientsPage() {
         </div>
     );
 }
+
+    

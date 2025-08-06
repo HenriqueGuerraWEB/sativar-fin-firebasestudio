@@ -57,34 +57,42 @@ export default function FinancePage() {
 
         const unsubExpenses = onSnapshot(expenseQuery, (snapshot) => {
             setExpenses(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Expense)));
-            if (!income.length && snapshot.empty) setIsLoading(false)
+            if (isLoading) { // Only change loading state if we haven't heard from income yet
+                const unsubIncome = onSnapshot(incomeQuery, (snapshot) => {
+                    setIncome(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Income)));
+                    setIsLoading(false);
+                }, (error) => {
+                    console.error("Error fetching income:", error);
+                    toast({ title: "Erro", description: "Não foi possível carregar as receitas.", variant: "destructive" });
+                    setIsLoading(false);
+                });
+                return () => unsubIncome();
+            }
         }, (error) => {
             console.error("Error fetching expenses:", error);
             toast({ title: "Erro", description: "Não foi possível carregar as despesas.", variant: "destructive" });
             setIsLoading(false);
         });
 
+
         const unsubIncome = onSnapshot(incomeQuery, (snapshot) => {
             setIncome(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Income)));
-            setIsLoading(false);
-        }, (error) => {
-            console.error("Error fetching income:", error);
-            toast({ title: "Erro", description: "Não foi possível carregar as receitas.", variant: "destructive" });
-            setIsLoading(false);
         });
+
 
         return () => {
             unsubExpenses();
             unsubIncome();
         };
-    }, [toast, income.length]);
+    }, [toast, isLoading]);
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const { id, value } = e.target;
         if (id === 'dueDate') {
             setCurrentExpense(prev => ({ ...prev, [id]: Timestamp.fromDate(new Date(value)) }));
         } else if (id === 'amount') {
-             setCurrentExpense(prev => ({ ...prev, [id]: parseFloat(value) || 0 }));
+             const numValue = parseFloat(value);
+             setCurrentExpense(prev => ({ ...prev, [id]: isNaN(numValue) ? 0 : numValue }));
         } else {
             setCurrentExpense(prev => ({ ...prev, [id]: value }));
         }
@@ -95,8 +103,8 @@ export default function FinancePage() {
     }
 
     const handleSaveExpense = async () => {
-        if (!currentExpense.description || !currentExpense.amount) {
-            toast({ title: "Erro", description: "Descrição e Valor são obrigatórios.", variant: "destructive" });
+        if (!currentExpense.description || currentExpense.amount <= 0) {
+            toast({ title: "Erro", description: "Descrição e Valor (maior que zero) são obrigatórios.", variant: "destructive" });
             return;
         }
 
@@ -293,3 +301,5 @@ export default function FinancePage() {
         </div>
     );
 }
+
+    
