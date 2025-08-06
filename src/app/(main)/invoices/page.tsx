@@ -13,12 +13,14 @@ import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/firebase';
 import { collection, onSnapshot, query, Timestamp, orderBy, addDoc, doc, updateDoc, getDocs, where } from "firebase/firestore";
 import { Skeleton } from '@/components/ui/skeleton';
-import { format, endOfMonth, startOfMonth } from 'date-fns';
+import { format, addDays, addMonths, addYears, isBefore, startOfDay, endOfMonth } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
 type Plan = {
     id: string;
     price: number;
+    recurrenceValue: number;
+    recurrencePeriod: 'dias' | 'meses' | 'anos';
 }
 
 type Client = {
@@ -26,6 +28,7 @@ type Client = {
     name: string;
     planId?: string;
     status: 'Ativo' | 'Inativo';
+    planActivationDate?: Timestamp;
 }
 
 type Invoice = {
@@ -50,18 +53,23 @@ export default function InvoicesPage() {
         const unsubscribe = onSnapshot(q, (querySnapshot) => {
             const invoicesData: Invoice[] = querySnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Invoice));
             
+            const today = startOfDay(new Date());
+            const updatePromises: Promise<void>[] = [];
+
             const updatedInvoices = invoicesData.map(invoice => {
-                const today = new Date();
-                today.setHours(0,0,0,0);
                 const dueDate = invoice.dueDate.toDate();
-                if (invoice.status === 'Pendente' && dueDate < today) {
+                if (invoice.status === 'Pendente' && isBefore(dueDate, today)) {
                     const invoiceRef = doc(db, "invoices", invoice.id);
-                    updateDoc(invoiceRef, { status: 'Vencida' });
+                    updatePromises.push(updateDoc(invoiceRef, { status: 'Vencida' }));
                     return {...invoice, status: 'Vencida'};
                 }
                 return invoice;
             });
             
+            Promise.all(updatePromises).then(() => {
+                 setInvoices(updatedInvoices.sort((a, b) => b.issueDate.toMillis() - a.issueDate.toMillis()));
+            });
+
             setInvoices(updatedInvoices);
             setIsLoading(false);
         }, (error) => {
@@ -80,67 +88,105 @@ export default function InvoicesPage() {
     const handleGenerateInvoices = async () => {
         setIsGenerating(true);
         try {
-            // 1. Fetch all active clients with a plan
-            const clientsQuery = query(collection(db, "clients"), where("status", "==", "Ativo"), where("planId", "!=", null));
+            // 1. Fetch all active clients with a plan and activation date
+            const clientsQuery = query(collection(db, "clients"), 
+                where("status", "==", "Ativo"), 
+                where("planId", "!=", null),
+                where("planActivationDate", "!=", null)
+            );
             const clientsSnapshot = await getDocs(clientsQuery);
             const activeClients = clientsSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Client));
 
             if (activeClients.length === 0) {
-                toast({ title: "Nenhuma ação necessária", description: "Não há clientes ativos com planos para gerar faturas." });
+                toast({ title: "Nenhuma ação necessária", description: "Não há clientes ativos com planos e data de ativação para gerar faturas." });
                 setIsGenerating(false);
                 return;
             }
 
             // 2. Fetch all plans
-            const plansQuery = query(collection(db, "plans"));
-            const plansSnapshot = await getDocs(plansQuery);
+            const plansSnapshot = await getDocs(query(collection(db, "plans")));
             const plansMap = plansSnapshot.docs.reduce((acc, doc) => {
                 acc[doc.id] = { ...doc.data(), id: doc.id } as Plan;
                 return acc;
             }, {} as Record<string, Plan>);
 
-            // 3. Fetch invoices for the current month
-            const now = new Date();
-            const startOfCurrentMonth = startOfMonth(now);
-            const endOfCurrentMonth = endOfMonth(now);
-            const invoicesQuery = query(collection(db, "invoices"), 
-                where("issueDate", ">=", Timestamp.fromDate(startOfCurrentMonth)),
-                where("issueDate", "<=", Timestamp.fromDate(endOfCurrentMonth))
-            );
-            const invoicesSnapshot = await getDocs(invoicesQuery);
-            const existingInvoicesClientIds = new Set(invoicesSnapshot.docs.map(doc => doc.data().clientId));
+            // 3. Fetch all invoices to check for existing ones
+            const invoicesSnapshot = await getDocs(query(collection(db, "invoices")));
+            const clientInvoicesMap = new Map<string, Invoice[]>();
+            invoicesSnapshot.docs.forEach(doc => {
+                const invoice = doc.data() as Invoice;
+                if (!clientInvoicesMap.has(invoice.clientId)) {
+                    clientInvoicesMap.set(invoice.clientId, []);
+                }
+                clientInvoicesMap.get(invoice.clientId)!.push(invoice);
+            });
+            
+            let generatedCount = 0;
+            const generationPromises: Promise<any>[] = [];
+            const today = new Date();
 
-            // 4. Determine which clients need invoices
-            const clientsToInvoice = activeClients.filter(client => !existingInvoicesClientIds.has(client.id));
+            activeClients.forEach(client => {
+                if (!client.planId || !client.planActivationDate) return;
 
-            if (clientsToInvoice.length === 0) {
-                toast({ title: "Nenhuma ação necessária", description: "Todos os clientes ativos já possuem faturas para o mês corrente." });
-                setIsGenerating(false);
-                return;
-            }
+                const plan = plansMap[client.planId];
+                if (!plan) return;
 
-            // 5. Create new invoices
-            const generationPromises = clientsToInvoice.map(client => {
-                const plan = plansMap[client.planId!];
-                if (!plan) {
-                    console.warn(`Plano com ID ${client.planId} não encontrado para o cliente ${client.name}.`);
-                    return Promise.resolve(null);
+                const activationDate = client.planActivationDate.toDate();
+                let nextDueDate = new Date(activationDate);
+
+                const clientInvoices = clientInvoicesMap.get(client.id)?.sort((a,b) => b.dueDate.toMillis() - a.dueDate.toMillis()) || [];
+                const lastInvoice = clientInvoices[0];
+
+                if (lastInvoice) {
+                     nextDueDate = lastInvoice.dueDate.toDate();
+                } else {
+                    // For first invoice, dueDate is activationDate. If past, generate.
+                     if (isBefore(nextDueDate, today)) {
+                         const newInvoice = {
+                            clientId: client.id,
+                            clientName: client.name,
+                            amount: plan.price,
+                            issueDate: Timestamp.now(),
+                            dueDate: Timestamp.fromDate(nextDueDate),
+                            status: 'Pendente' as const,
+                        };
+                         generationPromises.push(addDoc(collection(db, "invoices"), newInvoice));
+                         generatedCount++;
+                     }
+                }
+                
+                // Calculate the next date based on last invoice due date
+                if(lastInvoice){
+                    switch (plan.recurrencePeriod) {
+                        case 'dias': nextDueDate = addDays(nextDueDate, plan.recurrenceValue); break;
+                        case 'meses': nextDueDate = addMonths(nextDueDate, plan.recurrenceValue); break;
+                        case 'anos': nextDueDate = addYears(nextDueDate, plan.recurrenceValue); break;
+                    }
                 }
 
-                const newInvoice = {
-                    clientId: client.id,
-                    clientName: client.name,
-                    amount: plan.price,
-                    issueDate: Timestamp.now(),
-                    dueDate: Timestamp.fromDate(endOfMonth(new Date())),
-                    status: 'Pendente' as const,
-                };
-                return addDoc(collection(db, "invoices"), newInvoice);
+
+                // If the calculated next due date is today or in the past, generate a new invoice
+                if (isBefore(nextDueDate, today) || format(nextDueDate, 'yyyy-MM-dd') === format(today, 'yyyy-MM-dd')) {
+                     const newInvoice = {
+                        clientId: client.id,
+                        clientName: client.name,
+                        amount: plan.price,
+                        issueDate: Timestamp.now(),
+                        dueDate: Timestamp.fromDate(nextDueDate),
+                        status: 'Pendente' as const,
+                    };
+                    generationPromises.push(addDoc(collection(db, "invoices"), newInvoice));
+                    generatedCount++;
+                }
+
             });
 
-            await Promise.all(generationPromises);
-
-            toast({ title: "Sucesso!", description: `${clientsToInvoice.length} novas faturas foram geradas com sucesso.` });
+            if (generatedCount > 0) {
+                await Promise.all(generationPromises);
+                toast({ title: "Sucesso!", description: `${generatedCount} novas faturas foram geradas.` });
+            } else {
+                toast({ title: "Nenhuma ação necessária", description: "Todos os clientes estão com as faturas em dia." });
+            }
 
         } catch (error) {
             console.error("Error generating invoices:", error);
@@ -221,7 +267,7 @@ Agradecemos a sua atenção.
                 </div>
                  <Button size="sm" className="gap-1" onClick={handleGenerateInvoices} disabled={isGenerating}>
                     <PlusCircle className="h-4 w-4" />
-                    {isGenerating ? 'Gerando...' : 'Gerar Faturas Pendentes'}
+                    {isGenerating ? 'Gerando...' : 'Gerar Faturas Recorrentes'}
                 </Button>
             </div>
             <Card>
@@ -292,3 +338,5 @@ Agradecemos a sua atenção.
         </div>
     );
 }
+
+    

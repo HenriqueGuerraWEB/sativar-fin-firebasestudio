@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { MoreHorizontal, PlusCircle } from "lucide-react";
+import { MoreHorizontal, PlusCircle, Calendar as CalendarIcon } from "lucide-react";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger, SheetFooter } from "@/components/ui/sheet";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -18,6 +18,11 @@ import { collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc, query, Times
 import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
+import { cn } from '@/lib/utils';
+import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 
 type Plan = {
     id: string;
@@ -35,6 +40,7 @@ type Client = {
     notes: string;
     status: "Ativo" | "Inativo";
     planId?: string;
+    planActivationDate?: Timestamp;
     createdAt: Timestamp;
 };
 
@@ -47,6 +53,7 @@ const emptyClient: Omit<Client, 'id' | 'status' | 'createdAt'> = {
     whatsapp: "",
     notes: "",
     planId: undefined,
+    planActivationDate: undefined,
 };
 
 export default function ClientsPage() {
@@ -72,14 +79,9 @@ export default function ClientsPage() {
         const unsubClients = onSnapshot(clientQuery, (querySnapshot) => {
             const clientsData: Client[] = querySnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Client));
             setClients(clientsData);
-            if (!plans.length) {
-                getDocs(planQuery).then(planSnapshot => {
-                    const plansData = planSnapshot.docs.map(doc => ({ id: doc.id, name: doc.data().name } as Plan));
-                    setPlans(plansData);
-                    setIsLoading(false);
-                });
-            } else {
-                setIsLoading(false);
+            // Ensure plans are loaded before we stop loading
+            if (isLoading && plans.length > 0) {
+                 setIsLoading(false);
             }
         }, (error) => {
             console.error("Error fetching clients: ", error);
@@ -94,6 +96,9 @@ export default function ClientsPage() {
         const unsubPlans = onSnapshot(planQuery, (querySnapshot) => {
             const plansData: Plan[] = querySnapshot.docs.map(doc => ({ id: doc.id, name: doc.data().name } as Plan));
             setPlans(plansData);
+             if (isLoading) {
+                 setIsLoading(false);
+            }
         }, (error) => {
              console.error("Error fetching plans: ", error);
              toast({
@@ -101,6 +106,7 @@ export default function ClientsPage() {
                 description: "Não foi possível carregar os planos.",
                 variant: "destructive",
             });
+            setIsLoading(false);
         });
 
 
@@ -108,7 +114,7 @@ export default function ClientsPage() {
             unsubClients();
             unsubPlans();
         };
-    }, [toast, plans.length]);
+    }, [toast, isLoading, plans.length]);
 
     const formatPhoneNumber = (value: string) => {
         if (!value) return value;
@@ -132,8 +138,21 @@ export default function ClientsPage() {
     };
     
     const handlePlanSelect = (planId: string) => {
-        setCurrentClient(prev => ({ ...prev, planId: planId === 'none' ? undefined : planId }));
+        const selectedPlanId = planId === 'none' ? undefined : planId;
+        setCurrentClient(prev => ({ 
+            ...prev, 
+            planId: selectedPlanId,
+            // Set activation date if a plan is selected, otherwise clear it
+            planActivationDate: selectedPlanId ? prev.planActivationDate || Timestamp.now() : undefined,
+        }));
     }
+    
+    const handleDateSelect = (date: Date | undefined) => {
+        if (date) {
+            setCurrentClient(prev => ({ ...prev, planActivationDate: Timestamp.fromDate(date) }));
+        }
+    }
+
 
     const handleSaveClient = async () => {
         if (!currentClient.name || !currentClient.email) {
@@ -209,7 +228,7 @@ export default function ClientsPage() {
                             Novo Cliente
                         </Button>
                     </SheetTrigger>
-                    <SheetContent>
+                    <SheetContent className="overflow-y-auto">
                         <SheetHeader>
                             <SheetTitle>{'id' in currentClient ? 'Editar Cliente' : 'Adicionar novo cliente'}</SheetTitle>
                             <SheetDescription>
@@ -239,6 +258,33 @@ export default function ClientsPage() {
                                     </SelectContent>
                                 </Select>
                             </div>
+                            {currentClient.planId && (
+                                <div className="grid grid-cols-4 items-center gap-4">
+                                    <Label htmlFor="planActivationDate" className="text-right">Data de Ativação</Label>
+                                     <Popover>
+                                        <PopoverTrigger asChild>
+                                        <Button
+                                            variant={"outline"}
+                                            className={cn(
+                                            "col-span-3 justify-start text-left font-normal",
+                                            !currentClient.planActivationDate && "text-muted-foreground"
+                                            )}
+                                        >
+                                            <CalendarIcon className="mr-2 h-4 w-4" />
+                                            {currentClient.planActivationDate ? format(currentClient.planActivationDate.toDate(), "PPP", { locale: ptBR }) : <span>Escolha uma data</span>}
+                                        </Button>
+                                        </PopoverTrigger>
+                                        <PopoverContent className="w-auto p-0">
+                                        <Calendar
+                                            mode="single"
+                                            selected={currentClient.planActivationDate?.toDate()}
+                                            onSelect={handleDateSelect}
+                                            initialFocus
+                                        />
+                                        </PopoverContent>
+                                    </Popover>
+                                </div>
+                            )}
                             <div className="grid grid-cols-4 items-center gap-4">
                                 <Label htmlFor="contactName" className="text-right">Nome do Contato</Label>
                                 <Input id="contactName" value={currentClient.contactName} onChange={handleInputChange} className="col-span-3" />
