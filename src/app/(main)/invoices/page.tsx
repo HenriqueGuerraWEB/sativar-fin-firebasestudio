@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge, badgeVariants } from "@/components/ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
-import { MoreHorizontal, PlusCircle, Printer } from "lucide-react";
+import { MoreHorizontal, PlusCircle, Printer, Calendar as CalendarIcon } from "lucide-react";
 import type { VariantProps } from 'class-variance-authority';
 import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/firebase';
@@ -16,6 +16,14 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { format, addDays, addMonths, addYears, isBefore, startOfDay, subDays, subMonths, subYears } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
+import { Textarea } from '@/components/ui/textarea';
+import { cn } from '@/lib/utils';
 
 
 type Plan = {
@@ -45,6 +53,9 @@ type Invoice = {
     dueDate: Timestamp;
     status: 'Paga' | 'Pendente' | 'Vencida';
     planId: string;
+    paymentDate?: Timestamp;
+    paymentMethod?: 'Pix' | 'Cartão de Crédito' | 'Cartão de Débito';
+    paymentNotes?: string;
 };
 
 type CompanySettings = {
@@ -64,6 +75,17 @@ export default function InvoicesPage() {
     const [invoices, setInvoices] = useState<Invoice[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isGenerating, setIsGenerating] = useState(false);
+    const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+    const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
+    const [paymentDetails, setPaymentDetails] = useState<{
+        paymentDate: Date | undefined;
+        paymentMethod: 'Pix' | 'Cartão de Crédito' | 'Cartão de Débito' | undefined;
+        paymentNotes: string;
+    }>({
+        paymentDate: new Date(),
+        paymentMethod: undefined,
+        paymentNotes: '',
+    });
     
     useEffect(() => {
         setIsLoading(true);
@@ -216,16 +238,55 @@ export default function InvoicesPage() {
     }
 
 
-    const handleUpdateStatus = async (invoiceId: string, status: Invoice['status']) => {
+    const handleUpdateStatus = async (invoiceId: string, status: 'Pendente' | 'Vencida') => {
         try {
             const invoiceRef = doc(db, "invoices", invoiceId);
-            await updateDoc(invoiceRef, { status });
+            await updateDoc(invoiceRef, { 
+                status,
+                paymentDate: null,
+                paymentMethod: null,
+                paymentNotes: null,
+             });
             toast({ title: "Sucesso", description: `Fatura marcada como ${status}.`});
         } catch (error) {
             console.error("Error updating status: ", error);
             toast({ title: "Erro", description: "Não foi possível atualizar o status da fatura.", variant: "destructive" });
         }
     };
+    
+    const handleOpenPaymentModal = (invoice: Invoice) => {
+        setSelectedInvoice(invoice);
+        setPaymentDetails({
+            paymentDate: new Date(),
+            paymentMethod: undefined,
+            paymentNotes: ''
+        });
+        setIsPaymentModalOpen(true);
+    };
+
+    const handleConfirmPayment = async () => {
+        if (!selectedInvoice || !paymentDetails.paymentDate || !paymentDetails.paymentMethod) {
+            toast({ title: "Erro", description: "Data e tipo de pagamento são obrigatórios.", variant: "destructive" });
+            return;
+        }
+
+        try {
+            const invoiceRef = doc(db, "invoices", selectedInvoice.id);
+            await updateDoc(invoiceRef, {
+                status: 'Paga',
+                paymentDate: Timestamp.fromDate(paymentDetails.paymentDate),
+                paymentMethod: paymentDetails.paymentMethod,
+                paymentNotes: paymentDetails.paymentNotes,
+            });
+            toast({ title: "Sucesso", description: `Fatura marcada como Paga.`});
+            setIsPaymentModalOpen(false);
+            setSelectedInvoice(null);
+        } catch (error) {
+             console.error("Error confirming payment: ", error);
+            toast({ title: "Erro", description: "Não foi possível confirmar o pagamento.", variant: "destructive" });
+        }
+    };
+
 
     const handleSendReminder = async (invoice: Invoice) => {
         const dueDate = format(invoice.dueDate.toDate(), 'dd/MM/yyyy', { locale: ptBR });
@@ -460,7 +521,7 @@ Agradecemos a sua atenção.
                             <TableRow>
                                 <TableHead>Fatura</TableHead>
                                 <TableHead>Cliente</TableHead>
-                                <TableHead>Emissão</TableHead>
+                                <TableHead>Data do Pagamento</TableHead>
                                 <TableHead>Vencimento</TableHead>
                                 <TableHead>Status</TableHead>
                                 <TableHead className="text-right">Valor</TableHead>
@@ -482,7 +543,7 @@ Agradecemos a sua atenção.
                                 <TableRow key={invoice.id}>
                                     <TableCell className="font-medium">#{invoice.id.substring(0, 7).toUpperCase()}</TableCell>
                                     <TableCell>{invoice.clientName}</TableCell>
-                                    <TableCell>{invoice.issueDate ? format(invoice.issueDate.toDate(), 'dd/MM/yyyy') : 'N/A'}</TableCell>
+                                    <TableCell>{invoice.paymentDate ? format(invoice.paymentDate.toDate(), 'dd/MM/yyyy') : 'N/A'}</TableCell>
                                     <TableCell>{invoice.dueDate ? format(invoice.dueDate.toDate(), 'dd/MM/yyyy') : 'N/A'}</TableCell>
                                     <TableCell>
                                         <Badge variant={getStatusVariant(invoice.status)} className={getStatusClass(invoice.status)}>
@@ -498,38 +559,101 @@ Agradecemos a sua atenção.
                                                     <span className="sr-only">Imprimir</span>
                                                 </Button>
                                             )}
-                                            <DropdownMenu>
-                                                <DropdownMenuTrigger asChild>
-                                                    <Button aria-haspopup="true" size="icon" variant="ghost">
-                                                        <MoreHorizontal className="h-4 w-4" />
-                                                        <span className="sr-only">Toggle menu</span>
-                                                    </Button>
-                                                </DropdownMenuTrigger>
-                                                <DropdownMenuContent align="end">
-                                                    <DropdownMenuLabel>Ações</DropdownMenuLabel>
-                                                    <DropdownMenuItem onClick={() => handleUpdateStatus(invoice.id, 'Paga')} disabled={invoice.status === 'Paga'}>Marcar como Paga</DropdownMenuItem>
-                                                    <DropdownMenuItem onClick={() => handleUpdateStatus(invoice.id, 'Pendente')} disabled={invoice.status === 'Pendente'}>Marcar como Pendente</DropdownMenuItem>
-                                                    <DropdownMenuItem onClick={() => handleSendReminder(invoice)}>Enviar Lembrete</DropdownMenuItem>
-                                                    <DropdownMenuSeparator />
-                                                     <AlertDialog>
-                                                        <AlertDialogTrigger asChild>
-                                                            <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive focus:text-destructive focus:bg-destructive/10">Excluir</DropdownMenuItem>
-                                                        </AlertDialogTrigger>
-                                                        <AlertDialogContent>
-                                                            <AlertDialogHeader>
-                                                                <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
-                                                                <AlertDialogDescription>
-                                                                    Essa ação não pode ser desfeita. Isso excluirá permanentemente a fatura.
-                                                                </AlertDialogDescription>
-                                                            </AlertDialogHeader>
-                                                            <AlertDialogFooter>
-                                                                <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                                                <AlertDialogAction onClick={() => handleDeleteInvoice(invoice.id)}>Excluir</AlertDialogAction>
-                                                            </AlertDialogFooter>
-                                                        </AlertDialogContent>
-                                                    </AlertDialog>
-                                                </DropdownMenuContent>
-                                            </DropdownMenu>
+                                            <Dialog open={isPaymentModalOpen && selectedInvoice?.id === invoice.id} onOpenChange={setIsPaymentModalOpen}>
+                                                <DropdownMenu>
+                                                    <DropdownMenuTrigger asChild>
+                                                        <Button aria-haspopup="true" size="icon" variant="ghost">
+                                                            <MoreHorizontal className="h-4 w-4" />
+                                                            <span className="sr-only">Toggle menu</span>
+                                                        </Button>
+                                                    </DropdownMenuTrigger>
+                                                    <DropdownMenuContent align="end">
+                                                        <DropdownMenuLabel>Ações</DropdownMenuLabel>
+                                                        <DropdownMenuItem onClick={() => handleOpenPaymentModal(invoice)} disabled={invoice.status === 'Paga'}>Marcar como Paga</DropdownMenuItem>
+                                                        <DropdownMenuItem onClick={() => handleUpdateStatus(invoice.id, 'Pendente')} disabled={invoice.status === 'Pendente'}>Marcar como Pendente</DropdownMenuItem>
+                                                        <DropdownMenuItem onClick={() => handleSendReminder(invoice)}>Enviar Lembrete</DropdownMenuItem>
+                                                        <DropdownMenuSeparator />
+                                                        <AlertDialog>
+                                                            <AlertDialogTrigger asChild>
+                                                                <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive focus:text-destructive focus:bg-destructive/10">Excluir</DropdownMenuItem>
+                                                            </AlertDialogTrigger>
+                                                            <AlertDialogContent>
+                                                                <AlertDialogHeader>
+                                                                    <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
+                                                                    <AlertDialogDescription>
+                                                                        Essa ação não pode ser desfeita. Isso excluirá permanentemente a fatura.
+                                                                    </AlertDialogDescription>
+                                                                </AlertDialogHeader>
+                                                                <AlertDialogFooter>
+                                                                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                                                    <AlertDialogAction onClick={() => handleDeleteInvoice(invoice.id)}>Excluir</AlertDialogAction>
+                                                                </AlertDialogFooter>
+                                                            </AlertDialogContent>
+                                                        </AlertDialog>
+                                                    </DropdownMenuContent>
+                                                </DropdownMenu>
+                                                <DialogContent className="sm:max-w-[425px]">
+                                                    <DialogHeader>
+                                                        <DialogTitle>Confirmar Pagamento</DialogTitle>
+                                                        <DialogDescription>
+                                                            Preencha os detalhes do pagamento para a fatura #{selectedInvoice?.id.substring(0, 7).toUpperCase()}.
+                                                        </DialogDescription>
+                                                    </DialogHeader>
+                                                    <div className="grid gap-4 py-4">
+                                                        <div className="grid grid-cols-4 items-center gap-4">
+                                                            <Label htmlFor="paymentDate" className="text-right">Data do Pagamento</Label>
+                                                             <Popover>
+                                                                <PopoverTrigger asChild>
+                                                                <Button
+                                                                    variant={"outline"}
+                                                                    className={cn(
+                                                                    "col-span-3 justify-start text-left font-normal",
+                                                                    !paymentDetails.paymentDate && "text-muted-foreground"
+                                                                    )}
+                                                                >
+                                                                    <CalendarIcon className="mr-2 h-4 w-4" />
+                                                                    {paymentDetails.paymentDate ? format(paymentDetails.paymentDate, "PPP", { locale: ptBR }) : <span>Escolha uma data</span>}
+                                                                </Button>
+                                                                </PopoverTrigger>
+                                                                <PopoverContent className="w-auto p-0">
+                                                                <Calendar
+                                                                    mode="single"
+                                                                    selected={paymentDetails.paymentDate}
+                                                                    onSelect={(date) => setPaymentDetails(prev => ({...prev, paymentDate: date}))}
+                                                                    initialFocus
+                                                                />
+                                                                </PopoverContent>
+                                                            </Popover>
+                                                        </div>
+                                                        <div className="grid grid-cols-4 items-center gap-4">
+                                                            <Label htmlFor="paymentMethod" className="text-right">Tipo</Label>
+                                                            <Select onValueChange={(value) => setPaymentDetails(prev => ({...prev, paymentMethod: value as any}))}>
+                                                                <SelectTrigger className="col-span-3">
+                                                                    <SelectValue placeholder="Selecione o método" />
+                                                                </SelectTrigger>
+                                                                <SelectContent>
+                                                                    <SelectItem value="Pix">Pix</SelectItem>
+                                                                    <SelectItem value="Cartão de Crédito">Cartão de Crédito</SelectItem>
+                                                                    <SelectItem value="Cartão de Débito">Cartão de Débito</SelectItem>
+                                                                </SelectContent>
+                                                            </Select>
+                                                        </div>
+                                                        <div className="grid grid-cols-4 items-start gap-4">
+                                                            <Label htmlFor="paymentNotes" className="text-right pt-2">Observações</Label>
+                                                            <Textarea 
+                                                                id="paymentNotes" 
+                                                                className="col-span-3"
+                                                                value={paymentDetails.paymentNotes}
+                                                                onChange={(e) => setPaymentDetails(prev => ({...prev, paymentNotes: e.target.value}))}
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                    <DialogFooter>
+                                                        <Button type="button" variant="outline" onClick={() => setIsPaymentModalOpen(false)}>Cancelar</Button>
+                                                        <Button type="submit" onClick={handleConfirmPayment}>Salvar Pagamento</Button>
+                                                    </DialogFooter>
+                                                </DialogContent>
+                                            </Dialog>
                                         </div>
                                     </TableCell>
                                 </TableRow>
