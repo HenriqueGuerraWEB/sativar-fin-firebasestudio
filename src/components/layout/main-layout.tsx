@@ -14,7 +14,7 @@ import {
   SidebarFooter,
 } from '@/components/ui/sidebar';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { LayoutDashboard, Users, Package, Banknote, FileText, Settings, LogOut } from 'lucide-react';
+import { LayoutDashboard, Users, Package, Banknote, FileText, Settings, LogOut, Shapes } from 'lucide-react';
 import React from 'react';
 import { SativarLogoIcon } from '@/components/sativar-logo';
 import { ModeToggle } from '@/components/mode-toggle';
@@ -75,6 +75,7 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
     { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { href: '/clients', label: 'Clientes', icon: Users },
     { href: '/plans', label: 'Planos', icon: Package },
+    { href: '/settings/categories', label: 'Categorias', icon: Shapes },
     { href: '/finance', label: 'Financeiro', icon: Banknote },
     { href: '/invoices', label: 'Faturas', icon: FileText },
   ];
@@ -85,6 +86,9 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
     }
     if (['/clients', '/plans', '/finance', '/invoices', '/settings'].includes(href)) {
         return pathname.startsWith(href);
+    }
+     if (href === '/settings/categories') {
+        return pathname === href;
     }
     return false;
   }

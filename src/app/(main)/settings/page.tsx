@@ -12,9 +12,6 @@ import { doc, onSnapshot, setDoc } from "firebase/firestore";
 import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
 import Image from 'next/image';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import ExpenseCategoriesPage from './categories/page';
-import Link from 'next/link';
 
 type CompanySettings = {
     name: string;
@@ -99,111 +96,98 @@ export default function SettingsPage() {
     return (
         <div className="flex flex-col gap-8">
             <div>
-                <h1 className="text-3xl font-bold tracking-tight">Configurações</h1>
-                <p className="text-muted-foreground">Gerencie as configurações da sua conta e da empresa.</p>
+                <h1 className="text-3xl font-bold tracking-tight">Configurações da Empresa</h1>
+                <p className="text-muted-foreground">Gerencie as configurações da sua empresa.</p>
             </div>
-
-            <Tabs defaultValue="company" className="w-full">
-                <TabsList className="grid w-full grid-cols-2">
-                    <TabsTrigger value="company">Empresa</TabsTrigger>
-                    <TabsTrigger value="categories" asChild><Link href="/settings/categories">Categorias</Link></TabsTrigger>
-                </TabsList>
-                <TabsContent value="company">
-                     {isLoading ? (
-                        <Card className="mt-4">
-                            <CardHeader>
-                                <Skeleton className="h-7 w-1/3" />
-                                <Skeleton className="h-4 w-2/3" />
-                            </CardHeader>
-                            <CardContent className="space-y-6">
-                                <div className="space-y-2">
-                                <Skeleton className="h-4 w-24" />
-                                <Skeleton className="h-10 w-full" />
-                                </div>
-                                <div className="space-y-2">
-                                <Skeleton className="h-4 w-24" />
-                                <Skeleton className="h-20 w-full" />
-                                </div>
-                                <div className="space-y-2">
-                                <Skeleton className="h-4 w-24" />
-                                <Skeleton className="h-10 w-full" />
-                                </div>
-                            </CardContent>
-                        </Card>
-                    ) : (
-                        <>
-                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mt-4">
-                            <Card className="lg:col-span-2">
-                                <CardHeader>
-                                    <CardTitle>Detalhes da Empresa</CardTitle>
-                                    <CardDescription>Essas informações serão exibidas nos recibos e faturas.</CardDescription>
-                                </CardHeader>
-                                <CardContent className="grid gap-6">
-                                    <div className="grid gap-2">
-                                        <Label htmlFor="name">Nome da Empresa</Label>
-                                        <Input id="name" value={settings.name} onChange={handleInputChange} placeholder="Sua Empresa LTDA" />
-                                    </div>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                        <div className="grid gap-2">
-                                            <Label htmlFor="cpf">CPF</Label>
-                                            <Input id="cpf" value={settings.cpf} onChange={handleInputChange} placeholder="000.000.000-00" />
-                                        </div>
-                                        <div className="grid gap-2">
-                                            <Label htmlFor="cnpj">CNPJ</Label>
-                                            <Input id="cnpj" value={settings.cnpj} onChange={handleInputChange} placeholder="00.000.000/0000-00" />
-                                        </div>
-                                    </div>
-                                    <div className="grid gap-2">
-                                        <Label htmlFor="address">Endereço</Label>
-                                        <Textarea id="address" value={settings.address} onChange={handleInputChange} placeholder="Rua Exemplo, 123, Bairro, Cidade - Estado, CEP" />
-                                    </div>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                        <div className="grid gap-2">
-                                            <Label htmlFor="phone">Telefone</Label>
-                                            <Input id="phone" value={settings.phone} onChange={handleInputChange} placeholder="(00) 12345-6789" />
-                                        </div>
-                                        <div className="grid gap-2">
-                                            <Label htmlFor="email">Email</Label>
-                                            <Input id="email" type="email" value={settings.email} onChange={handleInputChange} placeholder="contato@suaempresa.com" />
-                                        </div>
-                                    </div>
-                                    <div className="grid gap-2">
-                                        <Label htmlFor="website">Website</Label>
-                                        <Input id="website" value={settings.website} onChange={handleInputChange} placeholder="www.suaempresa.com" />
-                                    </div>
-                                </CardContent>
-                            </Card>
-
-                            <Card>
-                                <CardHeader>
-                                    <CardTitle>Logo da Empresa</CardTitle>
-                                    <CardDescription>Faça o upload da sua logo. Recomendado: 200x100 pixels.</CardDescription>
-                                </CardHeader>
-                                <CardContent className="flex flex-col items-center gap-4">
-                                    <div className="w-full h-32 border-2 border-dashed rounded-md flex items-center justify-center bg-muted/50">
-                                        {settings.logoDataUrl ? (
-                                            <Image src={settings.logoDataUrl} alt="Logo preview" width={160} height={80} className="object-contain max-h-full max-w-full" />
-                                        ) : (
-                                            <p className="text-sm text-muted-foreground">Pré-visualização</p>
-                                        )}
-                                    </div>
-                                    <Input id="logo" type="file" onChange={handleLogoChange} accept="image/png, image/jpeg, image/svg+xml" className="text-sm" />
-                                </CardContent>
-                            </Card>
+            {isLoading ? (
+                <Card>
+                    <CardHeader>
+                        <Skeleton className="h-7 w-1/3" />
+                        <Skeleton className="h-4 w-2/3" />
+                    </CardHeader>
+                    <CardContent className="space-y-6">
+                        <div className="space-y-2">
+                        <Skeleton className="h-4 w-24" />
+                        <Skeleton className="h-10 w-full" />
                         </div>
-                        <div className="flex justify-end mt-8">
-                            <Button onClick={handleSaveSettings} disabled={isLoading || isSaving}>
-                                {isSaving ? 'Salvando...' : 'Salvar Alterações'}
-                            </Button>
+                        <div className="space-y-2">
+                        <Skeleton className="h-4 w-24" />
+                        <Skeleton className="h-20 w-full" />
                         </div>
-                        </>
-                    )}
-                </TabsContent>
-                {/* The content for the categories tab will be handled by its own page */}
-                 <TabsContent value="categories">
-                   <p className="text-center text-muted-foreground p-8">Selecione a aba para gerenciar as categorias.</p>
-                </TabsContent>
-            </Tabs>
+                        <div className="space-y-2">
+                        <Skeleton className="h-4 w-24" />
+                        <Skeleton className="h-10 w-full" />
+                        </div>
+                    </CardContent>
+                </Card>
+            ) : (
+                <>
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                    <Card className="lg:col-span-2">
+                        <CardHeader>
+                            <CardTitle>Detalhes da Empresa</CardTitle>
+                            <CardDescription>Essas informações serão exibidas nos recibos e faturas.</CardDescription>
+                        </CardHeader>
+                        <CardContent className="grid gap-6">
+                            <div className="grid gap-2">
+                                <Label htmlFor="name">Nome da Empresa</Label>
+                                <Input id="name" value={settings.name} onChange={handleInputChange} placeholder="Sua Empresa LTDA" />
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div className="grid gap-2">
+                                    <Label htmlFor="cpf">CPF</Label>
+                                    <Input id="cpf" value={settings.cpf} onChange={handleInputChange} placeholder="000.000.000-00" />
+                                </div>
+                                <div className="grid gap-2">
+                                    <Label htmlFor="cnpj">CNPJ</Label>
+                                    <Input id="cnpj" value={settings.cnpj} onChange={handleInputChange} placeholder="00.000.000/0000-00" />
+                                </div>
+                            </div>
+                            <div className="grid gap-2">
+                                <Label htmlFor="address">Endereço</Label>
+                                <Textarea id="address" value={settings.address} onChange={handleInputChange} placeholder="Rua Exemplo, 123, Bairro, Cidade - Estado, CEP" />
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div className="grid gap-2">
+                                    <Label htmlFor="phone">Telefone</Label>
+                                    <Input id="phone" value={settings.phone} onChange={handleInputChange} placeholder="(00) 12345-6789" />
+                                </div>
+                                <div className="grid gap-2">
+                                    <Label htmlFor="email">Email</Label>
+                                    <Input id="email" type="email" value={settings.email} onChange={handleInputChange} placeholder="contato@suaempresa.com" />
+                                </div>
+                            </div>
+                            <div className="grid gap-2">
+                                <Label htmlFor="website">Website</Label>
+                                <Input id="website" value={settings.website} onChange={handleInputChange} placeholder="www.suaempresa.com" />
+                            </div>
+                        </CardContent>
+                    </Card>
+
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Logo da Empresa</CardTitle>
+                            <CardDescription>Faça o upload da sua logo. Recomendado: 200x100 pixels.</CardDescription>
+                        </CardHeader>
+                        <CardContent className="flex flex-col items-center gap-4">
+                            <div className="w-full h-32 border-2 border-dashed rounded-md flex items-center justify-center bg-muted/50">
+                                {settings.logoDataUrl ? (
+                                    <Image src={settings.logoDataUrl} alt="Logo preview" width={160} height={80} className="object-contain max-h-full max-w-full" />
+                                ) : (
+                                    <p className="text-sm text-muted-foreground">Pré-visualização</p>
+                                )}
+                            </div>
+                            <Input id="logo" type="file" onChange={handleLogoChange} accept="image/png, image/jpeg, image/svg+xml" className="text-sm" />
+                        </CardContent>
+                    </Card>
+                </div>
+                <div className="flex justify-end mt-8">
+                    <Button onClick={handleSaveSettings} disabled={isLoading || isSaving}>
+                        {isSaving ? 'Salvando...' : 'Salvar Alterações'}
+                    </Button>
+                </div>
+                </>
+            )}
         </div>
     );
 }
