@@ -49,10 +49,10 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
             <SidebarMenu>
               {menuItems.map((item) => (
                 <SidebarMenuItem key={item.href}>
-                    <Link href={item.href}>
+                    <Link href={item.href} legacyBehavior={false}>
                         <SidebarMenuButton
-                        isActive={isActive(item.href)}
-                        tooltip={item.label}
+                            isActive={isActive(item.href)}
+                            tooltip={item.label}
                         >
                             <item.icon />
                             <span>{item.label}</span>
@@ -65,7 +65,7 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
           <SidebarFooter>
             <SidebarMenu>
               <SidebarMenuItem>
-                  <Link href="/settings">
+                  <Link href="/settings" legacyBehavior={false}>
                     <SidebarMenuButton isActive={pathname.startsWith('/settings')} tooltip="Configurações">
                         <Settings />
                         <span>Configurações</span>
@@ -76,22 +76,22 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
           </SidebarFooter>
         </Sidebar>
         <SidebarInset>
-          <header className="flex h-14 items-center justify-between gap-4 border-b bg-background px-4 lg:h-[60px] lg:px-6">
-              <SidebarTrigger className="flex items-center gap-2 md:hidden">
-                  <PanelLeft />
-                  <SativarLogo />
-              </SidebarTrigger>
-            <div className="ml-auto flex items-center gap-4">
-              <ModeToggle />
-              <Avatar className="h-9 w-9">
-                  <AvatarImage src="https://placehold.co/36x36.png" alt="@admin" data-ai-hint="person portrait" />
-                  <AvatarFallback>AD</AvatarFallback>
-              </Avatar>
-            </div>
-          </header>
-          <main className="flex-1 overflow-y-auto p-4 md:p-8">
-              {children}
-          </main>
+            <header className="flex h-14 items-center justify-between gap-4 border-b bg-background px-4 lg:h-[60px] lg:px-6">
+                <SidebarTrigger className="flex items-center gap-2 md:hidden">
+                    <PanelLeft />
+                    <SativarLogo />
+                </SidebarTrigger>
+                <div className="ml-auto flex items-center gap-4">
+                <ModeToggle />
+                <Avatar className="h-9 w-9">
+                    <AvatarImage src="https://placehold.co/36x36.png" alt="@admin" data-ai-hint="person portrait" />
+                    <AvatarFallback>AD</AvatarFallback>
+                </Avatar>
+                </div>
+            </header>
+            <main className="flex-1 overflow-y-auto p-4 md:p-8">
+                {children}
+            </main>
         </SidebarInset>
       </div>
     </SidebarProvider>
