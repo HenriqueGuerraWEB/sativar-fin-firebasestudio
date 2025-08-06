@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge, badgeVariants } from "@/components/ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
-import { MoreHorizontal, PlusCircle, Printer, Calendar as CalendarIcon, ChevronDown } from "lucide-react";
+import { MoreHorizontal, PlusCircle, Printer, Calendar as CalendarIcon, ChevronDown, Shapes } from "lucide-react";
 import type { VariantProps } from 'class-variance-authority';
 import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/firebase';
@@ -237,6 +237,8 @@ export default function InvoicesPage() {
                             planId: client.planId,
                         };
                         generationPromises.push(addDoc(collection(db, "invoices"), newInvoice));
+                        // Add to clientInvoices for the next loop iteration check
+                        clientInvoices.push({ ...newInvoice, id: 'temp' }); 
                         generatedCount++;
                     }
 
