@@ -611,13 +611,14 @@ Agradecemos a sua atenção.
                     ) : (
                     <Accordion type="multiple" className="w-full">
                         {Object.entries(groupedInvoices).map(([clientId, { clientName, invoices: clientInvoices }]) => {
-                             const totalPaid = clientInvoices
-                                .filter(inv => inv.status === 'Paga')
-                                .reduce((sum, inv) => sum + inv.amount, 0);
-
-                            const totalUnpaid = clientInvoices
-                                .filter(inv => inv.status !== 'Paga')
-                                .reduce((sum, inv) => sum + inv.amount, 0);
+                             const paidInvoices = clientInvoices.filter(inv => inv.status === 'Paga');
+                             const unpaidInvoices = clientInvoices.filter(inv => inv.status !== 'Paga');
+ 
+                             const totalPaid = paidInvoices.reduce((sum, inv) => sum + inv.amount, 0);
+                             const totalUnpaid = unpaidInvoices.reduce((sum, inv) => sum + inv.amount, 0);
+ 
+                             const paidCount = paidInvoices.length;
+                             const unpaidCount = unpaidInvoices.length;
 
                             return (
                             <AccordionItem value={clientId} key={clientId}>
@@ -625,9 +626,9 @@ Agradecemos a sua atenção.
                                     <AccordionTrigger className="flex-1 text-left p-0">
                                        <div className="flex flex-col items-start gap-1">
                                             <span className="font-medium text-lg">{clientName}</span>
-                                            <div className="flex items-center gap-4 text-xs">
-                                                <span className="text-green-600 font-semibold">Pagas: {totalPaid.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
-                                                <span className="text-muted-foreground font-semibold">Pendentes: {totalUnpaid.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
+                                            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-1 sm:gap-4 text-xs">
+                                                <span className="text-green-600 font-semibold">Pagas ({paidCount}): {totalPaid.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
+                                                <span className="text-muted-foreground font-semibold">Pendentes ({unpaidCount}): {totalUnpaid.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
                                             </div>
                                        </div>
                                     </AccordionTrigger>
