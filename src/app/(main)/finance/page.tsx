@@ -6,8 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Badge } from "@/components/ui/badge";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Badge, badgeVariants } from "@/components/ui/badge";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { MoreHorizontal, PlusCircle, Sparkles } from "lucide-react";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger, SheetFooter } from "@/components/ui/sheet";
 import { Input } from "@/components/ui/input";
@@ -19,6 +19,7 @@ import { collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc, query, Times
 import { Skeleton } from '@/components/ui/skeleton';
 import { format } from 'date-fns';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import type { VariantProps } from 'class-variance-authority';
 
 
 type ExpenseCategory = {
@@ -35,11 +36,15 @@ type Expense = {
     status: 'Paga' | 'Pendente';
 };
 
-type Income = {
+type Invoice = {
     id: string;
-    description: string;
+    clientName: string;
+    clientId: string;
     amount: number;
-    date: Timestamp;
+    issueDate: Timestamp;
+    dueDate: Timestamp;
+    status: 'Paga' | 'Pendente' | 'Vencida';
+    planId: string;
 };
 
 const emptyExpense: Omit<Expense, 'id' | 'status'> = {
@@ -52,7 +57,7 @@ const emptyExpense: Omit<Expense, 'id' | 'status'> = {
 export default function FinancePage() {
     const { toast } = useToast();
     const [expenses, setExpenses] = useState<Expense[]>([]);
-    const [income, setIncome] = useState<Income[]>([]);
+    const [invoices, setInvoices] = useState<Invoice[]>([]);
     const [categories, setCategories] = useState<ExpenseCategory[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isSheetOpen, setIsSheetOpen] = useState(false);
@@ -66,17 +71,17 @@ export default function FinancePage() {
             setIsLoading(true);
             try {
                 const expenseQuery = query(collection(db, "expenses"), orderBy("dueDate", "desc"));
-                const incomeQuery = query(collection(db, "income"), orderBy("date", "desc"));
+                const invoiceQuery = query(collection(db, "invoices"), orderBy("dueDate", "desc"));
                 const categoryQuery = query(collection(db, "expenseCategories"), orderBy("name"));
 
-                const [expenseSnapshot, incomeSnapshot, categorySnapshot] = await Promise.all([
+                const [expenseSnapshot, invoiceSnapshot, categorySnapshot] = await Promise.all([
                     getDocs(expenseQuery),
-                    getDocs(incomeQuery),
+                    getDocs(invoiceQuery),
                     getDocs(categoryQuery)
                 ]);
 
                 setExpenses(expenseSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Expense)));
-                setIncome(incomeSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Income)));
+                setInvoices(invoiceSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Invoice)));
                 setCategories(categorySnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as ExpenseCategory)));
 
             } catch (error) {
@@ -90,15 +95,15 @@ export default function FinancePage() {
         fetchInitialData();
 
         const expenseQuery = query(collection(db, "expenses"), orderBy("dueDate", "desc"));
-        const incomeQuery = query(collection(db, "income"), orderBy("date", "desc"));
+        const invoiceQuery = query(collection(db, "invoices"), orderBy("dueDate", "desc"));
         const categoryQuery = query(collection(db, "expenseCategories"), orderBy("name"));
 
         const unsubExpenses = onSnapshot(expenseQuery, (snapshot) => {
             setExpenses(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Expense)));
         });
 
-        const unsubIncome = onSnapshot(incomeQuery, (snapshot) => {
-            setIncome(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Income)));
+        const unsubInvoices = onSnapshot(invoiceQuery, (snapshot) => {
+            setInvoices(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Invoice)));
         });
         
         const unsubCategories = onSnapshot(categoryQuery, (snapshot) => {
@@ -107,7 +112,7 @@ export default function FinancePage() {
 
         return () => {
             unsubExpenses();
-            unsubIncome();
+            unsubInvoices();
             unsubCategories();
         };
     }, [toast]);
@@ -148,7 +153,7 @@ export default function FinancePage() {
         }
     };
     
-    const handleUpdateStatus = async (expenseId: string, status: Expense['status']) => {
+    const handleUpdateExpenseStatus = async (expenseId: string, status: Expense['status']) => {
         try {
             const expenseRef = doc(db, "expenses", expenseId);
             await updateDoc(expenseRef, { status });
@@ -168,6 +173,31 @@ export default function FinancePage() {
             toast({
                 title: "Erro",
                 description: "Não foi possível excluir a despesa.",
+                variant: "destructive",
+            });
+        }
+    };
+    
+    const handleUpdateInvoiceStatus = async (invoiceId: string, status: Invoice['status']) => {
+        try {
+            const invoiceRef = doc(db, "invoices", invoiceId);
+            await updateDoc(invoiceRef, { status });
+            toast({ title: "Sucesso", description: `Fatura marcada como ${status}.`});
+        } catch (error) {
+            console.error("Error updating status: ", error);
+            toast({ title: "Erro", description: "Não foi possível atualizar o status da fatura.", variant: "destructive" });
+        }
+    };
+
+    const handleDeleteInvoice = async (invoiceId: string) => {
+        try {
+            await deleteDoc(doc(db, "invoices", invoiceId));
+            toast({ title: "Sucesso", description: "Fatura excluída com sucesso." });
+        } catch (error) {
+            console.error("Error deleting invoice: ", error);
+            toast({
+                title: "Erro",
+                description: "Não foi possível excluir a fatura.",
                 variant: "destructive",
             });
         }
@@ -206,6 +236,24 @@ export default function FinancePage() {
             setIsAnalyzing(false);
             toast({ title: "Recibo analisado!", description: "Os dados foram preenchidos." });
         }, 2000);
+    }
+    
+    const getInvoiceStatusVariant = (status: Invoice['status']): VariantProps<typeof badgeVariants>['variant'] => {
+        switch (status) {
+            case 'Paga': return 'secondary';
+            case 'Pendente': return 'outline';
+            case 'Vencida': return 'destructive';
+            default: return 'default';
+        }
+    }
+
+    const getInvoiceStatusClass = (status: Invoice['status']) => {
+        switch (status) {
+            case 'Paga': return 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-400';
+            case 'Pendente': return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-400';
+            case 'Vencida': return 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-400';
+            default: return '';
+        }
     }
 
 
@@ -352,10 +400,10 @@ export default function FinancePage() {
                                                         </DropdownMenuTrigger>
                                                         <DropdownMenuContent align="end">
                                                             <DropdownMenuLabel>Ações</DropdownMenuLabel>
-                                                            <DropdownMenuItem onClick={() => handleUpdateStatus(expense.id, 'Paga')} disabled={expense.status === 'Paga'}>
+                                                            <DropdownMenuItem onClick={() => handleUpdateExpenseStatus(expense.id, 'Paga')} disabled={expense.status === 'Paga'}>
                                                                 Marcar como Paga
                                                             </DropdownMenuItem>
-                                                            <DropdownMenuItem onClick={() => handleUpdateStatus(expense.id, 'Pendente')} disabled={expense.status === 'Pendente'}>
+                                                            <DropdownMenuItem onClick={() => handleUpdateExpenseStatus(expense.id, 'Pendente')} disabled={expense.status === 'Pendente'}>
                                                                 Marcar como Pendente
                                                             </DropdownMenuItem>
                                                             <AlertDialog>
@@ -392,29 +440,79 @@ export default function FinancePage() {
                      <Card>
                         <CardHeader>
                             <CardTitle>Contas a Receber</CardTitle>
-                            <CardDescription>Visualize as entradas de capital.</CardDescription>
+                            <CardDescription>Visualize as faturas pendentes e pagas dos clientes.</CardDescription>
                         </CardHeader>
                         <CardContent>
                             <Table>
                                 <TableHeader>
                                     <TableRow>
-                                        <TableHead>Descrição</TableHead>
-                                        <TableHead>Data</TableHead>
+                                        <TableHead>Cliente</TableHead>
+                                        <TableHead>Vencimento</TableHead>
+                                        <TableHead>Status</TableHead>
                                         <TableHead className="text-right">Valor</TableHead>
+                                        <TableHead><span className="sr-only">Ações</span></TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                   {isLoading ? Array.from({length: 2}).map((_, i) => (
+                                   {isLoading ? Array.from({length: 4}).map((_, i) => (
                                         <TableRow key={i}>
-                                            <TableCell><Skeleton className="h-5 w-48" /></TableCell>
+                                            <TableCell><Skeleton className="h-5 w-32" /></TableCell>
                                             <TableCell><Skeleton className="h-5 w-24" /></TableCell>
+                                            <TableCell><Skeleton className="h-6 w-20" /></TableCell>
                                             <TableCell className="text-right"><Skeleton className="h-5 w-20 ml-auto" /></TableCell>
+                                            <TableCell><Skeleton className="h-8 w-8 ml-auto" /></TableCell>
                                         </TableRow>
-                                    )) : income.map(item => (
-                                        <TableRow key={item.id}>
-                                            <TableCell className="font-medium">{item.description}</TableCell>
-                                            <TableCell>{format(item.date.toDate(), 'dd/MM/yyyy')}</TableCell>
-                                            <TableCell className="text-right">{item.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</TableCell>
+                                    )) : invoices.map(invoice => (
+                                        <TableRow key={invoice.id}>
+                                            <TableCell className="font-medium">{invoice.clientName}</TableCell>
+                                            <TableCell>{format(invoice.dueDate.toDate(), 'dd/MM/yyyy')}</TableCell>
+                                            <TableCell>
+                                                <Badge variant={getInvoiceStatusVariant(invoice.status)} className={getInvoiceStatusClass(invoice.status)}>
+                                                    {invoice.status}
+                                                </Badge>
+                                            </TableCell>
+                                            <TableCell className="text-right">{invoice.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</TableCell>
+                                            <TableCell>
+                                                <div className="flex justify-end">
+                                                    <DropdownMenu>
+                                                        <DropdownMenuTrigger asChild>
+                                                            <Button aria-haspopup="true" size="icon" variant="ghost">
+                                                                <MoreHorizontal className="h-4 w-4" />
+                                                                <span className="sr-only">Toggle menu</span>
+                                                            </Button>
+                                                        </DropdownMenuTrigger>
+                                                        <DropdownMenuContent align="end">
+                                                            <DropdownMenuLabel>Ações</DropdownMenuLabel>
+                                                            <DropdownMenuItem onClick={() => handleUpdateInvoiceStatus(invoice.id, 'Paga')} disabled={invoice.status === 'Paga'}>
+                                                                Marcar como Paga
+                                                            </DropdownMenuItem>
+                                                            <DropdownMenuItem onClick={() => handleUpdateInvoiceStatus(invoice.id, 'Pendente')} disabled={invoice.status === 'Pendente' || invoice.status === 'Vencida'}>
+                                                                Marcar como Pendente
+                                                            </DropdownMenuItem>
+                                                            <DropdownMenuSeparator />
+                                                            <AlertDialog>
+                                                                <AlertDialogTrigger asChild>
+                                                                    <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive focus:text-destructive focus:bg-destructive/10">
+                                                                        Excluir
+                                                                    </DropdownMenuItem>
+                                                                </AlertDialogTrigger>
+                                                                <AlertDialogContent>
+                                                                    <AlertDialogHeader>
+                                                                        <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
+                                                                        <AlertDialogDescription>
+                                                                            Essa ação não pode ser desfeita. Isso excluirá permanentemente a fatura.
+                                                                        </AlertDialogDescription>
+                                                                    </AlertDialogHeader>
+                                                                    <AlertDialogFooter>
+                                                                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                                                        <AlertDialogAction onClick={() => handleDeleteInvoice(invoice.id)}>Excluir</AlertDialogAction>
+                                                                    </AlertDialogFooter>
+                                                                </AlertDialogContent>
+                                                            </AlertDialog>
+                                                        </DropdownMenuContent>
+                                                    </DropdownMenu>
+                                                </div>
+                                            </TableCell>
                                         </TableRow>
                                     ))}
                                 </TableBody>
@@ -438,4 +536,5 @@ export default function FinancePage() {
             </Tabs>
         </div>
     );
-}
+
+    
