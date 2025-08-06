@@ -30,18 +30,20 @@ export default function InvoicesPage() {
     }
 
     return (
-        <div className="flex flex-col gap-6">
-            <div className="flex items-center justify-between">
-                <h1 className="text-2xl font-semibold">Faturas</h1>
+        <div className="flex flex-col gap-8">
+            <div className="flex items-start justify-between">
+                <div>
+                    <h1 className="text-3xl font-bold tracking-tight">Faturas</h1>
+                    <p className="text-muted-foreground">Gerencie e visualize todas as faturas.</p>
+                </div>
                 <Button size="sm" className="gap-1">
                     <PlusCircle className="h-4 w-4" />
-                    Gerar Fatura Avulsa
+                    Gerar Fatura
                 </Button>
             </div>
             <Card>
                 <CardHeader>
                     <CardTitle>Lista de Faturas</CardTitle>
-                    <CardDescription>Gerencie e visualize todas as faturas.</CardDescription>
                 </CardHeader>
                 <CardContent>
                     <Table>

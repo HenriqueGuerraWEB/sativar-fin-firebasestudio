@@ -20,9 +20,12 @@ const plans = [
 
 export default function PlansPage() {
     return (
-        <div className="flex flex-col gap-6">
-            <div className="flex items-center justify-between">
-                <h1 className="text-2xl font-semibold">Planos de Serviço</h1>
+        <div className="flex flex-col gap-8">
+            <div className="flex items-start justify-between">
+                <div>
+                    <h1 className="text-3xl font-bold tracking-tight">Planos de Serviço</h1>
+                    <p className="text-muted-foreground">Gerencie seus planos de serviço.</p>
+                </div>
                 <Sheet>
                     <SheetTrigger asChild>
                         <Button size="sm" className="gap-1">
@@ -60,7 +63,6 @@ export default function PlansPage() {
             <Card>
                 <CardHeader>
                     <CardTitle>Lista de Planos</CardTitle>
-                    <CardDescription>Gerencie seus planos de serviço.</CardDescription>
                 </CardHeader>
                 <CardContent>
                     <Table>

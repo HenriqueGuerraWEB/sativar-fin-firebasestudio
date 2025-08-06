@@ -31,8 +31,11 @@ const invoices = [
 
 export default function DashboardPage() {
   return (
-    <div className="flex flex-col gap-6">
-      <h1 className="text-2xl font-semibold">Dashboard</h1>
+    <div className="flex flex-col gap-8">
+        <div>
+            <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
+            <p className="text-muted-foreground">Visão geral do seu negócio.</p>
+        </div>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -76,8 +79,8 @@ export default function DashboardPage() {
         </Card>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <Card>
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-5">
+        <Card className="lg:col-span-3">
           <CardHeader>
             <CardTitle>Receita vs. Despesas</CardTitle>
             <CardDescription>Últimos 6 meses</CardDescription>
@@ -95,7 +98,7 @@ export default function DashboardPage() {
             </ChartContainer>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="lg:col-span-2">
           <CardHeader>
             <CardTitle>Avisos Importantes</CardTitle>
             <CardDescription>Faturas vencendo hoje e vencidas.</CardDescription>

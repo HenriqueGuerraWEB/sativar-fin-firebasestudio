@@ -15,7 +15,7 @@ import {
   SidebarTrigger,
 } from '@/components/ui/sidebar';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { LayoutDashboard, Users, Package, Banknote, FileText, Settings } from 'lucide-react';
+import { LayoutDashboard, Users, Package, Banknote, FileText, Settings, PanelLeft } from 'lucide-react';
 import React from 'react';
 import { SativarLogo } from '@/components/sativar-logo';
 import { ModeToggle } from '@/components/mode-toggle';
@@ -40,22 +40,20 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <SidebarProvider>
-      <Sidebar>
+      <Sidebar side="left" variant="sidebar" collapsible="icon">
         <SidebarHeader>
-          <div className="flex items-center gap-2">
             <SativarLogo />
-          </div>
         </SidebarHeader>
         <SidebarContent>
           <SidebarMenu>
             {menuItems.map((item) => (
               <SidebarMenuItem key={item.href}>
-                <SidebarMenuButton asChild isActive={isActive(item.href)} tooltip={item.label}>
-                  <Link href={item.href}>
+                <Link href={item.href} passHref>
+                  <SidebarMenuButton asChild={false} isActive={isActive(item.href)} tooltip={item.label}>
                     <item.icon />
-                    {item.label}
-                  </Link>
-                </SidebarMenuButton>
+                    <span>{item.label}</span>
+                  </SidebarMenuButton>
+                </Link>
               </SidebarMenuItem>
             ))}
           </SidebarMenu>
@@ -63,37 +61,31 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
         <SidebarFooter>
           <SidebarMenu>
             <SidebarMenuItem>
-                <SidebarMenuButton asChild isActive={pathname.startsWith('/settings')} tooltip="Configurações">
-                    <Link href="/settings">
-                        <Settings />
-                        Configurações
-                    </Link>
+              <Link href="/settings" passHref>
+                <SidebarMenuButton asChild={false} isActive={pathname.startsWith('/settings')} tooltip="Configurações">
+                  <Settings />
+                  <span>Configurações</span>
                 </SidebarMenuButton>
-            </SidebarMenuItem>
-            <SidebarMenuItem>
-                <div className="flex items-center gap-3 rounded-lg px-3 py-2 text-sidebar-foreground transition-all">
-                    <Avatar className="h-8 w-8">
-                        <AvatarImage src="https://placehold.co/32x32.png" alt="@admin" data-ai-hint="person portrait" />
-                        <AvatarFallback>AD</AvatarFallback>
-                    </Avatar>
-                     <div className="flex flex-col overflow-hidden group-data-[collapsible=icon]:hidden">
-                        <span className="truncate text-sm font-semibold">Administrador</span>
-                        <span className="truncate text-xs text-muted-foreground">admin@sativar.com</span>
-                    </div>
-                </div>
+              </Link>
             </SidebarMenuItem>
           </SidebarMenu>
         </SidebarFooter>
       </Sidebar>
       <SidebarInset>
         <header className="flex h-14 items-center justify-between gap-4 border-b bg-background px-4 lg:h-[60px] lg:px-6">
-          <SidebarTrigger className="md:hidden" />
-          <SativarLogo className="md:hidden" />
-          <div className="flex items-center gap-2">
+            <SidebarTrigger className="flex items-center gap-2 md:hidden">
+                <PanelLeft />
+                <SativarLogo />
+            </SidebarTrigger>
+          <div className="ml-auto flex items-center gap-4">
             <ModeToggle />
+            <Avatar className="h-9 w-9">
+                <AvatarImage src="https://placehold.co/36x36.png" alt="@admin" data-ai-hint="person portrait" />
+                <AvatarFallback>AD</AvatarFallback>
+            </Avatar>
           </div>
         </header>
-        <main className="flex-1 overflow-y-auto p-4 md:p-6">
+        <main className="flex-1 overflow-y-auto p-4 md:p-8">
             {children}
         </main>
       </SidebarInset>

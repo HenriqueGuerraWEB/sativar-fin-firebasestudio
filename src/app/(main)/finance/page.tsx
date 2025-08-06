@@ -34,9 +34,12 @@ export default function FinancePage() {
     }
 
     return (
-        <div className="flex flex-col gap-6">
-            <div className="flex items-center justify-between">
-                <h1 className="text-2xl font-semibold">Financeiro</h1>
+        <div className="flex flex-col gap-8">
+            <div className="flex items-start justify-between">
+                <div>
+                    <h1 className="text-3xl font-bold tracking-tight">Financeiro</h1>
+                    <p className="text-muted-foreground">Acompanhe as finanças da sua empresa.</p>
+                </div>
                  <Sheet>
                     <SheetTrigger asChild>
                         <Button size="sm" className="gap-1">
@@ -139,7 +142,7 @@ export default function FinancePage() {
                         <CardHeader>
                             <CardTitle>Contas a Receber</CardTitle>
                             <CardDescription>Visualize as entradas de capital.</CardDescription>
-                        </CardHeader>
+                        </Header>
                         <CardContent>
                             <Table>
                                 <TableHeader>
@@ -169,7 +172,9 @@ export default function FinancePage() {
                             <CardDescription>Relatório de entradas e saídas.</CardDescription>
                         </CardHeader>
                         <CardContent>
-                            <p className="py-10 text-center text-muted-foreground">O relatório de fluxo de caixa será implementado em breve.</p>
+                            <div className="flex items-center justify-center h-48">
+                                <p className="text-center text-muted-foreground">O relatório de fluxo de caixa será implementado em breve.</p>
+                            </div>
                         </CardContent>
                     </Card>
                 </TabsContent>

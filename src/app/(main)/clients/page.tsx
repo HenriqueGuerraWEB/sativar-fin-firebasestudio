@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -13,7 +13,7 @@ import { Label } from "@/components/ui/label";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/firebase';
-import { collection, getDocs, addDoc, doc, updateDoc, deleteDoc, query, onSnapshot } from "firebase/firestore";
+import { collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc, query } from "firebase/firestore";
 import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
 
@@ -153,9 +153,12 @@ export default function ClientsPage() {
     };
 
     return (
-        <div className="flex flex-col gap-6">
-            <div className="flex items-center justify-between">
-                <h1 className="text-2xl font-semibold">Clientes</h1>
+        <div className="flex flex-col gap-8">
+            <div className="flex items-start justify-between">
+                <div>
+                    <h1 className="text-3xl font-bold tracking-tight">Clientes</h1>
+                    <p className="text-muted-foreground">Gerencie seus clientes e visualize seus detalhes.</p>
+                </div>
                 <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
                     <SheetTrigger asChild>
                         <Button size="sm" className="gap-1" onClick={handleAddNew}>
@@ -209,83 +212,83 @@ export default function ClientsPage() {
             <Card>
                 <CardHeader>
                     <CardTitle>Lista de Clientes</CardTitle>
-                    <CardDescription>Gerencie seus clientes e visualize seus detalhes.</CardDescription>
                 </CardHeader>
                 <CardContent>
-                    <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead>Cliente</TableHead>
-                                <TableHead>Status</TableHead>
-                                <TableHead>Contato</TableHead>
-                                <TableHead><span className="sr-only">Ações</span></TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {isLoading ? (
-                                Array.from({ length: 4 }).map((_, index) => (
-                                <TableRow key={index}>
-                                    <TableCell>
-                                        <Skeleton className="h-5 w-32" />
-                                        <Skeleton className="mt-1 h-4 w-40" />
-                                    </TableCell>
-                                    <TableCell><Skeleton className="h-6 w-16 rounded-full" /></TableCell>
-                                    <TableCell>
-                                        <Skeleton className="h-5 w-28" />
-                                        <Skeleton className="mt-1 h-4 w-36" />
-                                    </TableCell>
-                                    <TableCell><Skeleton className="h-8 w-8 ml-auto" /></TableCell>
+                    <div className="overflow-x-auto">
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Cliente</TableHead>
+                                    <TableHead>Status</TableHead>
+                                    <TableHead>Contato</TableHead>
+                                    <TableHead><span className="sr-only">Ações</span></TableHead>
                                 </TableRow>
-                                ))
-                            ) : clients.map(client => (
-                                <TableRow key={client.id}>
-                                    <TableCell className="font-medium">
-                                        <div>{client.name}</div>
-                                        <div className="text-sm text-muted-foreground">{client.taxId}</div>
-                                    </TableCell>
-                                    <TableCell><Badge variant={client.status === 'Ativo' ? 'default' : 'secondary'}>{client.status}</Badge></TableCell>
-                                    <TableCell>
-                                        <div>{client.contactName}</div>
-                                        <div className="text-sm text-muted-foreground">{client.email}</div>
-                                    </TableCell>
-                                    <TableCell>
-                                        <div className="flex justify-end">
-                                            <DropdownMenu>
-                                                <DropdownMenuTrigger asChild>
-                                                    <Button aria-haspopup="true" size="icon" variant="ghost">
-                                                        <MoreHorizontal className="h-4 w-4" />
-                                                        <span className="sr-only">Toggle menu</span>
-                                                    </Button>
-                                                </DropdownMenuTrigger>
-                                                <DropdownMenuContent align="end">
-                                                    <DropdownMenuLabel>Ações</DropdownMenuLabel>
-                                                    <DropdownMenuItem onClick={() => handleEdit(client)}>Editar</DropdownMenuItem>
-                                                    <DropdownMenuItem>Ver Histórico</DropdownMenuItem>
-                                                    <AlertDialog>
-                                                        <AlertDialogTrigger asChild>
-                                                            <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive">Excluir</DropdownMenuItem>
-                                                        </AlertDialogTrigger>
-                                                        <AlertDialogContent>
-                                                            <AlertDialogHeader>
-                                                                <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
-                                                                <AlertDialogDescription>
-                                                                    Essa ação não pode ser desfeita. Isso excluirá permanentemente o cliente.
-                                                                </AlertDialogDescription>
-                                                            </AlertDialogHeader>
-                                                            <AlertDialogFooter>
-                                                                <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                                                <AlertDialogAction onClick={() => handleDelete(client.id)}>Excluir</AlertDialogAction>
-                                                            </AlertDialogFooter>
-                                                        </AlertDialogContent>
-                                                    </AlertDialog>
-                                                </DropdownMenuContent>
-                                            </DropdownMenu>
-                                        </div>
-                                    </TableCell>
-                                </TableRow>
-                            ))}
-                        </TableBody>
-                    </Table>
+                            </TableHeader>
+                            <TableBody>
+                                {isLoading ? (
+                                    Array.from({ length: 5 }).map((_, index) => (
+                                    <TableRow key={index}>
+                                        <TableCell>
+                                            <Skeleton className="h-5 w-32" />
+                                            <Skeleton className="mt-2 h-4 w-40" />
+                                        </TableCell>
+                                        <TableCell><Skeleton className="h-6 w-16 rounded-full" /></TableCell>
+                                        <TableCell>
+                                            <Skeleton className="h-5 w-28" />
+                                            <Skeleton className="mt-2 h-4 w-36" />
+                                        </TableCell>
+                                        <TableCell><Skeleton className="h-8 w-8 ml-auto" /></TableCell>
+                                    </TableRow>
+                                    ))
+                                ) : clients.map(client => (
+                                    <TableRow key={client.id}>
+                                        <TableCell className="font-medium">
+                                            <div className="font-medium">{client.name}</div>
+                                            <div className="text-sm text-muted-foreground">{client.taxId}</div>
+                                        </TableCell>
+                                        <TableCell><Badge variant={client.status === 'Ativo' ? 'default' : 'secondary'} className={client.status === 'Ativo' ? 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-400' : ''}>{client.status}</Badge></TableCell>
+                                        <TableCell>
+                                            <div className="font-medium">{client.contactName}</div>
+                                            <div className="text-sm text-muted-foreground">{client.email}</div>
+                                        </TableCell>
+                                        <TableCell>
+                                            <div className="flex justify-end">
+                                                <DropdownMenu>
+                                                    <DropdownMenuTrigger asChild>
+                                                        <Button aria-haspopup="true" size="icon" variant="ghost">
+                                                            <MoreHorizontal className="h-4 w-4" />
+                                                            <span className="sr-only">Toggle menu</span>
+                                                        </Button>
+                                                    </DropdownMenuTrigger>
+                                                    <DropdownMenuContent align="end">
+                                                        <DropdownMenuLabel>Ações</DropdownMenuLabel>
+                                                        <DropdownMenuItem onClick={() => handleEdit(client)}>Editar</DropdownMenuItem>
+                                                        <AlertDialog>
+                                                            <AlertDialogTrigger asChild>
+                                                                <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive focus:text-destructive focus:bg-destructive/10">Excluir</DropdownMenuItem>
+                                                            </AlertDialogTrigger>
+                                                            <AlertDialogContent>
+                                                                <AlertDialogHeader>
+                                                                    <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
+                                                                    <AlertDialogDescription>
+                                                                        Essa ação não pode ser desfeita. Isso excluirá permanentemente o cliente.
+                                                                    </AlertDialogDescription>
+                                                                </AlertDialogHeader>
+                                                                <AlertDialogFooter>
+                                                                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                                                    <AlertDialogAction onClick={() => handleDelete(client.id)}>Excluir</AlertDialogAction>
+                                                                </AlertDialogFooter>
+                                                            </AlertDialogContent>
+                                                        </AlertDialog>
+                                                    </DropdownMenuContent>
+                                                </DropdownMenu>
+                                            </div>
+                                        </TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    </div>
                 </CardContent>
             </Card>
         </div>

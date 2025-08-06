@@ -2,15 +2,20 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 
 export default function SettingsPage() {
   return (
-    <div className="flex flex-col gap-6">
-      <h1 className="text-2xl font-semibold">Configurações</h1>
+    <div className="flex flex-col gap-8">
+      <div>
+        <h1 className="text-3xl font-bold tracking-tight">Configurações</h1>
+        <p className="text-muted-foreground">Gerencie as configurações da sua conta e da empresa.</p>
+      </div>
       <Card>
         <CardHeader>
           <CardTitle>Configurações da Conta</CardTitle>
-          <CardDescription>Gerencie as configurações da sua conta e da empresa.</CardDescription>
+          <CardDescription>Em breve você poderá gerenciar as configurações aqui.</CardDescription>
         </CardHeader>
         <CardContent>
-          <p className="py-10 text-center text-muted-foreground">As opções de configuração serão implementadas em breve.</p>
+          <div className="flex items-center justify-center h-48">
+            <p className="text-center text-muted-foreground">As opções de configuração serão implementadas em breve.</p>
+          </div>
         </CardContent>
       </Card>
     </div>
