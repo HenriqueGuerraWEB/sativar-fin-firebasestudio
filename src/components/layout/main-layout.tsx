@@ -13,22 +13,18 @@ import {
   SidebarMenuButton,
   SidebarInset,
   SidebarFooter,
-  SidebarTrigger,
 } from '@/components/ui/sidebar';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { LayoutDashboard, Users, Package, Banknote, FileText, Settings, PanelLeft, LogOut } from 'lucide-react';
+import { LayoutDashboard, Users, Package, Banknote, FileText, Settings, LogOut } from 'lucide-react';
 import React from 'react';
 import { SativarLogo, SativarLogoIcon } from '@/components/sativar-logo';
 import { ModeToggle } from '@/components/mode-toggle';
 import { useAuth } from '@/hooks/use-auth';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '../ui/dropdown-menu';
-import { useSidebar } from '@/components/ui/sidebar';
 
 function HeaderContent() {
     const { user, logout } = useAuth();
     const router = useRouter();
-    const { state } = useSidebar();
-
 
     const handleLogout = async () => {
         await logout();
@@ -45,39 +41,32 @@ function HeaderContent() {
     }
 
     return (
-        <>
-            <SidebarTrigger className="flex items-center gap-2 md:hidden">
-                <PanelLeft />
-                {state === 'expanded' ? <SativarLogo /> : <SativarLogoIcon />}
-            </SidebarTrigger>
-            <div className="ml-auto flex items-center gap-4">
-                <ModeToggle />
-                <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                        <Avatar className="h-9 w-9 cursor-pointer">
-                            <AvatarImage src={user?.photoURL ?? ''} alt={user?.displayName ?? 'User'} data-ai-hint="person portrait" />
-                            <AvatarFallback>{getInitials(user?.displayName)}</AvatarFallback>
-                        </Avatar>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                        <DropdownMenuLabel>Minha Conta</DropdownMenuLabel>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem onClick={() => router.push('/settings')}>
-                            <Settings className="mr-2 h-4 w-4" />
-                            <span>Configurações</span>
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem onClick={handleLogout}>
-                            <LogOut className="mr-2 h-4 w-4" />
-                            <span>Sair</span>
-                        </DropdownMenuItem>
-                    </DropdownMenuContent>
-                </DropdownMenu>
-            </div>
-        </>
+        <div className="ml-auto flex items-center gap-4">
+            <ModeToggle />
+            <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                    <Avatar className="h-9 w-9 cursor-pointer">
+                        <AvatarImage src={user?.photoURL ?? ''} alt={user?.displayName ?? 'User'} data-ai-hint="person portrait" />
+                        <AvatarFallback>{getInitials(user?.displayName)}</AvatarFallback>
+                    </Avatar>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                    <DropdownMenuLabel>Minha Conta</DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={() => router.push('/settings')}>
+                        <Settings className="mr-2 h-4 w-4" />
+                        <span>Configurações</span>
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={handleLogout}>
+                        <LogOut className="mr-2 h-4 w-4" />
+                        <span>Sair</span>
+                    </DropdownMenuItem>
+                </DropdownMenuContent>
+            </DropdownMenu>
+        </div>
     );
 }
-
 
 export function MainLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -106,15 +95,15 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <SidebarProvider>
+    <SidebarProvider defaultOpen={false}>
         <div className="flex h-screen w-full flex-col overflow-hidden">
-            <header className="flex h-14 shrink-0 items-center justify-between gap-4 border-b bg-background px-4 lg:h-[60px] lg:px-6">
+            <header className="flex h-14 shrink-0 items-center justify-between gap-4 border-b bg-background px-4 pl-[var(--sidebar-width-icon)] lg:h-[60px] lg:px-6 lg:pl-[var(--sidebar-width-icon)]">
                 <HeaderContent />
             </header>
             <div className="flex flex-1 overflow-hidden">
-                <Sidebar side="left" variant="sidebar" collapsible="icon">
+                <Sidebar>
                     <SidebarHeader>
-                       <SativarLogo />
+                       <SativarLogoIcon />
                     </SidebarHeader>
                     <SidebarContent>
                     <SidebarMenu>
