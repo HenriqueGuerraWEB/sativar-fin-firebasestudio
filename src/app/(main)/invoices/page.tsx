@@ -46,6 +46,7 @@ type Client = {
     id: string;
     name: string;
     email: string;
+    whatsapp: string;
     plans: ClientPlan[];
     status: 'Ativo' | 'Inativo';
 }
@@ -90,6 +91,9 @@ export default function InvoicesPage() {
     const [isLoading, setIsLoading] = useState(true);
     const [isGenerating, setIsGenerating] = useState(false);
     const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+    const [isReminderModalOpen, setIsReminderModalOpen] = useState(false);
+    const [reminderText, setReminderText] = useState("");
+    const [clientForReminder, setClientForReminder] = useState<Client | null>(null);
     const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
     const [paymentDetails, setPaymentDetails] = useState<{
         paymentDate: Date | undefined;
@@ -348,36 +352,51 @@ export default function InvoicesPage() {
     };
 
 
-    const handleSendReminder = async (invoice: Invoice) => {
-        const dueDate = format(invoice.dueDate.toDate(), 'dd/MM/yyyy', { locale: ptBR });
-        const amount = invoice.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-
-        const reminderText = `
-Olá, ${invoice.clientName}!
-
-Este é um lembrete amigável sobre sua fatura pendente.
-
-Valor: ${amount}
-Vencimento: ${dueDate}
-
-Agradecemos a sua atenção.
-        `.trim();
-
+    const handlePrepareReminder = async (invoice: Invoice) => {
         try {
-            await navigator.clipboard.writeText(reminderText);
-            toast({
-                title: 'Copiado!',
-                description: 'A mensagem de lembrete foi copiada para a área de transferência.',
-            });
+            const clientRef = doc(db, 'clients', invoice.clientId);
+            const clientDoc = await getDoc(clientRef);
+
+            if (!clientDoc.exists() || !clientDoc.data().whatsapp) {
+                toast({
+                    title: 'Erro',
+                    description: 'O cliente não possui um número de WhatsApp cadastrado.',
+                    variant: 'destructive',
+                });
+                return;
+            }
+            
+            const clientData = clientDoc.data() as Client;
+            setClientForReminder(clientData);
+            setSelectedInvoice(invoice);
+
+            const dueDate = format(invoice.dueDate.toDate(), 'dd/MM/yyyy', { locale: ptBR });
+            const amount = invoice.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+            const text = `Olá, ${invoice.clientName}!\n\nEste é um lembrete sobre a fatura do seu plano pendente.\n\nValor: ${amount}\nVencimento: ${dueDate}\n\nAgradecemos a sua atenção.`.trim();
+            
+            setReminderText(text);
+            setIsReminderModalOpen(true);
+
         } catch (err) {
-            console.error('Failed to copy text: ', err);
+            console.error('Failed to prepare reminder: ', err);
             toast({
                 title: 'Erro',
-                description: 'Não foi possível copiar o texto.',
+                description: 'Não foi possível preparar o lembrete.',
                 variant: 'destructive',
             });
         }
     };
+    
+    const handleSendWhatsappReminder = () => {
+        if (!clientForReminder || !clientForReminder.whatsapp) return;
+        const phoneNumber = clientForReminder.whatsapp.replace(/\D/g, '');
+        const encodedText = encodeURIComponent(reminderText);
+        const whatsappUrl = `https://wa.me/55${phoneNumber}?text=${encodedText}`;
+        
+        window.open(whatsappUrl, '_blank');
+        setIsReminderModalOpen(false);
+    }
 
     const handleDeleteInvoice = async (invoiceId: string) => {
         try {
@@ -457,7 +476,7 @@ Agradecemos a sua atenção.
             
             const logoHtml = company?.logoDataUrl 
                 ? `<img src="${company.logoDataUrl}" alt="Company Logo" style="max-height: 60px; max-width: 200px;" />` 
-                : `<h1 class="text-3xl font-bold text-gray-800">${company?.name || 'Sua Empresa'}</h1>`;
+                : `<h1 class="text-2xl font-bold text-gray-800">${company?.name || 'Sua Empresa'}</h1>`;
             
             const companyDetailsHtml = [
                 company?.address?.replace(/\n/g, '<br>'),
@@ -702,7 +721,7 @@ Agradecemos a sua atenção.
                                                                         <DropdownMenuLabel>Ações</DropdownMenuLabel>
                                                                         <DropdownMenuItem onClick={() => handleOpenPaymentModal(invoice)} disabled={invoice.status === 'Paga'}>Marcar como Paga</DropdownMenuItem>
                                                                         <DropdownMenuItem onClick={() => handleUpdateStatus(invoice.id, 'Pendente')} disabled={invoice.status === 'Pendente'}>Marcar como Pendente</DropdownMenuItem>
-                                                                        <DropdownMenuItem onClick={() => handleSendReminder(invoice)}>Enviar Lembrete</DropdownMenuItem>
+                                                                        <DropdownMenuItem onClick={() => handlePrepareReminder(invoice)}>Enviar Lembrete</DropdownMenuItem>
                                                                         <DropdownMenuSeparator />
                                                                         <AlertDialog>
                                                                             <AlertDialogTrigger asChild>
@@ -798,6 +817,25 @@ Agradecemos a sua atenção.
                     )}
                 </CardContent>
             </Card>
+             <Dialog open={isReminderModalOpen} onOpenChange={setIsReminderModalOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Enviar lembrete para {selectedInvoice?.clientName}</DialogTitle>
+                        <DialogDescription>
+                            Revise a mensagem abaixo antes de enviar para o WhatsApp.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="my-4">
+                        <p className="whitespace-pre-wrap rounded-md border bg-muted p-4 text-sm text-muted-foreground">
+                            {reminderText}
+                        </p>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setIsReminderModalOpen(false)}>Cancelar</Button>
+                        <Button onClick={handleSendWhatsappReminder}>Enviar via WhatsApp</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }
