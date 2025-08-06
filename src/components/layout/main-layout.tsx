@@ -115,7 +115,7 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
                                     tooltip={item.label}
                                 >
                                     <item.icon />
-                                    <span>{item.label}</span>
+                                    <span className="hidden">{item.label}</span>
                                 </SidebarMenuButton>
                             </Link>
                         </SidebarMenuItem>
@@ -128,7 +128,7 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
                             <Link href="/settings" passHref>
                             <SidebarMenuButton isActive={isActive('/settings')} tooltip="Configurações">
                                 <Settings />
-                                <span>Configurações</span>
+                                <span className="hidden">Configurações</span>
                             </SidebarMenuButton>
                             </Link>
                         </SidebarMenuItem>
