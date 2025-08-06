@@ -243,7 +243,7 @@ export default function ClientsPage() {
 
     return (
         <div className="flex flex-col gap-8">
-            <div className="flex items-start justify-between">
+            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
                 <div>
                     <h1 className="text-3xl font-bold tracking-tight">Clientes</h1>
                     <p className="text-muted-foreground">Gerencie seus clientes e visualize seus detalhes.</p>
@@ -253,7 +253,7 @@ export default function ClientsPage() {
                     if (!isOpen) setCurrentClient(emptyClient);
                 }}>
                     <SheetTrigger asChild>
-                        <Button size="sm" className="gap-1" onClick={handleAddNew}>
+                        <Button size="sm" className="gap-1 w-full sm:w-auto" onClick={handleAddNew}>
                             <PlusCircle className="h-4 w-4" />
                             Novo Cliente
                         </Button>
@@ -320,7 +320,7 @@ export default function ClientsPage() {
                                                     </PopoverContent>
                                                 </Popover>
                                             </div>
-                                            <div className="sm:col-span-1 pt-5">
+                                            <div className="sm:col-span-1 pt-5 flex justify-end">
                                                  <Button variant="destructive" size="icon" onClick={() => removePlanFromClient(index)}>
                                                     <Trash2 className="h-4 w-4" />
                                                 </Button>
@@ -375,8 +375,8 @@ export default function ClientsPage() {
                             <TableHeader>
                                 <TableRow>
                                     <TableHead>Cliente</TableHead>
-                                    <TableHead>Planos</TableHead>
-                                    <TableHead>Status</TableHead>
+                                    <TableHead className="hidden sm:table-cell">Planos</TableHead>
+                                    <TableHead className="hidden sm:table-cell">Status</TableHead>
                                     <TableHead>Contato</TableHead>
                                     <TableHead><span className="sr-only">Ações</span></TableHead>
                                 </TableRow>
@@ -389,8 +389,8 @@ export default function ClientsPage() {
                                             <Skeleton className="h-5 w-32" />
                                             <Skeleton className="mt-2 h-4 w-40" />
                                         </TableCell>
-                                        <TableCell><Skeleton className="h-5 w-24" /></TableCell>
-                                        <TableCell><Skeleton className="h-6 w-16 rounded-full" /></TableCell>
+                                        <TableCell className="hidden sm:table-cell"><Skeleton className="h-5 w-24" /></TableCell>
+                                        <TableCell className="hidden sm:table-cell"><Skeleton className="h-6 w-16 rounded-full" /></TableCell>
                                         <TableCell>
                                             <Skeleton className="h-5 w-28" />
                                             <Skeleton className="mt-2 h-4 w-36" />
@@ -404,14 +404,14 @@ export default function ClientsPage() {
                                             <div className="font-medium">{client.name}</div>
                                             <div className="text-sm text-muted-foreground">{client.taxId}</div>
                                         </TableCell>
-                                        <TableCell>
+                                        <TableCell className="hidden sm:table-cell">
                                             <div className="flex flex-col space-y-1">
                                                 {(client.plans && client.plans.length > 0) ? client.plans.map((p, i) => (
                                                     <Badge key={i} variant="secondary">{plansMap[p.planId] || 'Plano desconhecido'}</Badge>
                                                 )) : 'N/A'}
                                             </div>
                                         </TableCell>
-                                        <TableCell><Badge variant={client.status === 'Ativo' ? 'default' : 'secondary'} className={client.status === 'Ativo' ? 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-400' : ''}>{client.status}</Badge></TableCell>
+                                        <TableCell className="hidden sm:table-cell"><Badge variant={client.status === 'Ativo' ? 'default' : 'secondary'} className={client.status === 'Ativo' ? 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-400' : ''}>{client.status}</Badge></TableCell>
                                         <TableCell>
                                             <div className="font-medium">{client.contactName}</div>
                                             <div className="text-sm text-muted-foreground">{client.email}</div>

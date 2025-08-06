@@ -160,7 +160,7 @@ export default function PlansPage() {
 
     return (
         <div className="flex flex-col gap-8">
-            <div className="flex items-start justify-between">
+            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
                 <div>
                     <h1 className="text-3xl font-bold tracking-tight">Planos de Serviço</h1>
                     <p className="text-muted-foreground">Gerencie seus planos de serviço, recorrentes ou de pagamento único.</p>
@@ -170,7 +170,7 @@ export default function PlansPage() {
                     if (!isOpen) setCurrentPlan(emptyPlan);
                 }}>
                     <SheetTrigger asChild>
-                        <Button size="sm" className="gap-1" onClick={handleAddNew}>
+                        <Button size="sm" className="gap-1 w-full sm:w-auto" onClick={handleAddNew}>
                             <PlusCircle className="h-4 w-4" />
                             Novo Plano
                         </Button>
@@ -241,77 +241,79 @@ export default function PlansPage() {
                     <CardTitle>Lista de Planos</CardTitle>
                 </CardHeader>
                 <CardContent>
-                    <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead>Plano</TableHead>
-                                <TableHead>Cobrança</TableHead>
-                                <TableHead className="text-right">Preço</TableHead>
-                                <TableHead><span className="sr-only">Ações</span></TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {isLoading ? (
-                                Array.from({ length: 3 }).map((_, index) => (
-                                <TableRow key={index}>
-                                    <TableCell>
-                                        <Skeleton className="h-5 w-32" />
-                                        <Skeleton className="mt-2 h-4 w-48" />
-                                    </TableCell>
-                                     <TableCell><Skeleton className="h-5 w-20" /></TableCell>
-                                    <TableCell className="text-right"><Skeleton className="h-5 w-20 ml-auto" /></TableCell>
-                                    <TableCell><Skeleton className="h-8 w-8 ml-auto" /></TableCell>
+                    <div className="overflow-x-auto">
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Plano</TableHead>
+                                    <TableHead>Cobrança</TableHead>
+                                    <TableHead className="text-right">Preço</TableHead>
+                                    <TableHead><span className="sr-only">Ações</span></TableHead>
                                 </TableRow>
-                                ))
-                            ) : plans.map(plan => (
-                                <TableRow key={plan.id}>
-                                    <TableCell className="font-medium">
-                                        <div>{plan.name}</div>
-                                        <div className="text-sm text-muted-foreground">{plan.description}</div>
-                                    </TableCell>
-                                    <TableCell>
-                                        <Badge variant={plan.type === 'recurring' ? 'secondary' : 'outline'}>{formatRecurrence(plan)}</Badge>
-                                    </TableCell>
-                                    <TableCell className="text-right">
-                                        {plan.price.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                                    </TableCell>
-                                    <TableCell>
-                                        <div className="flex justify-end">
-                                            <DropdownMenu>
-                                                <DropdownMenuTrigger asChild>
-                                                    <Button aria-haspopup="true" size="icon" variant="ghost">
-                                                        <MoreHorizontal className="h-4 w-4" />
-                                                        <span className="sr-only">Toggle menu</span>
-                                                    </Button>
-                                                </DropdownMenuTrigger>
-                                                <DropdownMenuContent align="end">
-                                                    <DropdownMenuLabel>Ações</DropdownMenuLabel>
-                                                    <DropdownMenuItem onClick={() => handleEdit(plan)}>Editar</DropdownMenuItem>
-                                                    <AlertDialog>
-                                                        <AlertDialogTrigger asChild>
-                                                            <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive focus:text-destructive focus:bg-destructive/10">Excluir</DropdownMenuItem>
-                                                        </AlertDialogTrigger>
-                                                        <AlertDialogContent>
-                                                            <AlertDialogHeader>
-                                                                <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
-                                                                <AlertDialogDescription>
-                                                                    Essa ação não pode ser desfeita. Isso excluirá permanentemente o plano.
-                                                                </AlertDialogDescription>
-                                                            </AlertDialogHeader>
-                                                            <AlertDialogFooter>
-                                                                <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                                                <AlertDialogAction onClick={() => handleDelete(plan.id)}>Excluir</AlertDialogAction>
-                                                            </AlertDialogFooter>
-                                                        </AlertDialogContent>
-                                                    </AlertDialog>
-                                                </DropdownMenuContent>
-                                            </DropdownMenu>
-                                        </div>
-                                    </TableCell>
-                                </TableRow>
-                            ))}
-                        </TableBody>
-                    </Table>
+                            </TableHeader>
+                            <TableBody>
+                                {isLoading ? (
+                                    Array.from({ length: 3 }).map((_, index) => (
+                                    <TableRow key={index}>
+                                        <TableCell>
+                                            <Skeleton className="h-5 w-32" />
+                                            <Skeleton className="mt-2 h-4 w-48" />
+                                        </TableCell>
+                                        <TableCell><Skeleton className="h-5 w-20" /></TableCell>
+                                        <TableCell className="text-right"><Skeleton className="h-5 w-20 ml-auto" /></TableCell>
+                                        <TableCell><Skeleton className="h-8 w-8 ml-auto" /></TableCell>
+                                    </TableRow>
+                                    ))
+                                ) : plans.map(plan => (
+                                    <TableRow key={plan.id}>
+                                        <TableCell className="font-medium">
+                                            <div>{plan.name}</div>
+                                            <div className="text-sm text-muted-foreground max-w-xs truncate">{plan.description}</div>
+                                        </TableCell>
+                                        <TableCell>
+                                            <Badge variant={plan.type === 'recurring' ? 'secondary' : 'outline'}>{formatRecurrence(plan)}</Badge>
+                                        </TableCell>
+                                        <TableCell className="text-right">
+                                            {plan.price.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                        </TableCell>
+                                        <TableCell>
+                                            <div className="flex justify-end">
+                                                <DropdownMenu>
+                                                    <DropdownMenuTrigger asChild>
+                                                        <Button aria-haspopup="true" size="icon" variant="ghost">
+                                                            <MoreHorizontal className="h-4 w-4" />
+                                                            <span className="sr-only">Toggle menu</span>
+                                                        </Button>
+                                                    </DropdownMenuTrigger>
+                                                    <DropdownMenuContent align="end">
+                                                        <DropdownMenuLabel>Ações</DropdownMenuLabel>
+                                                        <DropdownMenuItem onClick={() => handleEdit(plan)}>Editar</DropdownMenuItem>
+                                                        <AlertDialog>
+                                                            <AlertDialogTrigger asChild>
+                                                                <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive focus:text-destructive focus:bg-destructive/10">Excluir</DropdownMenuItem>
+                                                            </AlertDialogTrigger>
+                                                            <AlertDialogContent>
+                                                                <AlertDialogHeader>
+                                                                    <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
+                                                                    <AlertDialogDescription>
+                                                                        Essa ação não pode ser desfeita. Isso excluirá permanentemente o plano.
+                                                                    </AlertDialogDescription>
+                                                                </AlertDialogHeader>
+                                                                <AlertDialogFooter>
+                                                                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                                                    <AlertDialogAction onClick={() => handleDelete(plan.id)}>Excluir</AlertDialogAction>
+                                                                </AlertDialogFooter>
+                                                            </AlertDialogContent>
+                                                        </AlertDialog>
+                                                    </DropdownMenuContent>
+                                                </DropdownMenu>
+                                            </div>
+                                        </TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    </div>
                 </CardContent>
             </Card>
         </div>

@@ -324,14 +324,14 @@ export default function FinancePage() {
 
     return (
         <div className="flex flex-col gap-8">
-            <div className="flex items-start justify-between">
+            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
                 <div>
                     <h1 className="text-3xl font-bold tracking-tight">Financeiro</h1>
                     <p className="text-muted-foreground">Acompanhe as finanças da sua empresa.</p>
                 </div>
                  <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
                     <SheetTrigger asChild>
-                        <Button size="sm" className="gap-1" onClick={() => { setCurrentExpense(emptyExpense); setIsSheetOpen(true); }}>
+                        <Button size="sm" className="gap-1 w-full sm:w-auto" onClick={() => { setCurrentExpense(emptyExpense); setIsSheetOpen(true); }}>
                             <PlusCircle className="h-4 w-4" />
                             Lançar Despesa
                         </Button>
@@ -426,78 +426,80 @@ export default function FinancePage() {
                             <CardDescription>Visualize e gerencie as despesas da empresa.</CardDescription>
                         </CardHeader>
                         <CardContent>
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead>Descrição</TableHead>
-                                        <TableHead>Categoria</TableHead>
-                                        <TableHead>Vencimento</TableHead>
-                                        <TableHead>Status</TableHead>
-                                        <TableHead className="text-right">Valor</TableHead>
-                                        <TableHead><span className="sr-only">Ações</span></TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {isLoading ? Array.from({length: 3}).map((_, i) => (
-                                        <TableRow key={i}>
-                                            <TableCell><Skeleton className="h-5 w-32" /></TableCell>
-                                            <TableCell><Skeleton className="h-5 w-24" /></TableCell>
-                                            <TableCell><Skeleton className="h-5 w-20" /></TableCell>
-                                            <TableCell><Skeleton className="h-6 w-16" /></TableCell>
-                                            <TableCell className="text-right"><Skeleton className="h-5 w-20 ml-auto" /></TableCell>
-                                            <TableCell><Skeleton className="h-8 w-8 ml-auto" /></TableCell>
+                             <div className="overflow-x-auto">
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead>Descrição</TableHead>
+                                            <TableHead>Categoria</TableHead>
+                                            <TableHead>Vencimento</TableHead>
+                                            <TableHead>Status</TableHead>
+                                            <TableHead className="text-right">Valor</TableHead>
+                                            <TableHead><span className="sr-only">Ações</span></TableHead>
                                         </TableRow>
-                                    )) : expenses.map(expense => (
-                                        <TableRow key={expense.id}>
-                                            <TableCell className="font-medium">{expense.description}</TableCell>
-                                            <TableCell><Badge variant="outline">{expense.category}</Badge></TableCell>
-                                            <TableCell>{format(expense.dueDate.toDate(), 'dd/MM/yyyy')}</TableCell>
-                                            <TableCell><Badge variant={expense.status === 'Paga' ? 'secondary' : 'destructive'}>{expense.status}</Badge></TableCell>
-                                            <TableCell className="text-right">{expense.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</TableCell>
-                                            <TableCell>
-                                                <div className="flex justify-end">
-                                                    <DropdownMenu>
-                                                        <DropdownMenuTrigger asChild>
-                                                            <Button aria-haspopup="true" size="icon" variant="ghost">
-                                                                <MoreHorizontal className="h-4 w-4" />
-                                                                <span className="sr-only">Toggle menu</span>
-                                                            </Button>
-                                                        </DropdownMenuTrigger>
-                                                        <DropdownMenuContent align="end">
-                                                            <DropdownMenuLabel>Ações</DropdownMenuLabel>
-                                                            <DropdownMenuItem onClick={() => handleUpdateExpenseStatus(expense.id, 'Paga')} disabled={expense.status === 'Paga'}>
-                                                                Marcar como Paga
-                                                            </DropdownMenuItem>
-                                                            <DropdownMenuItem onClick={() => handleUpdateExpenseStatus(expense.id, 'Pendente')} disabled={expense.status === 'Pendente'}>
-                                                                Marcar como Pendente
-                                                            </DropdownMenuItem>
-                                                            <AlertDialog>
-                                                                <AlertDialogTrigger asChild>
-                                                                    <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive focus:text-destructive focus:bg-destructive/10">
-                                                                        Excluir
-                                                                    </DropdownMenuItem>
-                                                                </AlertDialogTrigger>
-                                                                <AlertDialogContent>
-                                                                    <AlertDialogHeader>
-                                                                        <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
-                                                                        <AlertDialogDescription>
-                                                                            Essa ação não pode ser desfeita. Isso excluirá permanentemente a despesa.
-                                                                        </AlertDialogDescription>
-                                                                    </AlertDialogHeader>
-                                                                    <AlertDialogFooter>
-                                                                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                                                        <AlertDialogAction onClick={() => handleDeleteExpense(expense.id)}>Excluir</AlertDialogAction>
-                                                                    </AlertDialogFooter>
-                                                                </AlertDialogContent>
-                                                            </AlertDialog>
-                                                        </DropdownMenuContent>
-                                                    </DropdownMenu>
-                                                </div>
-                                            </TableCell>
-                                        </TableRow>
-                                    ))}
-                                </TableBody>
-                            </Table>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {isLoading ? Array.from({length: 3}).map((_, i) => (
+                                            <TableRow key={i}>
+                                                <TableCell><Skeleton className="h-5 w-32" /></TableCell>
+                                                <TableCell><Skeleton className="h-5 w-24" /></TableCell>
+                                                <TableCell><Skeleton className="h-5 w-20" /></TableCell>
+                                                <TableCell><Skeleton className="h-6 w-16" /></TableCell>
+                                                <TableCell className="text-right"><Skeleton className="h-5 w-20 ml-auto" /></TableCell>
+                                                <TableCell><Skeleton className="h-8 w-8 ml-auto" /></TableCell>
+                                            </TableRow>
+                                        )) : expenses.map(expense => (
+                                            <TableRow key={expense.id}>
+                                                <TableCell className="font-medium">{expense.description}</TableCell>
+                                                <TableCell><Badge variant="outline">{expense.category}</Badge></TableCell>
+                                                <TableCell>{format(expense.dueDate.toDate(), 'dd/MM/yyyy')}</TableCell>
+                                                <TableCell><Badge variant={expense.status === 'Paga' ? 'secondary' : 'destructive'}>{expense.status}</Badge></TableCell>
+                                                <TableCell className="text-right">{expense.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</TableCell>
+                                                <TableCell>
+                                                    <div className="flex justify-end">
+                                                        <DropdownMenu>
+                                                            <DropdownMenuTrigger asChild>
+                                                                <Button aria-haspopup="true" size="icon" variant="ghost">
+                                                                    <MoreHorizontal className="h-4 w-4" />
+                                                                    <span className="sr-only">Toggle menu</span>
+                                                                </Button>
+                                                            </DropdownMenuTrigger>
+                                                            <DropdownMenuContent align="end">
+                                                                <DropdownMenuLabel>Ações</DropdownMenuLabel>
+                                                                <DropdownMenuItem onClick={() => handleUpdateExpenseStatus(expense.id, 'Paga')} disabled={expense.status === 'Paga'}>
+                                                                    Marcar como Paga
+                                                                </DropdownMenuItem>
+                                                                <DropdownMenuItem onClick={() => handleUpdateExpenseStatus(expense.id, 'Pendente')} disabled={expense.status === 'Pendente'}>
+                                                                    Marcar como Pendente
+                                                                </DropdownMenuItem>
+                                                                <AlertDialog>
+                                                                    <AlertDialogTrigger asChild>
+                                                                        <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive focus:text-destructive focus:bg-destructive/10">
+                                                                            Excluir
+                                                                        </DropdownMenuItem>
+                                                                    </AlertDialogTrigger>
+                                                                    <AlertDialogContent>
+                                                                        <AlertDialogHeader>
+                                                                            <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
+                                                                            <AlertDialogDescription>
+                                                                                Essa ação não pode ser desfeita. Isso excluirá permanentemente a despesa.
+                                                                            </AlertDialogDescription>
+                                                                        </AlertDialogHeader>
+                                                                        <AlertDialogFooter>
+                                                                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                                                            <AlertDialogAction onClick={() => handleDeleteExpense(expense.id)}>Excluir</AlertDialogAction>
+                                                                        </AlertDialogFooter>
+                                                                    </AlertDialogContent>
+                                                                </AlertDialog>
+                                                            </DropdownMenuContent>
+                                                        </DropdownMenu>
+                                                    </div>
+                                                </TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                </Table>
+                            </div>
                         </CardContent>
                     </Card>
                 </TabsContent>
@@ -508,30 +510,32 @@ export default function FinancePage() {
                             <CardDescription>Visualize o histórico de faturas pagas pelos clientes.</CardDescription>
                         </CardHeader>
                         <CardContent>
-                             <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead>Cliente</TableHead>
-                                        <TableHead>Data do Pagamento</TableHead>
-                                        <TableHead className="text-right">Valor</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                   {isLoading ? Array.from({length: 4}).map((_, i) => (
-                                        <TableRow key={i}>
-                                            <TableCell><Skeleton className="h-5 w-32" /></TableCell>
-                                            <TableCell><Skeleton className="h-5 w-24" /></TableCell>
-                                            <TableCell className="text-right"><Skeleton className="h-5 w-20 ml-auto" /></TableCell>
+                             <div className="overflow-x-auto">
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead>Cliente</TableHead>
+                                            <TableHead>Data do Pagamento</TableHead>
+                                            <TableHead className="text-right">Valor</TableHead>
                                         </TableRow>
-                                    )) : invoices.filter(invoice => invoice.status === 'Paga').map(invoice => (
-                                        <TableRow key={invoice.id}>
-                                            <TableCell className="font-medium">{invoice.clientName}</TableCell>
-                                            <TableCell>{format(invoice.dueDate.toDate(), 'dd/MM/yyyy')}</TableCell>
-                                            <TableCell className="text-right">{invoice.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</TableCell>
-                                        </TableRow>
-                                    ))}
-                                </TableBody>
-                            </Table>
+                                    </TableHeader>
+                                    <TableBody>
+                                    {isLoading ? Array.from({length: 4}).map((_, i) => (
+                                            <TableRow key={i}>
+                                                <TableCell><Skeleton className="h-5 w-32" /></TableCell>
+                                                <TableCell><Skeleton className="h-5 w-24" /></TableCell>
+                                                <TableCell className="text-right"><Skeleton className="h-5 w-20 ml-auto" /></TableCell>
+                                            </TableRow>
+                                        )) : invoices.filter(invoice => invoice.status === 'Paga').map(invoice => (
+                                            <TableRow key={invoice.id}>
+                                                <TableCell className="font-medium">{invoice.clientName}</TableCell>
+                                                <TableCell>{format(invoice.dueDate.toDate(), 'dd/MM/yyyy')}</TableCell>
+                                                <TableCell className="text-right">{invoice.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                </Table>
+                            </div>
                         </CardContent>
                     </Card>
                 </TabsContent>
@@ -543,7 +547,7 @@ export default function FinancePage() {
                                     <CardTitle>Fluxo de Caixa</CardTitle>
                                     <CardDescription>Relatório de entradas e saídas.</CardDescription>
                                 </div>
-                                <div className="flex items-center gap-2">
+                                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
                                      <Tabs defaultValue="monthly" onValueChange={(value) => {
                                          setCashFlowView(value as any);
                                          setCurrentDate(new Date()); // Reset date on view change
@@ -556,7 +560,7 @@ export default function FinancePage() {
                                     </Tabs>
                                     <Popover>
                                         <PopoverTrigger asChild>
-                                            <Button variant="outline" className="w-[240px] justify-start text-left font-normal">
+                                            <Button variant="outline" className="w-full sm:w-[240px] justify-start text-left font-normal">
                                                 <CalendarIcon className="mr-2 h-4 w-4" />
                                                 <span>{formatCashFlowTitle()}</span>
                                             </Button>
@@ -580,8 +584,8 @@ export default function FinancePage() {
                                                     onSelect={handleDateSelect}
                                                     views={["months", "years"]}
                                                     captionLayout="dropdown-buttons"
-                                                    fromYear={getYear(subYears(new Date(), 1))}
-                                                    toYear={getYear(new Date())}
+                                                    fromDate={subMonths(new Date(), 11)}
+                                                    toDate={new Date()}
                                                     locale={ptBR}
                                                 />
                                             )}
@@ -592,7 +596,7 @@ export default function FinancePage() {
                                                     onSelect={handleDateSelect}
                                                     views={["years"]}
                                                     captionLayout="dropdown-buttons"
-                                                    fromYear={getYear(subYears(new Date(), 5))}
+                                                    fromYear={getYear(subYears(new Date(), 4))}
                                                     toYear={getYear(new Date())}
                                                     locale={ptBR}
                                                 />
@@ -654,41 +658,43 @@ export default function FinancePage() {
 
                            <div>
                                <h4 className="text-lg font-semibold mb-4">Transações do Período</h4>
-                               <Table>
-                                   <TableHeader>
-                                       <TableRow>
-                                           <TableHead>Data</TableHead>
-                                           <TableHead>Descrição</TableHead>
-                                           <TableHead>Tipo</TableHead>
-                                           <TableHead className="text-right">Valor</TableHead>
-                                       </TableRow>
-                                   </TableHeader>
-                                   <TableBody>
-                                        {isLoading ? Array.from({length: 4}).map((_, i) => (
-                                            <TableRow key={i}>
-                                                <TableCell><Skeleton className="h-5 w-24" /></TableCell>
-                                                <TableCell><Skeleton className="h-5 w-40" /></TableCell>
-                                                <TableCell><Skeleton className="h-6 w-20" /></TableCell>
-                                                <TableCell className="text-right"><Skeleton className="h-5 w-20 ml-auto" /></TableCell>
-                                            </TableRow>
-                                        )) : cashFlowReport.transactions.length > 0 ? cashFlowReport.transactions.map(t => (
-                                           <TableRow key={t.id}>
-                                                <TableCell>{format(t.date, 'dd/MM/yyyy')}</TableCell>
-                                                <TableCell>{t.description}</TableCell>
-                                                <TableCell>
-                                                    <Badge variant={t.type === 'Entrada' ? 'secondary' : 'destructive'} className={t.type === 'Entrada' ? getInvoiceStatusClass('Paga') : getInvoiceStatusClass('Vencida')}>
-                                                        {t.type}
-                                                    </Badge>
-                                                </TableCell>
-                                                <TableCell className="text-right">{t.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</TableCell>
+                               <div className="overflow-x-auto">
+                                   <Table>
+                                       <TableHeader>
+                                           <TableRow>
+                                               <TableHead>Data</TableHead>
+                                               <TableHead>Descrição</TableHead>
+                                               <TableHead>Tipo</TableHead>
+                                               <TableHead className="text-right">Valor</TableHead>
                                            </TableRow>
-                                       )) : (
-                                        <TableRow>
-                                            <TableCell colSpan={4} className="text-center h-24">Nenhuma transação encontrada para este período.</TableCell>
-                                        </TableRow>
-                                       )}
-                                   </TableBody>
-                               </Table>
+                                       </TableHeader>
+                                       <TableBody>
+                                            {isLoading ? Array.from({length: 4}).map((_, i) => (
+                                                <TableRow key={i}>
+                                                    <TableCell><Skeleton className="h-5 w-24" /></TableCell>
+                                                    <TableCell><Skeleton className="h-5 w-40" /></TableCell>
+                                                    <TableCell><Skeleton className="h-6 w-20" /></TableCell>
+                                                    <TableCell className="text-right"><Skeleton className="h-5 w-20 ml-auto" /></TableCell>
+                                                </TableRow>
+                                            )) : cashFlowReport.transactions.length > 0 ? cashFlowReport.transactions.map(t => (
+                                            <TableRow key={t.id}>
+                                                    <TableCell>{format(t.date, 'dd/MM/yyyy')}</TableCell>
+                                                    <TableCell>{t.description}</TableCell>
+                                                    <TableCell>
+                                                        <Badge variant={t.type === 'Entrada' ? 'secondary' : 'destructive'} className={t.type === 'Entrada' ? getInvoiceStatusClass('Paga') : getInvoiceStatusClass('Vencida')}>
+                                                            {t.type}
+                                                        </Badge>
+                                                    </TableCell>
+                                                    <TableCell className="text-right">{t.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</TableCell>
+                                            </TableRow>
+                                        )) : (
+                                            <TableRow>
+                                                <TableCell colSpan={4} className="text-center h-24">Nenhuma transação encontrada para este período.</TableCell>
+                                            </TableRow>
+                                        )}
+                                       </TableBody>
+                                   </Table>
+                               </div>
                            </div>
                         </CardContent>
                     </Card>
