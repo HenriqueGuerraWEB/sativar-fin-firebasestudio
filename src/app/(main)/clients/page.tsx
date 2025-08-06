@@ -15,6 +15,7 @@ import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/firebase';
 import { collection, getDocs, addDoc, doc, updateDoc, deleteDoc, query, onSnapshot } from "firebase/firestore";
 import { Skeleton } from '@/components/ui/skeleton';
+import { Textarea } from '@/components/ui/textarea';
 
 
 type Client = {
@@ -23,6 +24,9 @@ type Client = {
     taxId: string;
     contactName: string;
     email: string;
+    phone: string;
+    whatsapp: string;
+    notes: string;
     status: "Ativo" | "Inativo";
 };
 
@@ -31,6 +35,9 @@ const emptyClient: Omit<Client, 'id' | 'status'> = {
     taxId: "",
     contactName: "",
     email: "",
+    phone: "",
+    whatsapp: "",
+    notes: "",
 };
 
 export default function ClientsPage() {
@@ -63,10 +70,25 @@ export default function ClientsPage() {
         return () => unsubscribe();
     }, [toast]);
 
+    const formatPhoneNumber = (value: string) => {
+        if (!value) return value;
+        const phoneNumber = value.replace(/[^\d]/g, '');
+        const phoneNumberLength = phoneNumber.length;
+        if (phoneNumberLength < 3) return `(${phoneNumber}`;
+        if (phoneNumberLength < 8) {
+            return `(${phoneNumber.slice(0, 2)}) ${phoneNumber.slice(2)}`;
+        }
+        return `(${phoneNumber.slice(0, 2)}) ${phoneNumber.slice(2, 7)}-${phoneNumber.slice(7, 11)}`;
+    };
 
-    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
         const { id, value } = e.target;
-        setCurrentClient(prev => ({ ...prev, [id]: value }));
+        if (id === 'phone' || id === 'whatsapp') {
+            const formattedValue = formatPhoneNumber(value);
+            setCurrentClient(prev => ({ ...prev, [id]: formattedValue }));
+        } else {
+            setCurrentClient(prev => ({ ...prev, [id]: value }));
+        }
     };
 
     const handleSaveClient = async () => {
@@ -164,6 +186,18 @@ export default function ClientsPage() {
                             <div className="grid grid-cols-4 items-center gap-4">
                                 <Label htmlFor="email" className="text-right">Email</Label>
                                 <Input id="email" type="email" value={currentClient.email} onChange={handleInputChange} className="col-span-3" />
+                            </div>
+                             <div className="grid grid-cols-4 items-center gap-4">
+                                <Label htmlFor="phone" className="text-right">Telefone</Label>
+                                <Input id="phone" value={currentClient.phone} onChange={handleInputChange} className="col-span-3" />
+                            </div>
+                            <div className="grid grid-cols-4 items-center gap-4">
+                                <Label htmlFor="whatsapp" className="text-right">Whatsapp</Label>
+                                <Input id="whatsapp" value={currentClient.whatsapp} onChange={handleInputChange} className="col-span-3" />
+                            </div>
+                            <div className="grid grid-cols-4 items-start gap-4">
+                                <Label htmlFor="notes" className="text-right pt-2">Observações</Label>
+                                <Textarea id="notes" value={currentClient.notes} onChange={handleInputChange} className="col-span-3" />
                             </div>
                         </div>
                         <SheetFooter>
