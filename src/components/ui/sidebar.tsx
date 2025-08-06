@@ -20,7 +20,6 @@ import { Sheet, SheetContent } from "./sheet"
 const SIDEBAR_WIDTH_ICON = "3.5rem"
 
 type SidebarContext = {
-  state: "expanded" | "collapsed"
   isMobile: boolean
   openMobile: boolean
   setOpenMobile: (open: boolean) => void
@@ -45,7 +44,6 @@ const SidebarProvider = React.forwardRef<
 >(
   (
     {
-      defaultOpen = false,
       className,
       style,
       children,
@@ -56,16 +54,13 @@ const SidebarProvider = React.forwardRef<
     const isMobile = useIsMobile()
     const [openMobile, setOpenMobile] = React.useState(false)
 
-    const state = defaultOpen ? "expanded" : "collapsed"
-
     const contextValue = React.useMemo<SidebarContext>(
       () => ({
-        state,
         isMobile,
         openMobile,
         setOpenMobile,
       }),
-      [state, isMobile, openMobile, setOpenMobile]
+      [isMobile, openMobile, setOpenMobile]
     )
 
     return (
@@ -185,7 +180,7 @@ const SidebarFooter = React.forwardRef<
     <div
       ref={ref}
       data-sidebar="footer"
-      className={cn("flex flex-col gap-2 p-4 mt-auto", className)}
+      className={cn("flex flex-col gap-2 p-4 mt-auto items-center", className)}
       {...props}
     />
   )
