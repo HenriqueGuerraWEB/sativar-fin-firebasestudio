@@ -12,6 +12,7 @@ import { doc, onSnapshot, setDoc } from "firebase/firestore";
 import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
 import Image from 'next/image';
+import { X } from 'lucide-react';
 
 type CompanySettings = {
     name: string;
@@ -77,6 +78,10 @@ export default function SettingsPage() {
             };
             reader.readAsDataURL(file);
         }
+    };
+
+    const handleRemoveLogo = () => {
+        setSettings(prev => ({ ...prev, logoDataUrl: '' }));
     };
 
     const handleSaveSettings = async () => {
@@ -177,7 +182,15 @@ export default function SettingsPage() {
                                     <p className="text-sm text-muted-foreground">Pré-visualização</p>
                                 )}
                             </div>
-                            <Input id="logo" type="file" onChange={handleLogoChange} accept="image/png, image/jpeg, image/svg+xml" className="text-sm" />
+                            <div className="flex w-full gap-2">
+                                <Input id="logo" type="file" onChange={handleLogoChange} accept="image/png, image/jpeg, image/svg+xml" className="text-sm flex-grow" />
+                                {settings.logoDataUrl && (
+                                    <Button variant="destructive" size="icon" onClick={handleRemoveLogo}>
+                                        <X className="h-4 w-4" />
+                                        <span className="sr-only">Remover Logo</span>
+                                    </Button>
+                                )}
+                            </div>
                         </CardContent>
                     </Card>
                 </div>
