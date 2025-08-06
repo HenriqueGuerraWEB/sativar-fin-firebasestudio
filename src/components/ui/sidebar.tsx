@@ -217,7 +217,7 @@ const Sidebar = React.forwardRef<
         ref={ref}
         className={cn(
             "group peer hidden md:flex flex-col bg-sidebar text-sidebar-foreground transition-all duration-300 ease-in-out border-r",
-            "w-[--sidebar-width] group-data-[collapsible=icon]:w-[--sidebar-width-icon]",
+            "w-[--sidebar-width] data-[state=collapsed]:w-[--sidebar-width-icon]",
             className
         )}
         data-state={state}
@@ -302,8 +302,7 @@ const SidebarInset = React.forwardRef<
       ref={ref}
       className={cn(
         "relative flex min-h-svh flex-1 flex-col bg-background transition-all duration-300 ease-in-out",
-        "md:peer-data-[state=expanded]:ml-[--sidebar-width]",
-        "md:peer-data-[state=collapsed]:ml-[--sidebar-width-icon]",
+        "md:ml-[var(--sidebar-width-icon)] peer-data-[state=expanded]:md:ml-[var(--sidebar-width)]",
         className
       )}
       {...props}
