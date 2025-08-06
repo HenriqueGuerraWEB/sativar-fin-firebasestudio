@@ -17,7 +17,7 @@ import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/firebase';
 import { collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc, query, Timestamp, orderBy, getDocs } from "firebase/firestore";
 import { Skeleton } from '@/components/ui/skeleton';
-import { format, startOfDay, endOfDay, startOfMonth, endOfMonth, startOfYear, endOfYear, eachDayOfInterval, eachMonthOfInterval, getMonth, getYear } from 'date-fns';
+import { format, startOfDay, endOfDay, startOfMonth, endOfMonth, startOfYear, endOfYear, eachDayOfInterval, eachMonthOfInterval, getMonth, getYear, subYears, subMonths } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import type { VariantProps } from 'class-variance-authority';
@@ -544,7 +544,10 @@ export default function FinancePage() {
                                     <CardDescription>Relatório de entradas e saídas.</CardDescription>
                                 </div>
                                 <div className="flex items-center gap-2">
-                                     <Tabs defaultValue="monthly" onValueChange={(value) => setCashFlowView(value as any)} className="w-auto">
+                                     <Tabs defaultValue="monthly" onValueChange={(value) => {
+                                         setCashFlowView(value as any);
+                                         setCurrentDate(new Date()); // Reset date on view change
+                                     }} className="w-auto">
                                         <TabsList>
                                             <TabsTrigger value="daily">Diário</TabsTrigger>
                                             <TabsTrigger value="monthly">Mensal</TabsTrigger>
@@ -565,6 +568,9 @@ export default function FinancePage() {
                                                     selected={currentDate}
                                                     onSelect={handleDateSelect}
                                                     initialFocus
+                                                    month={startOfMonth(new Date())}
+                                                    fromDate={startOfMonth(new Date())}
+                                                    toDate={endOfDay(new Date())}
                                                 />
                                             )}
                                             {cashFlowView === 'monthly' && (
@@ -574,8 +580,10 @@ export default function FinancePage() {
                                                     onSelect={handleDateSelect}
                                                     views={["months", "years"]}
                                                     captionLayout="dropdown-buttons"
-                                                    fromYear={2020}
-                                                    toYear={new Date().getFullYear()}
+                                                    fromYear={getYear(subYears(new Date(), 5))}
+                                                    toYear={getYear(new Date())}
+                                                    fromDate={subMonths(new Date(), 12)}
+                                                    toDate={new Date()}
                                                     locale={ptBR}
                                                 />
                                             )}
@@ -586,8 +594,8 @@ export default function FinancePage() {
                                                     onSelect={handleDateSelect}
                                                     views={["years"]}
                                                     captionLayout="dropdown-buttons"
-                                                    fromYear={2020}
-                                                    toYear={new Date().getFullYear()}
+                                                    fromYear={getYear(subYears(new Date(), 5))}
+                                                    toYear={getYear(new Date())}
                                                     locale={ptBR}
                                                 />
                                             )}
