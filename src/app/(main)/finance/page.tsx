@@ -17,6 +17,8 @@ import { db } from '@/lib/firebase';
 import { collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc, query, Timestamp, orderBy, getDocs } from "firebase/firestore";
 import { Skeleton } from '@/components/ui/skeleton';
 import { format } from 'date-fns';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+
 
 type ExpenseCategory = {
     id: string;
@@ -55,6 +57,8 @@ export default function FinancePage() {
     const [isSheetOpen, setIsSheetOpen] = useState(false);
     const [currentExpense, setCurrentExpense] = useState<Omit<Expense, 'id' | 'status'>>(emptyExpense);
     const [isAnalyzing, setIsAnalyzing] = useState(false);
+    const [isCategoryDialogOpen, setIsCategoryDialogOpen] = useState(false);
+    const [newCategoryName, setNewCategoryName] = useState("");
 
     useEffect(() => {
         const fetchInitialData = async () => {
@@ -142,6 +146,23 @@ export default function FinancePage() {
             toast({ title: "Erro", description: "Não foi possível salvar a despesa.", variant: "destructive" });
         }
     };
+
+    const handleSaveNewCategory = async () => {
+        if (!newCategoryName.trim()) {
+            toast({ title: "Erro", description: "O nome da categoria não pode estar vazio.", variant: "destructive" });
+            return;
+        }
+        try {
+            await addDoc(collection(db, "expenseCategories"), { name: newCategoryName });
+            toast({ title: "Sucesso!", description: `Categoria "${newCategoryName}" adicionada.` });
+            setCurrentExpense(prev => ({ ...prev, category: newCategoryName }));
+            setNewCategoryName("");
+            setIsCategoryDialogOpen(false);
+        } catch (error) {
+            console.error("Error saving new category: ", error);
+            toast({ title: "Erro", description: "Não foi possível salvar a nova categoria.", variant: "destructive" });
+        }
+    };
     
     const handleAnalyze = () => {
         setIsAnalyzing(true);
@@ -197,16 +218,43 @@ export default function FinancePage() {
                             </div>
                              <div className="grid grid-cols-4 items-center gap-4">
                                 <Label htmlFor="category" className="text-right">Categoria</Label>
-                                <Select value={currentExpense.category} onValueChange={handleSelectChange}>
-                                    <SelectTrigger className="col-span-3">
-                                        <SelectValue placeholder="Selecione uma categoria" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {categories.map(category => (
-                                            <SelectItem key={category.id} value={category.name}>{category.name}</SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
+                                <div className="col-span-3 flex items-center gap-2">
+                                    <Select value={currentExpense.category} onValueChange={handleSelectChange}>
+                                        <SelectTrigger className="flex-grow">
+                                            <SelectValue placeholder="Selecione uma categoria" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {categories.map(category => (
+                                                <SelectItem key={category.id} value={category.name}>{category.name}</SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                     <AlertDialog open={isCategoryDialogOpen} onOpenChange={setIsCategoryDialogOpen}>
+                                        <AlertDialogTrigger asChild>
+                                            <Button size="icon" variant="outline"><PlusCircle className="h-4 w-4" /></Button>
+                                        </AlertDialogTrigger>
+                                        <AlertDialogContent>
+                                            <AlertDialogHeader>
+                                                <AlertDialogTitle>Adicionar Nova Categoria</AlertDialogTitle>
+                                                <AlertDialogDescription>
+                                                    Digite o nome da nova categoria de despesa.
+                                                </AlertDialogDescription>
+                                            </AlertDialogHeader>
+                                            <div className="py-2">
+                                                <Input 
+                                                    id="newCategoryName" 
+                                                    value={newCategoryName} 
+                                                    onChange={(e) => setNewCategoryName(e.target.value)}
+                                                    placeholder="Ex: Marketing"
+                                                />
+                                            </div>
+                                            <AlertDialogFooter>
+                                                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                                <AlertDialogAction onClick={handleSaveNewCategory}>Salvar</AlertDialogAction>
+                                            </AlertDialogFooter>
+                                        </AlertDialogContent>
+                                    </AlertDialog>
+                                </div>
                             </div>
                             <div className="grid grid-cols-4 items-center gap-4">
                                 <Label htmlFor="amount" className="text-right">Valor (R$)</Label>
