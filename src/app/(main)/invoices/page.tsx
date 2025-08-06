@@ -11,10 +11,12 @@ import { MoreHorizontal, PlusCircle } from "lucide-react";
 import type { VariantProps } from 'class-variance-authority';
 import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/firebase';
-import { collection, onSnapshot, query, Timestamp, orderBy, addDoc, doc, updateDoc, getDocs, where } from "firebase/firestore";
+import { collection, onSnapshot, query, Timestamp, orderBy, addDoc, doc, updateDoc, getDocs, where, deleteDoc } from "firebase/firestore";
 import { Skeleton } from '@/components/ui/skeleton';
 import { format, addDays, addMonths, addYears, isBefore, startOfDay, endOfMonth } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+
 
 type Plan = {
     id: string;
@@ -88,16 +90,15 @@ export default function InvoicesPage() {
     const handleGenerateInvoices = async () => {
         setIsGenerating(true);
         try {
-            // 1. Fetch all active clients 
+            // 1. Fetch all active clients that have a plan
             const clientsQuery = query(collection(db, "clients"), where("status", "==", "Ativo"));
             const clientsSnapshot = await getDocs(clientsQuery);
-            // Filter clients that have a plan and activation date in code
             const activeClients = clientsSnapshot.docs
                 .map(doc => ({ ...doc.data(), id: doc.id } as Client))
                 .filter(client => client.planId && client.planActivationDate);
 
             if (activeClients.length === 0) {
-                toast({ title: "Nenhuma ação necessária", description: "Não há clientes ativos com planos e data de ativação para gerar faturas." });
+                toast({ title: "Nenhuma ação necessária", description: "Não há clientes ativos com planos para gerar faturas." });
                 setIsGenerating(false);
                 return;
             }
@@ -238,6 +239,20 @@ Agradecemos a sua atenção.
         }
     };
 
+    const handleDeleteInvoice = async (invoiceId: string) => {
+        try {
+            await deleteDoc(doc(db, "invoices", invoiceId));
+            toast({ title: "Sucesso", description: "Fatura excluída com sucesso." });
+        } catch (error) {
+            console.error("Error deleting invoice: ", error);
+            toast({
+                title: "Erro",
+                description: "Não foi possível excluir a fatura.",
+                variant: "destructive",
+            });
+        }
+    };
+
 
     const getStatusVariant = (status: Invoice['status']): VariantProps<typeof badgeVariants>['variant'] => {
         switch (status) {
@@ -322,8 +337,25 @@ Agradecemos a sua atenção.
                                                     <DropdownMenuLabel>Ações</DropdownMenuLabel>
                                                     <DropdownMenuItem onClick={() => handleUpdateStatus(invoice.id, 'Paga')} disabled={invoice.status === 'Paga'}>Marcar como Paga</DropdownMenuItem>
                                                     <DropdownMenuItem onClick={() => handleUpdateStatus(invoice.id, 'Pendente')} disabled={invoice.status === 'Pendente'}>Marcar como Pendente</DropdownMenuItem>
-                                                    <DropdownMenuSeparator />
                                                     <DropdownMenuItem onClick={() => handleSendReminder(invoice)}>Enviar Lembrete</DropdownMenuItem>
+                                                    <DropdownMenuSeparator />
+                                                     <AlertDialog>
+                                                        <AlertDialogTrigger asChild>
+                                                            <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive focus:text-destructive focus:bg-destructive/10">Excluir</DropdownMenuItem>
+                                                        </AlertDialogTrigger>
+                                                        <AlertDialogContent>
+                                                            <AlertDialogHeader>
+                                                                <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
+                                                                <AlertDialogDescription>
+                                                                    Essa ação não pode ser desfeita. Isso excluirá permanentemente a fatura.
+                                                                </AlertDialogDescription>
+                                                            </AlertDialogHeader>
+                                                            <AlertDialogFooter>
+                                                                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                                                <AlertDialogAction onClick={() => handleDeleteInvoice(invoice.id)}>Excluir</AlertDialogAction>
+                                                            </AlertDialogFooter>
+                                                        </AlertDialogContent>
+                                                    </AlertDialog>
                                                 </DropdownMenuContent>
                                             </DropdownMenu>
                                         </div>
@@ -337,7 +369,3 @@ Agradecemos a sua atenção.
         </div>
     );
 }
-
-    
-
-    
