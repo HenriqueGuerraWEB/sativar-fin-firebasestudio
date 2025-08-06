@@ -16,18 +16,23 @@ import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/firebase';
 import { collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc, query } from "firebase/firestore";
 import { Skeleton } from '@/components/ui/skeleton';
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 
 type Plan = {
     id: string;
     name: string;
     description: string;
     price: number;
+    recurrenceValue: number;
+    recurrencePeriod: 'dias' | 'meses' | 'anos';
 };
 
 const emptyPlan: Omit<Plan, 'id'> = {
     name: "",
     description: "",
     price: 0,
+    recurrenceValue: 1,
+    recurrencePeriod: 'meses',
 };
 
 export default function PlansPage() {
@@ -62,8 +67,12 @@ export default function PlansPage() {
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
         const { id, value } = e.target;
-        setCurrentPlan(prev => ({ ...prev, [id]: id === 'price' ? parseFloat(value) || 0 : value }));
+        setCurrentPlan(prev => ({ ...prev, [id]: id === 'price' || id === 'recurrenceValue' ? parseFloat(value) || 0 : value }));
     };
+    
+    const handleSelectChange = (value: 'dias' | 'meses' | 'anos') => {
+        setCurrentPlan(prev => ({...prev, recurrencePeriod: value}));
+    }
 
     const handleSavePlan = async () => {
         if (!currentPlan.name || !currentPlan.price) {
@@ -76,15 +85,21 @@ export default function PlansPage() {
         }
 
         try {
+            const planData = {
+                ...currentPlan,
+                recurrenceValue: currentPlan.recurrenceValue || 1,
+                recurrencePeriod: currentPlan.recurrencePeriod || 'meses'
+            };
+
             if ('id' in currentPlan) {
                 // Edit
                 const planRef = doc(db, "plans", currentPlan.id);
-                const { id, ...planData } = currentPlan;
-                await updateDoc(planRef, planData);
+                const { id, ...data } = currentPlan;
+                await updateDoc(planRef, data);
                 toast({ title: "Sucesso", description: "Plano atualizado com sucesso." });
             } else {
                 // Add
-                await addDoc(collection(db, "plans"), currentPlan);
+                await addDoc(collection(db, "plans"), planData);
                 toast({ title: "Sucesso", description: "Plano adicionado com sucesso." });
             }
             setIsSheetOpen(false);
@@ -122,6 +137,15 @@ export default function PlansPage() {
             });
         }
     };
+    
+    const formatRecurrence = (plan: Plan) => {
+        if (!plan.recurrenceValue || !plan.recurrencePeriod) return 'N/A';
+        const period = plan.recurrenceValue === 1 
+            ? plan.recurrencePeriod.slice(0, -1) // mes, ano, dia
+            : plan.recurrencePeriod;
+        return `${plan.recurrenceValue} ${period}`;
+    }
+
 
     return (
         <div className="flex flex-col gap-8">
@@ -157,6 +181,22 @@ export default function PlansPage() {
                                 <Label htmlFor="price" className="text-right">Preço (R$)</Label>
                                 <Input id="price" type="number" value={currentPlan.price} onChange={handleInputChange} className="col-span-3" />
                             </div>
+                            <div className="grid grid-cols-4 items-center gap-4">
+                                <Label className="text-right">Recorrência</Label>
+                                <div className="col-span-3 grid grid-cols-2 gap-2">
+                                     <Input id="recurrenceValue" type="number" value={currentPlan.recurrenceValue} onChange={handleInputChange} min="1" />
+                                     <Select value={currentPlan.recurrencePeriod} onValueChange={handleSelectChange}>
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Período" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="dias">Dias</SelectItem>
+                                            <SelectItem value="meses">Meses</SelectItem>
+                                            <SelectItem value="anos">Anos</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                            </div>
                         </div>
                         <SheetFooter>
                             <Button onClick={handleSavePlan}>Salvar Plano</Button>
@@ -173,6 +213,7 @@ export default function PlansPage() {
                         <TableHeader>
                             <TableRow>
                                 <TableHead>Plano</TableHead>
+                                <TableHead>Recorrência</TableHead>
                                 <TableHead className="text-right">Preço</TableHead>
                                 <TableHead><span className="sr-only">Ações</span></TableHead>
                             </TableRow>
@@ -185,6 +226,7 @@ export default function PlansPage() {
                                         <Skeleton className="h-5 w-32" />
                                         <Skeleton className="mt-2 h-4 w-48" />
                                     </TableCell>
+                                     <TableCell><Skeleton className="h-5 w-20" /></TableCell>
                                     <TableCell className="text-right"><Skeleton className="h-5 w-20 ml-auto" /></TableCell>
                                     <TableCell><Skeleton className="h-8 w-8 ml-auto" /></TableCell>
                                 </TableRow>
@@ -195,6 +237,7 @@ export default function PlansPage() {
                                         <div>{plan.name}</div>
                                         <div className="text-sm text-muted-foreground">{plan.description}</div>
                                     </TableCell>
+                                    <TableCell>{formatRecurrence(plan)}</TableCell>
                                     <TableCell className="text-right">
                                         {plan.price.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                                     </TableCell>
@@ -240,4 +283,3 @@ export default function PlansPage() {
         </div>
     );
 }
-

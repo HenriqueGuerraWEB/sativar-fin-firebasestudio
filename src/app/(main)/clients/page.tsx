@@ -1,6 +1,7 @@
+
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -16,7 +17,12 @@ import { db } from '@/lib/firebase';
 import { collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc, query } from "firebase/firestore";
 import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
+type Plan = {
+    id: string;
+    name: string;
+};
 
 type Client = {
     id: string;
@@ -28,6 +34,7 @@ type Client = {
     whatsapp: string;
     notes: string;
     status: "Ativo" | "Inativo";
+    planId?: string;
 };
 
 const emptyClient: Omit<Client, 'id' | 'status'> = {
@@ -38,25 +45,36 @@ const emptyClient: Omit<Client, 'id' | 'status'> = {
     phone: "",
     whatsapp: "",
     notes: "",
+    planId: undefined,
 };
 
 export default function ClientsPage() {
     const { toast } = useToast();
     const [clients, setClients] = useState<Client[]>([]);
+    const [plans, setPlans] = useState<Plan[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isSheetOpen, setIsSheetOpen] = useState(false);
     const [currentClient, setCurrentClient] = useState<Omit<Client, 'id' | 'status'> | Client>(emptyClient);
 
+    const plansMap = useMemo(() => {
+        return plans.reduce((acc, plan) => {
+            acc[plan.id] = plan.name;
+            return acc;
+        }, {} as Record<string, string>);
+    }, [plans]);
+
      useEffect(() => {
         setIsLoading(true);
-        const q = query(collection(db, "clients"));
-        const unsubscribe = onSnapshot(q, (querySnapshot) => {
+        const clientQuery = query(collection(db, "clients"));
+        const planQuery = query(collection(db, "plans"));
+
+        const unsubClients = onSnapshot(clientQuery, (querySnapshot) => {
             const clientsData: Client[] = [];
             querySnapshot.forEach((doc) => {
                 clientsData.push({ ...doc.data(), id: doc.id } as Client);
             });
             setClients(clientsData);
-            setIsLoading(false);
+            if(plans.length > 0) setIsLoading(false);
         }, (error) => {
             console.error("Error fetching clients: ", error);
             toast({
@@ -67,7 +85,29 @@ export default function ClientsPage() {
             setIsLoading(false);
         });
 
-        return () => unsubscribe();
+        const unsubPlans = onSnapshot(planQuery, (querySnapshot) => {
+            const plansData: Plan[] = [];
+            querySnapshot.forEach((doc) => {
+                const data = doc.data();
+                plansData.push({ id: doc.id, name: data.name } as Plan);
+            });
+            setPlans(plansData);
+             if(clients.length > 0 || querySnapshot.empty) setIsLoading(false);
+        }, (error) => {
+             console.error("Error fetching plans: ", error);
+             toast({
+                title: "Erro",
+                description: "Não foi possível carregar os planos.",
+                variant: "destructive",
+            });
+            setIsLoading(false);
+        });
+
+
+        return () => {
+            unsubClients();
+            unsubPlans();
+        };
     }, [toast]);
 
     const formatPhoneNumber = (value: string) => {
@@ -90,6 +130,10 @@ export default function ClientsPage() {
             setCurrentClient(prev => ({ ...prev, [id]: value }));
         }
     };
+    
+    const handlePlanSelect = (planId: string) => {
+        setCurrentClient(prev => ({ ...prev, planId: planId === 'none' ? undefined : planId }));
+    }
 
     const handleSaveClient = async () => {
         if (!currentClient.name || !currentClient.email) {
@@ -182,6 +226,20 @@ export default function ClientsPage() {
                                 <Label htmlFor="taxId" className="text-right">CPF/CNPJ</Label>
                                 <Input id="taxId" value={currentClient.taxId} onChange={handleInputChange} className="col-span-3" />
                             </div>
+                             <div className="grid grid-cols-4 items-center gap-4">
+                                <Label htmlFor="plan" className="text-right">Plano</Label>
+                                <Select onValueChange={handlePlanSelect} value={currentClient.planId}>
+                                    <SelectTrigger className="col-span-3">
+                                        <SelectValue placeholder="Selecione um plano" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="none">Nenhum</SelectItem>
+                                        {plans.map(plan => (
+                                            <SelectItem key={plan.id} value={plan.id}>{plan.name}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
                             <div className="grid grid-cols-4 items-center gap-4">
                                 <Label htmlFor="contactName" className="text-right">Nome do Contato</Label>
                                 <Input id="contactName" value={currentClient.contactName} onChange={handleInputChange} className="col-span-3" />
@@ -219,6 +277,7 @@ export default function ClientsPage() {
                             <TableHeader>
                                 <TableRow>
                                     <TableHead>Cliente</TableHead>
+                                    <TableHead>Plano</TableHead>
                                     <TableHead>Status</TableHead>
                                     <TableHead>Contato</TableHead>
                                     <TableHead><span className="sr-only">Ações</span></TableHead>
@@ -232,6 +291,7 @@ export default function ClientsPage() {
                                             <Skeleton className="h-5 w-32" />
                                             <Skeleton className="mt-2 h-4 w-40" />
                                         </TableCell>
+                                        <TableCell><Skeleton className="h-5 w-24" /></TableCell>
                                         <TableCell><Skeleton className="h-6 w-16 rounded-full" /></TableCell>
                                         <TableCell>
                                             <Skeleton className="h-5 w-28" />
@@ -246,6 +306,7 @@ export default function ClientsPage() {
                                             <div className="font-medium">{client.name}</div>
                                             <div className="text-sm text-muted-foreground">{client.taxId}</div>
                                         </TableCell>
+                                        <TableCell>{client.planId ? plansMap[client.planId] : 'N/A'}</TableCell>
                                         <TableCell><Badge variant={client.status === 'Ativo' ? 'default' : 'secondary'} className={client.status === 'Ativo' ? 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-400' : ''}>{client.status}</Badge></TableCell>
                                         <TableCell>
                                             <div className="font-medium">{client.contactName}</div>
