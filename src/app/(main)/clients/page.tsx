@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -12,6 +12,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { useToast } from '@/hooks/use-toast';
+import { db } from '@/lib/firebase';
+import { collection, getDocs, addDoc, doc, updateDoc, deleteDoc, query, onSnapshot } from "firebase/firestore";
+import { Skeleton } from '@/components/ui/skeleton';
+
 
 type Client = {
     id: string;
@@ -22,13 +26,6 @@ type Client = {
     status: "Ativo" | "Inativo";
 };
 
-const initialClients: Client[] = [
-    { id: "1", name: "Inovatech Soluções", taxId: "12.345.678/0001-99", contactName: "Carlos Silva", email: "contato@inovatech.com", status: "Ativo" },
-    { id: "2", name: "Global-Trade Inc.", taxId: "98.765.432/0001-11", contactName: "Ana Rodrigues", email: "ana.r@global-trade.com", status: "Ativo" },
-    { id: "3", name: "Quantum Dynamics", taxId: "55.123.456/0001-77", contactName: "Pedro Almeida", email: "pedro@quantumdynamics.io", status: "Inativo" },
-    { id: "4", name: "Nexus-Enterprises", taxId: "33.444.555/0001-01", contactName: "Mariana Costa", email: "mariana.c@nexus.com", status: "Ativo" },
-];
-
 const emptyClient: Omit<Client, 'id' | 'status'> = {
     name: "",
     taxId: "",
@@ -38,16 +35,41 @@ const emptyClient: Omit<Client, 'id' | 'status'> = {
 
 export default function ClientsPage() {
     const { toast } = useToast();
-    const [clients, setClients] = useState<Client[]>(initialClients);
+    const [clients, setClients] = useState<Client[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
     const [isSheetOpen, setIsSheetOpen] = useState(false);
     const [currentClient, setCurrentClient] = useState<Omit<Client, 'id' | 'status'> | Client>(emptyClient);
+
+     useEffect(() => {
+        setIsLoading(true);
+        const q = query(collection(db, "clients"));
+        const unsubscribe = onSnapshot(q, (querySnapshot) => {
+            const clientsData: Client[] = [];
+            querySnapshot.forEach((doc) => {
+                clientsData.push({ ...doc.data(), id: doc.id } as Client);
+            });
+            setClients(clientsData);
+            setIsLoading(false);
+        }, (error) => {
+            console.error("Error fetching clients: ", error);
+            toast({
+                title: "Erro",
+                description: "Não foi possível carregar os clientes.",
+                variant: "destructive",
+            });
+            setIsLoading(false);
+        });
+
+        return () => unsubscribe();
+    }, [toast]);
+
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const { id, value } = e.target;
         setCurrentClient(prev => ({ ...prev, [id]: value }));
     };
 
-    const handleSaveClient = () => {
+    const handleSaveClient = async () => {
         if (!currentClient.name || !currentClient.email) {
             toast({
                 title: "Erro",
@@ -57,22 +79,31 @@ export default function ClientsPage() {
             return;
         }
 
-        if ('id' in currentClient) {
-            // Edit
-            setClients(clients.map(c => c.id === currentClient.id ? currentClient as Client : c));
-            toast({ title: "Sucesso", description: "Cliente atualizado com sucesso." });
-        } else {
-            // Add
-            const newClient: Client = {
-                ...currentClient,
-                id: (clients.length + 1).toString(),
-                status: "Ativo",
-            };
-            setClients([...clients, newClient]);
-            toast({ title: "Sucesso", description: "Cliente adicionado com sucesso." });
+        try {
+            if ('id' in currentClient) {
+                // Edit
+                const clientRef = doc(db, "clients", currentClient.id);
+                const { id, ...clientData } = currentClient;
+                await updateDoc(clientRef, clientData);
+                toast({ title: "Sucesso", description: "Cliente atualizado com sucesso." });
+            } else {
+                // Add
+                await addDoc(collection(db, "clients"), {
+                    ...currentClient,
+                    status: "Ativo",
+                });
+                toast({ title: "Sucesso", description: "Cliente adicionado com sucesso." });
+            }
+            setIsSheetOpen(false);
+            setCurrentClient(emptyClient);
+        } catch (error) {
+            console.error("Error saving client: ", error);
+            toast({
+                title: "Erro",
+                description: "Não foi possível salvar o cliente.",
+                variant: "destructive",
+            });
         }
-        setIsSheetOpen(false);
-        setCurrentClient(emptyClient);
     };
 
     const handleAddNew = () => {
@@ -85,9 +116,18 @@ export default function ClientsPage() {
         setIsSheetOpen(true);
     };
 
-    const handleDelete = (clientId: string) => {
-        setClients(clients.filter(c => c.id !== clientId));
-        toast({ title: "Sucesso", description: "Cliente excluído com sucesso." });
+    const handleDelete = async (clientId: string) => {
+        try {
+            await deleteDoc(doc(db, "clients", clientId));
+            toast({ title: "Sucesso", description: "Cliente excluído com sucesso." });
+        } catch (error) {
+            console.error("Error deleting client: ", error);
+            toast({
+                title: "Erro",
+                description: "Não foi possível excluir o cliente.",
+                variant: "destructive",
+            });
+        }
     };
 
     return (
@@ -148,7 +188,22 @@ export default function ClientsPage() {
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {clients.map(client => (
+                            {isLoading ? (
+                                Array.from({ length: 4 }).map((_, index) => (
+                                <TableRow key={index}>
+                                    <TableCell>
+                                        <Skeleton className="h-5 w-32" />
+                                        <Skeleton className="mt-1 h-4 w-40" />
+                                    </TableCell>
+                                    <TableCell><Skeleton className="h-6 w-16 rounded-full" /></TableCell>
+                                    <TableCell>
+                                        <Skeleton className="h-5 w-28" />
+                                        <Skeleton className="mt-1 h-4 w-36" />
+                                    </TableCell>
+                                    <TableCell><Skeleton className="h-8 w-8 ml-auto" /></TableCell>
+                                </TableRow>
+                                ))
+                            ) : clients.map(client => (
                                 <TableRow key={client.id}>
                                     <TableCell className="font-medium">
                                         <div>{client.name}</div>
@@ -181,7 +236,7 @@ export default function ClientsPage() {
                                                                 <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
                                                                 <AlertDialogDescription>
                                                                     Essa ação não pode ser desfeita. Isso excluirá permanentemente o cliente.
-                                                                </AlertDialogDescription>
+                                                                </adD>
                                                             </AlertDialogHeader>
                                                             <AlertDialogFooter>
                                                                 <AlertDialogCancel>Cancelar</AlertDialogCancel>
