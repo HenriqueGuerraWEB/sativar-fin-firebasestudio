@@ -567,10 +567,10 @@ export default function FinancePage() {
                                                     mode="single"
                                                     selected={currentDate}
                                                     onSelect={handleDateSelect}
+                                                    disabled={(date) =>
+                                                        date > new Date() || date < startOfMonth(new Date())
+                                                    }
                                                     initialFocus
-                                                    month={startOfMonth(new Date())}
-                                                    fromDate={startOfMonth(new Date())}
-                                                    toDate={endOfDay(new Date())}
                                                 />
                                             )}
                                             {cashFlowView === 'monthly' && (
@@ -580,10 +580,8 @@ export default function FinancePage() {
                                                     onSelect={handleDateSelect}
                                                     views={["months", "years"]}
                                                     captionLayout="dropdown-buttons"
-                                                    fromYear={getYear(subYears(new Date(), 5))}
+                                                    fromYear={getYear(subYears(new Date(), 1))}
                                                     toYear={getYear(new Date())}
-                                                    fromDate={subMonths(new Date(), 12)}
-                                                    toDate={new Date()}
                                                     locale={ptBR}
                                                 />
                                             )}
