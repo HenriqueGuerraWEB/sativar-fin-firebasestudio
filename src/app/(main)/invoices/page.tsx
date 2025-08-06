@@ -13,7 +13,7 @@ import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/firebase';
 import { collection, onSnapshot, query, Timestamp, orderBy, addDoc, doc, updateDoc, getDocs, where, deleteDoc, getDoc } from "firebase/firestore";
 import { Skeleton } from '@/components/ui/skeleton';
-import { format, addDays, addMonths, addYears, isBefore, startOfDay, subDays, subMonths, subYears } from 'date-fns';
+import { format, addDays, addMonths, addYears, isBefore, startOfDay, subDays, subMonths, subYears, isEqual } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -32,8 +32,9 @@ type Plan = {
     name: string;
     description: string;
     price: number;
-    recurrenceValue: number;
-    recurrencePeriod: 'dias' | 'meses' | 'anos';
+    type: 'recurring' | 'one-time';
+    recurrenceValue?: number;
+    recurrencePeriod?: 'dias' | 'meses' | 'anos';
 }
 
 type ClientPlan = {
@@ -159,7 +160,6 @@ export default function InvoicesPage() {
     const handleGenerateInvoices = async () => {
         setIsGenerating(true);
         try {
-            // 1. Fetch all active clients that have plans
             const clientsQuery = query(collection(db, "clients"), where("status", "==", "Ativo"));
             const clientsSnapshot = await getDocs(clientsQuery);
             const activeClients = clientsSnapshot.docs
@@ -172,24 +172,15 @@ export default function InvoicesPage() {
                 return;
             }
 
-            // 2. Fetch all plans
             const plansSnapshot = await getDocs(query(collection(db, "plans")));
             const plansMap = plansSnapshot.docs.reduce((acc, doc) => {
                 acc[doc.id] = { ...doc.data(), id: doc.id } as Plan;
                 return acc;
             }, {} as Record<string, Plan>);
 
-            // 3. Fetch all invoices to check for existing ones
             const invoicesSnapshot = await getDocs(query(collection(db, "invoices")));
-            const clientInvoicesMap = new Map<string, Invoice[]>();
-            invoicesSnapshot.docs.forEach(doc => {
-                const invoice = doc.data() as Invoice;
-                if (!clientInvoicesMap.has(invoice.clientId)) {
-                    clientInvoicesMap.set(invoice.clientId, []);
-                }
-                clientInvoicesMap.get(invoice.clientId)!.push(invoice);
-            });
-            
+            const allInvoices = invoicesSnapshot.docs.map(doc => doc.data() as Invoice);
+
             let generatedCount = 0;
             const generationPromises: Promise<any>[] = [];
             const today = new Date();
@@ -199,52 +190,93 @@ export default function InvoicesPage() {
                     const plan = plansMap[clientPlan.planId];
                     if (!plan) continue;
 
-                    const clientPlanInvoices = (clientInvoicesMap.get(client.id) || [])
-                        .filter(inv => inv.planId === clientPlan.planId)
-                        .sort((a, b) => b.dueDate.toMillis() - a.dueDate.toMillis());
-                    
-                    let lastBilledDueDate = clientPlanInvoices.length > 0 
-                        ? clientPlanInvoices[0].dueDate.toDate()
-                        : subDays(clientPlan.planActivationDate.toDate(), 1);
-                    
-                    while (true) {
-                        let nextDueDate: Date;
-                        if (!(lastBilledDueDate instanceof Date && !isNaN(lastBilledDueDate.valueOf()))) {
-                           lastBilledDueDate = subDays(clientPlan.planActivationDate.toDate(), 1);
-                        }
+                    const clientPlanInvoices = allInvoices.filter(inv => inv.clientId === client.id && inv.planId === clientPlan.planId);
 
-                        switch (plan.recurrencePeriod) {
-                            case 'dias': nextDueDate = addDays(lastBilledDueDate, plan.recurrenceValue); break;
-                            case 'meses': nextDueDate = addMonths(lastBilledDueDate, plan.recurrenceValue); break;
-                            case 'anos': nextDueDate = addYears(lastBilledDueDate, plan.recurrenceValue); break;
-                            default: console.error("Invalid recurrence period for plan:", plan.id); continue;
-                        }
-
-                        if (isBefore(today, nextDueDate)) {
-                            break; 
-                        }
-
-                        const invoiceExists = clientPlanInvoices.some(
-                            inv => inv.dueDate && format(inv.dueDate.toDate(), 'yyyy-MM-dd') === format(nextDueDate, 'yyyy-MM-dd')
-                        );
-
-                        if (!invoiceExists) {
+                    // Handle one-time plans
+                    if (plan.type === 'one-time') {
+                        if (clientPlanInvoices.length === 0) {
                             const newInvoice = {
                                 clientId: client.id,
                                 clientName: client.name,
                                 amount: plan.price,
                                 issueDate: Timestamp.now(),
-                                dueDate: Timestamp.fromDate(nextDueDate),
+                                dueDate: clientPlan.planActivationDate,
                                 status: 'Pendente' as const,
                                 planId: clientPlan.planId,
                                 planName: plan.name,
                             };
                             generationPromises.push(addDoc(collection(db, "invoices"), newInvoice));
-                            clientPlanInvoices.push({ ...newInvoice, id: 'temp' });
                             generatedCount++;
                         }
+                        continue; // Move to the next plan
+                    }
+                    
+                    // Handle recurring plans
+                    if (plan.type === 'recurring' && plan.recurrencePeriod && plan.recurrenceValue) {
+                        const sortedClientPlanInvoices = clientPlanInvoices.sort((a, b) => b.dueDate.toMillis() - a.dueDate.toMillis());
+                        
+                        let lastBilledDueDate = sortedClientPlanInvoices.length > 0
+                            ? sortedClientPlanInvoices[0].dueDate.toDate()
+                            : subDays(clientPlan.planActivationDate.toDate(), 1);
 
-                        lastBilledDueDate = nextDueDate;
+                        // Ensure activation date itself is considered for billing if it's in the past and no invoice exists for it
+                        const activationDate = clientPlan.planActivationDate.toDate();
+                        if (isBefore(activationDate, today) || isEqual(startOfDay(activationDate), startOfDay(today))) {
+                             const invoiceForActivationExists = sortedClientPlanInvoices.some(
+                                inv => inv.dueDate && isEqual(startOfDay(inv.dueDate.toDate()), startOfDay(activationDate))
+                            );
+                            if (!invoiceForActivationExists && sortedClientPlanInvoices.length === 0) {
+                               const newInvoice = {
+                                    clientId: client.id,
+                                    clientName: client.name,
+                                    amount: plan.price,
+                                    issueDate: Timestamp.now(),
+                                    dueDate: Timestamp.fromDate(activationDate),
+                                    status: 'Pendente' as const,
+                                    planId: clientPlan.planId,
+                                    planName: plan.name,
+                                };
+                                generationPromises.push(addDoc(collection(db, "invoices"), newInvoice));
+                                generatedCount++;
+                                lastBilledDueDate = activationDate;
+                            }
+                        }
+
+                        while (true) {
+                            let nextDueDate: Date;
+                            switch (plan.recurrencePeriod) {
+                                case 'dias': nextDueDate = addDays(lastBilledDueDate, plan.recurrenceValue); break;
+                                case 'meses': nextDueDate = addMonths(lastBilledDueDate, plan.recurrenceValue); break;
+                                case 'anos': nextDueDate = addYears(lastBilledDueDate, plan.recurrenceValue); break;
+                                default: console.error("Invalid recurrence period for plan:", plan.id); continue;
+                            }
+
+                            if (isBefore(today, nextDueDate)) {
+                                break;
+                            }
+
+                             const invoiceExists = sortedClientPlanInvoices.some(
+                                inv => inv.dueDate && isEqual(startOfDay(inv.dueDate.toDate()), startOfDay(nextDueDate))
+                            );
+
+                            if (!invoiceExists) {
+                                const newInvoice = {
+                                    clientId: client.id,
+                                    clientName: client.name,
+                                    amount: plan.price,
+                                    issueDate: Timestamp.now(),
+                                    dueDate: Timestamp.fromDate(nextDueDate),
+                                    status: 'Pendente' as const,
+                                    planId: clientPlan.planId,
+                                    planName: plan.name,
+                                };
+                                generationPromises.push(addDoc(collection(db, "invoices"), newInvoice));
+                                sortedClientPlanInvoices.push({ ...newInvoice, id: 'temp' } as any); // Add to local list for loop check
+                                generatedCount++;
+                            }
+
+                            lastBilledDueDate = nextDueDate;
+                        }
                     }
                 }
             }
@@ -388,17 +420,19 @@ Agradecemos a sua atenção.
             const company = settingsDoc.exists() ? settingsDoc.data() as CompanySettings : null;
 
             const dueDate = invoice.dueDate.toDate();
-            let startDate: Date;
-
-            switch (plan.recurrencePeriod) {
-                case 'dias': startDate = subDays(dueDate, plan.recurrenceValue); break;
-                case 'meses': startDate = subMonths(dueDate, plan.recurrenceValue); break;
-                case 'anos': startDate = subYears(dueDate, plan.recurrenceValue); break;
-                default: startDate = dueDate;
+            let billingPeriod = format(dueDate, 'dd/MM/yyyy');
+            if (plan.type === 'recurring' && plan.recurrencePeriod && plan.recurrenceValue) {
+                let startDate: Date;
+                switch (plan.recurrencePeriod) {
+                    case 'dias': startDate = subDays(dueDate, plan.recurrenceValue); break;
+                    case 'meses': startDate = subMonths(dueDate, plan.recurrenceValue); break;
+                    case 'anos': startDate = subYears(dueDate, plan.recurrenceValue); break;
+                    default: startDate = dueDate;
+                }
+                 startDate = addDays(startDate, 1);
+                 billingPeriod = `${format(startDate, 'dd/MM/yyyy')} - ${format(dueDate, 'dd/MM/yyyy')}`;
             }
-            startDate = addDays(startDate, 1); // Start from the day after the last period ended
 
-            const billingPeriod = `${format(startDate, 'dd/MM/yyyy')} - ${format(dueDate, 'dd/MM/yyyy')}`;
             
             const logoHtml = company?.logoDataUrl 
                 ? `<img src="${company.logoDataUrl}" alt="Company Logo" style="max-height: 60px; max-width: 200px;" />` 
@@ -536,7 +570,7 @@ Agradecemos a sua atenção.
                 </div>
                  <Button size="sm" className="gap-1" onClick={handleGenerateInvoices} disabled={isGenerating}>
                     <PlusCircle className="h-4 w-4" />
-                    {isGenerating ? 'Gerando...' : 'Gerar Faturas Recorrentes'}
+                    {isGenerating ? 'Gerando...' : 'Gerar Faturas'}
                 </Button>
             </div>
             <Card>
@@ -709,5 +743,3 @@ Agradecemos a sua atenção.
         </div>
     );
 }
-
-    

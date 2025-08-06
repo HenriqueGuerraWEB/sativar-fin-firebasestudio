@@ -17,20 +17,23 @@ import { db } from '@/lib/firebase';
 import { collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc, query } from "firebase/firestore";
 import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
+import { Badge } from '@/components/ui/badge';
 
 type Plan = {
     id: string;
     name: string;
     description: string;
     price: number;
-    recurrenceValue: number;
-    recurrencePeriod: 'dias' | 'meses' | 'anos';
+    type: 'recurring' | 'one-time';
+    recurrenceValue?: number;
+    recurrencePeriod?: 'dias' | 'meses' | 'anos';
 };
 
 const emptyPlan: Omit<Plan, 'id'> = {
     name: "",
     description: "",
     price: 0,
+    type: 'recurring',
     recurrenceValue: 1,
     recurrencePeriod: 'meses',
 };
@@ -72,8 +75,8 @@ export default function PlansPage() {
         }));
     };
     
-    const handleSelectChange = (value: 'dias' | 'meses' | 'anos') => {
-        setCurrentPlan(prev => ({...prev, recurrencePeriod: value}));
+    const handleSelectChange = (id: 'type' | 'recurrencePeriod', value: string) => {
+        setCurrentPlan(prev => ({...prev, [id]: value}));
     }
 
     const handleSavePlan = async () => {
@@ -87,11 +90,18 @@ export default function PlansPage() {
         }
 
         try {
-            const planData = {
+            const planData: Partial<Plan> = {
                 ...currentPlan,
-                recurrenceValue: currentPlan.recurrenceValue || 1,
-                recurrencePeriod: currentPlan.recurrencePeriod || 'meses'
             };
+
+            if (planData.type === 'one-time') {
+                delete planData.recurrenceValue;
+                delete planData.recurrencePeriod;
+            } else {
+                 planData.recurrenceValue = planData.recurrenceValue || 1;
+                 planData.recurrencePeriod = planData.recurrencePeriod || 'meses';
+            }
+
 
             if ('id' in currentPlan) {
                 const planRef = doc(db, "plans", currentPlan.id);
@@ -139,11 +149,12 @@ export default function PlansPage() {
     };
     
     const formatRecurrence = (plan: Plan) => {
+        if (plan.type === 'one-time') return 'Pagamento Único';
         if (!plan.recurrenceValue || !plan.recurrencePeriod) return 'N/A';
         const period = plan.recurrenceValue === 1 
             ? plan.recurrencePeriod.slice(0, -1) 
             : plan.recurrencePeriod;
-        return `${plan.recurrenceValue} ${period}`;
+        return `A cada ${plan.recurrenceValue} ${period}`;
     }
 
 
@@ -152,9 +163,12 @@ export default function PlansPage() {
             <div className="flex items-start justify-between">
                 <div>
                     <h1 className="text-3xl font-bold tracking-tight">Planos de Serviço</h1>
-                    <p className="text-muted-foreground">Gerencie seus planos de serviço.</p>
+                    <p className="text-muted-foreground">Gerencie seus planos de serviço, recorrentes ou de pagamento único.</p>
                 </div>
-                <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
+                <Sheet open={isSheetOpen} onOpenChange={(isOpen) => {
+                    setIsSheetOpen(isOpen);
+                    if (!isOpen) setCurrentPlan(emptyPlan);
+                }}>
                     <SheetTrigger asChild>
                         <Button size="sm" className="gap-1" onClick={handleAddNew}>
                             <PlusCircle className="h-4 w-4" />
@@ -168,35 +182,53 @@ export default function PlansPage() {
                                 Defina os detalhes do novo plano de serviço.
                             </SheetDescription>
                         </SheetHeader>
-                        <div className="grid gap-4 py-4">
-                            <div className="grid grid-cols-4 items-center gap-4">
-                                <Label htmlFor="name" className="text-right">Nome</Label>
-                                <Input id="name" value={currentPlan.name} onChange={handleInputChange} className="col-span-3" />
+                        <div className="grid gap-6 py-6">
+                            <div className="space-y-2">
+                                <Label htmlFor="name">Nome</Label>
+                                <Input id="name" value={currentPlan.name} onChange={handleInputChange} />
                             </div>
-                            <div className="grid grid-cols-4 items-start gap-4">
-                                <Label htmlFor="description" className="text-right pt-2">Descrição</Label>
-                                <Textarea id="description" value={currentPlan.description} onChange={handleInputChange} className="col-span-3" />
+                            <div className="space-y-2">
+                                <Label htmlFor="description">Descrição</Label>
+                                <Textarea id="description" value={currentPlan.description} onChange={handleInputChange} />
                             </div>
-                            <div className="grid grid-cols-4 items-center gap-4">
-                                <Label htmlFor="price" className="text-right">Preço (R$)</Label>
-                                <Input id="price" type="number" value={currentPlan.price} onChange={handleInputChange} className="col-span-3" />
-                            </div>
-                            <div className="grid grid-cols-4 items-center gap-4">
-                                <Label className="text-right">Recorrência</Label>
-                                <div className="col-span-3 grid grid-cols-2 gap-2">
-                                     <Input id="recurrenceValue" type="number" value={currentPlan.recurrenceValue} onChange={handleInputChange} min="1" />
-                                     <Select value={currentPlan.recurrencePeriod} onValueChange={handleSelectChange}>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <Label htmlFor="price">Preço (R$)</Label>
+                                    <Input id="price" type="number" value={currentPlan.price} onChange={handleInputChange}/>
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="type">Tipo</Label>
+                                    <Select value={currentPlan.type} onValueChange={(value) => handleSelectChange('type', value)}>
                                         <SelectTrigger>
-                                            <SelectValue placeholder="Período" />
+                                            <SelectValue placeholder="Tipo de cobrança" />
                                         </SelectTrigger>
                                         <SelectContent>
-                                            <SelectItem value="dias">Dias</SelectItem>
-                                            <SelectItem value="meses">Meses</SelectItem>
-                                            <SelectItem value="anos">Anos</SelectItem>
+                                            <SelectItem value="recurring">Recorrente</SelectItem>
+                                            <SelectItem value="one-time">Único</SelectItem>
                                         </SelectContent>
                                     </Select>
                                 </div>
                             </div>
+                           
+                            {currentPlan.type === 'recurring' && (
+                                <div className="p-4 border rounded-lg space-y-4">
+                                     <Label className="font-semibold">Configuração de Recorrência</Label>
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <Input id="recurrenceValue" type="number" placeholder="Ex: 1" value={currentPlan.recurrenceValue} onChange={handleInputChange} min="1" />
+                                        <Select value={currentPlan.recurrencePeriod} onValueChange={(value) => handleSelectChange('recurrencePeriod', value as any)}>
+                                            <SelectTrigger>
+                                                <SelectValue placeholder="Período" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="dias">Dias</SelectItem>
+                                                <SelectItem value="meses">Meses</SelectItem>
+                                                <SelectItem value="anos">Anos</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                </div>
+                            )}
+
                         </div>
                         <SheetFooter>
                             <Button onClick={handleSavePlan}>Salvar Plano</Button>
@@ -213,7 +245,7 @@ export default function PlansPage() {
                         <TableHeader>
                             <TableRow>
                                 <TableHead>Plano</TableHead>
-                                <TableHead>Recorrência</TableHead>
+                                <TableHead>Cobrança</TableHead>
                                 <TableHead className="text-right">Preço</TableHead>
                                 <TableHead><span className="sr-only">Ações</span></TableHead>
                             </TableRow>
@@ -237,7 +269,9 @@ export default function PlansPage() {
                                         <div>{plan.name}</div>
                                         <div className="text-sm text-muted-foreground">{plan.description}</div>
                                     </TableCell>
-                                    <TableCell>{formatRecurrence(plan)}</TableCell>
+                                    <TableCell>
+                                        <Badge variant={plan.type === 'recurring' ? 'secondary' : 'outline'}>{formatRecurrence(plan)}</Badge>
+                                    </TableCell>
                                     <TableCell className="text-right">
                                         {plan.price.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                                     </TableCell>
@@ -283,5 +317,3 @@ export default function PlansPage() {
         </div>
     );
 }
-
-    
