@@ -38,16 +38,13 @@ function useSidebar() {
 
 const SidebarProvider = React.forwardRef<
   HTMLDivElement,
-  React.ComponentProps<"div"> & {
-    defaultOpen?: boolean
-  }
+  React.ComponentProps<"div">
 >(
   (
     {
       className,
       style,
       children,
-      defaultOpen,
       ...props
     },
     ref
@@ -123,7 +120,7 @@ const Sidebar = React.forwardRef<
       <aside
         ref={ref}
         className={cn(
-            "fixed left-0 top-0 z-20 flex h-full flex-col bg-sidebar text-sidebar-foreground border-r w-[var(--sidebar-width-icon)]",
+            "flex h-full flex-col bg-sidebar text-sidebar-foreground border-r w-[var(--sidebar-width-icon)]",
             className
         )}
         data-state="collapsed"
@@ -141,22 +138,6 @@ const Sidebar = React.forwardRef<
 )
 Sidebar.displayName = "Sidebar"
 
-const SidebarInset = React.forwardRef<
-  HTMLDivElement,
-  React.ComponentProps<"div">
->(({ className, ...props }, ref) => {
-  return (
-    <div
-      ref={ref}
-      className={cn(
-        "relative flex-1 bg-background ml-[var(--sidebar-width-icon)]",
-        className
-      )}
-      {...props}
-    />
-  )
-})
-SidebarInset.displayName = "SidebarInset"
 
 const SidebarHeader = React.forwardRef<
   HTMLDivElement,
@@ -181,7 +162,7 @@ const SidebarFooter = React.forwardRef<
     <div
       ref={ref}
       data-sidebar="footer"
-      className={cn("flex flex-col gap-2 p-4 mt-auto items-center", className)}
+      className={cn("flex flex-col gap-2 p-2 mt-auto items-center", className)}
       {...props}
     />
   )
@@ -228,7 +209,7 @@ const SidebarMenu = React.forwardRef<
   <ul
     ref={ref}
     data-sidebar="menu"
-    className={cn("flex w-full min-w-0 flex-col gap-1", className)}
+    className={cn("flex w-full min-w-0 flex-col gap-1 items-center", className)}
     {...props}
   />
 ))
@@ -333,7 +314,6 @@ export {
   SidebarContent,
   SidebarFooter,
   SidebarHeader,
-  SidebarInset,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,

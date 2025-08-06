@@ -11,13 +11,12 @@ import {
   SidebarMenu,
   SidebarMenuItem,
   SidebarMenuButton,
-  SidebarInset,
   SidebarFooter,
 } from '@/components/ui/sidebar';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { LayoutDashboard, Users, Package, Banknote, FileText, Settings, LogOut } from 'lucide-react';
 import React from 'react';
-import { SativarLogo, SativarLogoIcon } from '@/components/sativar-logo';
+import { SativarLogoIcon } from '@/components/sativar-logo';
 import { ModeToggle } from '@/components/mode-toggle';
 import { useAuth } from '@/hooks/use-auth';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '../ui/dropdown-menu';
@@ -95,51 +94,49 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <SidebarProvider defaultOpen={false}>
-        <div className="flex h-screen w-full flex-col overflow-hidden">
-            <header className="flex h-14 shrink-0 items-center justify-between gap-4 border-b bg-background px-4 pl-[var(--sidebar-width-icon)] lg:h-[60px] lg:px-6 lg:pl-[var(--sidebar-width-icon)]">
-                <HeaderContent />
-            </header>
-            <div className="flex flex-1 overflow-hidden">
-                <Sidebar>
-                    <SidebarHeader>
-                        <Link href="/dashboard">
-                           <SativarLogoIcon />
-                        </Link>
-                    </SidebarHeader>
-                    <SidebarContent>
-                    <SidebarMenu>
-                        {menuItems.map((item) => (
-                        <SidebarMenuItem key={item.href}>
-                            <Link href={item.href} passHref>
-                                <SidebarMenuButton
-                                    isActive={isActive(item.href)}
-                                    tooltip={item.label}
-                                >
-                                    <item.icon />
-                                </SidebarMenuButton>
-                            </Link>
-                        </SidebarMenuItem>
-                        ))}
-                    </SidebarMenu>
-                    </SidebarContent>
-                    <SidebarFooter>
-                    <SidebarMenu>
-                        <SidebarMenuItem>
-                            <Link href="/settings" passHref>
-                            <SidebarMenuButton isActive={isActive('/settings')} tooltip="Configurações">
-                                <Settings />
+    <SidebarProvider>
+        <div className="flex h-screen w-full bg-background">
+            <Sidebar>
+                <SidebarHeader>
+                    <Link href="/dashboard">
+                       <SativarLogoIcon />
+                    </Link>
+                </SidebarHeader>
+                <SidebarContent>
+                <SidebarMenu>
+                    {menuItems.map((item) => (
+                    <SidebarMenuItem key={item.href}>
+                        <Link href={item.href} passHref>
+                            <SidebarMenuButton
+                                isActive={isActive(item.href)}
+                                tooltip={item.label}
+                            >
+                                <item.icon />
                             </SidebarMenuButton>
-                            </Link>
-                        </SidebarMenuItem>
-                    </SidebarMenu>
-                    </SidebarFooter>
-                </Sidebar>
-                <SidebarInset>
-                    <main className="flex-1 overflow-y-auto p-4 md:p-8">
-                        {children}
-                    </main>
-                </SidebarInset>
+                        </Link>
+                    </SidebarMenuItem>
+                    ))}
+                </SidebarMenu>
+                </SidebarContent>
+                <SidebarFooter>
+                <SidebarMenu>
+                    <SidebarMenuItem>
+                        <Link href="/settings" passHref>
+                        <SidebarMenuButton isActive={isActive('/settings')} tooltip="Configurações">
+                            <Settings />
+                        </SidebarMenuButton>
+                        </Link>
+                    </SidebarMenuItem>
+                </SidebarMenu>
+                </SidebarFooter>
+            </Sidebar>
+            <div className="flex flex-1 flex-col">
+                 <header className="flex h-14 shrink-0 items-center justify-between gap-4 border-b bg-background px-4 lg:h-[60px] lg:px-6">
+                    <HeaderContent />
+                </header>
+                <main className="flex-1 overflow-y-auto p-4 md:p-8">
+                    {children}
+                </main>
             </div>
         </div>
     </SidebarProvider>
