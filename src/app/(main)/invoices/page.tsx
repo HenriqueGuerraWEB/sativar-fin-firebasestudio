@@ -412,7 +412,7 @@ Agradecemos a sua atenção.
                                         ${company ? `<div class="text-gray-500 mt-4 text-sm">${companyDetailsHtml}</div>` : ''}
                                     </div>
                                     <div class="text-right">
-                                        <h2 class="text-4xl font-bold text-gray-700">FATURA</h2>
+                                        <h2 class="text-2xl font-bold text-gray-700">FATURA</h2>
                                         <p class="text-gray-500 mt-1">#${invoice.id.substring(0, 7).toUpperCase()}</p>
                                     </div>
                                 </div>
@@ -665,3 +665,6 @@ Agradecemos a sua atenção.
         </div>
     );
 }
+
+
+    
