@@ -18,10 +18,15 @@ import { collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc, query, Times
 import { Skeleton } from '@/components/ui/skeleton';
 import { format } from 'date-fns';
 
+type ExpenseCategory = {
+    id: string;
+    name: string;
+};
+
 type Expense = {
     id: string;
     description: string;
-    category: 'Recursos Humanos' | 'Marketing' | 'Infraestrutura' | 'Ferramentas' | 'Outros';
+    category: string;
     amount: number;
     dueDate: Timestamp;
     status: 'Paga' | 'Pendente';
@@ -36,7 +41,7 @@ type Income = {
 
 const emptyExpense: Omit<Expense, 'id' | 'status'> = {
     description: "",
-    category: "Outros",
+    category: "",
     amount: 0,
     dueDate: Timestamp.now(),
 };
@@ -45,6 +50,7 @@ export default function FinancePage() {
     const { toast } = useToast();
     const [expenses, setExpenses] = useState<Expense[]>([]);
     const [income, setIncome] = useState<Income[]>([]);
+    const [categories, setCategories] = useState<ExpenseCategory[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isSheetOpen, setIsSheetOpen] = useState(false);
     const [currentExpense, setCurrentExpense] = useState<Omit<Expense, 'id' | 'status'>>(emptyExpense);
@@ -56,14 +62,17 @@ export default function FinancePage() {
             try {
                 const expenseQuery = query(collection(db, "expenses"), orderBy("dueDate", "desc"));
                 const incomeQuery = query(collection(db, "income"), orderBy("date", "desc"));
+                const categoryQuery = query(collection(db, "expenseCategories"), orderBy("name"));
 
-                const [expenseSnapshot, incomeSnapshot] = await Promise.all([
+                const [expenseSnapshot, incomeSnapshot, categorySnapshot] = await Promise.all([
                     getDocs(expenseQuery),
-                    getDocs(incomeQuery)
+                    getDocs(incomeQuery),
+                    getDocs(categoryQuery)
                 ]);
 
                 setExpenses(expenseSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Expense)));
                 setIncome(incomeSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Income)));
+                setCategories(categorySnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as ExpenseCategory)));
 
             } catch (error) {
                 console.error("Error fetching initial data:", error);
@@ -77,6 +86,7 @@ export default function FinancePage() {
 
         const expenseQuery = query(collection(db, "expenses"), orderBy("dueDate", "desc"));
         const incomeQuery = query(collection(db, "income"), orderBy("date", "desc"));
+        const categoryQuery = query(collection(db, "expenseCategories"), orderBy("name"));
 
         const unsubExpenses = onSnapshot(expenseQuery, (snapshot) => {
             setExpenses(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Expense)));
@@ -85,10 +95,15 @@ export default function FinancePage() {
         const unsubIncome = onSnapshot(incomeQuery, (snapshot) => {
             setIncome(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Income)));
         });
+        
+        const unsubCategories = onSnapshot(categoryQuery, (snapshot) => {
+            setCategories(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as ExpenseCategory)));
+        });
 
         return () => {
             unsubExpenses();
             unsubIncome();
+            unsubCategories();
         };
     }, [toast]);
 
@@ -104,13 +119,13 @@ export default function FinancePage() {
         }
     };
     
-    const handleSelectChange = (value: Expense['category']) => {
+    const handleSelectChange = (value: string) => {
         setCurrentExpense(prev => ({...prev, category: value}));
     }
 
     const handleSaveExpense = async () => {
-        if (!currentExpense.description || currentExpense.amount <= 0) {
-            toast({ title: "Erro", description: "Descrição e Valor (maior que zero) são obrigatórios.", variant: "destructive" });
+        if (!currentExpense.description || currentExpense.amount <= 0 || !currentExpense.category) {
+            toast({ title: "Erro", description: "Descrição, Categoria e Valor (maior que zero) são obrigatórios.", variant: "destructive" });
             return;
         }
 
@@ -132,9 +147,10 @@ export default function FinancePage() {
         setIsAnalyzing(true);
         // Simulate AI analysis
         setTimeout(() => {
+             const adobeCategory = categories.find(c => c.name.toLowerCase().includes('ferramentas'));
             setCurrentExpense({
                 description: "Assinatura Adobe Creative Cloud",
-                category: "Ferramentas",
+                category: adobeCategory ? adobeCategory.name : "Ferramentas",
                 amount: 280.00,
                 dueDate: Timestamp.now(),
             })
@@ -186,11 +202,9 @@ export default function FinancePage() {
                                         <SelectValue placeholder="Selecione uma categoria" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="Recursos Humanos">Recursos Humanos</SelectItem>
-                                        <SelectItem value="Marketing">Marketing</SelectItem>
-                                        <SelectItem value="Infraestrutura">Infraestrutura</SelectItem>
-                                        <SelectItem value="Ferramentas">Ferramentas</SelectItem>
-                                        <SelectItem value="Outros">Outros</SelectItem>
+                                        {categories.map(category => (
+                                            <SelectItem key={category.id} value={category.name}>{category.name}</SelectItem>
+                                        ))}
                                     </SelectContent>
                                 </Select>
                             </div>
@@ -307,5 +321,3 @@ export default function FinancePage() {
         </div>
     );
 }
-
-    

@@ -37,10 +37,15 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
   ];
 
   const isActive = (href: string) => {
+    // Exact match for dashboard
     if (href === '/dashboard') {
         return pathname === href;
     }
-    return pathname.startsWith(href);
+    // Starts with for other main routes
+    if (['/clients', '/plans', '/finance', '/invoices', '/settings'].includes(href)) {
+        return pathname.startsWith(href);
+    }
+    return false;
   }
   
   const handleLogout = async () => {
@@ -89,7 +94,7 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
           <SidebarMenu>
             <SidebarMenuItem>
                 <Link href="/settings" passHref>
-                  <SidebarMenuButton isActive={pathname.startsWith('/settings')} tooltip="Configurações">
+                  <SidebarMenuButton isActive={isActive('/settings')} tooltip="Configurações">
                       <Settings />
                       <span>Configurações</span>
                   </SidebarMenuButton>
