@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState } from 'react';
@@ -77,7 +78,7 @@ export default function FinancePage() {
                                     <SelectContent>
                                         <SelectItem value="rh">Recursos Humanos</SelectItem>
                                         <SelectItem value="marketing">Marketing</SelectItem>
-                                        <SelectItem value="infra">Infraestrutura</SelectItem>
+                                        <SelectItem value.tsx
                                         <SelectItem value="tools">Ferramentas</SelectItem>
                                         <SelectItem value="others">Outros</SelectItem>
                                     </SelectContent>
@@ -142,7 +143,7 @@ export default function FinancePage() {
                         <CardHeader>
                             <CardTitle>Contas a Receber</CardTitle>
                             <CardDescription>Visualize as entradas de capital.</CardDescription>
-                        </Header>
+                        </CardHeader>
                         <CardContent>
                             <Table>
                                 <TableHeader>
@@ -170,7 +171,7 @@ export default function FinancePage() {
                         <CardHeader>
                             <CardTitle>Fluxo de Caixa</CardTitle>
                             <CardDescription>Relatório de entradas e saídas.</CardDescription>
-                        </CardHeader>
+                        </Header>
                         <CardContent>
                             <div className="flex items-center justify-center h-48">
                                 <p className="text-center text-muted-foreground">O relatório de fluxo de caixa será implementado em breve.</p>
@@ -182,3 +183,4 @@ export default function FinancePage() {
         </div>
     );
 }
+
