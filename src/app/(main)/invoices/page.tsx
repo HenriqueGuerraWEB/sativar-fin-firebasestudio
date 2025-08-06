@@ -14,6 +14,7 @@ import { db } from '@/lib/firebase';
 import { collection, onSnapshot, query, Timestamp, orderBy, addDoc, doc, updateDoc, getDocs, where } from "firebase/firestore";
 import { Skeleton } from '@/components/ui/skeleton';
 import { format, endOfMonth, startOfMonth } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 
 type Plan = {
     id: string;
@@ -86,6 +87,7 @@ export default function InvoicesPage() {
 
             if (activeClients.length === 0) {
                 toast({ title: "Nenhuma ação necessária", description: "Não há clientes ativos com planos para gerar faturas." });
+                setIsGenerating(false);
                 return;
             }
 
@@ -113,6 +115,7 @@ export default function InvoicesPage() {
 
             if (clientsToInvoice.length === 0) {
                 toast({ title: "Nenhuma ação necessária", description: "Todos os clientes ativos já possuem faturas para o mês corrente." });
+                setIsGenerating(false);
                 return;
             }
 
@@ -157,7 +160,38 @@ export default function InvoicesPage() {
             console.error("Error updating status: ", error);
             toast({ title: "Erro", description: "Não foi possível atualizar o status da fatura.", variant: "destructive" });
         }
-    }
+    };
+
+    const handleSendReminder = async (invoice: Invoice) => {
+        const dueDate = format(invoice.dueDate.toDate(), 'dd/MM/yyyy', { locale: ptBR });
+        const amount = invoice.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+        const reminderText = `
+Olá, ${invoice.clientName}!
+
+Este é um lembrete amigável sobre sua fatura pendente.
+
+Valor: ${amount}
+Vencimento: ${dueDate}
+
+Agradecemos a sua atenção.
+        `.trim();
+
+        try {
+            await navigator.clipboard.writeText(reminderText);
+            toast({
+                title: 'Copiado!',
+                description: 'A mensagem de lembrete foi copiada para a área de transferência.',
+            });
+        } catch (err) {
+            console.error('Failed to copy text: ', err);
+            toast({
+                title: 'Erro',
+                description: 'Não foi possível copiar o texto.',
+                variant: 'destructive',
+            });
+        }
+    };
 
 
     const getStatusVariant = (status: Invoice['status']): VariantProps<typeof badgeVariants>['variant'] => {
@@ -244,9 +278,7 @@ export default function InvoicesPage() {
                                                     <DropdownMenuItem onClick={() => handleUpdateStatus(invoice.id, 'Paga')} disabled={invoice.status === 'Paga'}>Marcar como Paga</DropdownMenuItem>
                                                     <DropdownMenuItem onClick={() => handleUpdateStatus(invoice.id, 'Pendente')} disabled={invoice.status === 'Pendente'}>Marcar como Pendente</DropdownMenuItem>
                                                     <DropdownMenuSeparator />
-                                                    <DropdownMenuItem>Ver Detalhes</DropdownMenuItem>
-                                                    <DropdownMenuItem>Enviar Lembrete</DropdownMenuItem>
-                                                    <DropdownMenuItem>Baixar PDF</DropdownMenuItem>
+                                                    <DropdownMenuItem onClick={() => handleSendReminder(invoice)}>Enviar Lembrete</DropdownMenuItem>
                                                 </DropdownMenuContent>
                                             </DropdownMenu>
                                         </div>
