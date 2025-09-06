@@ -12,8 +12,8 @@ import { Textarea } from '@/components/ui/textarea';
 import Image from 'next/image';
 import { X } from 'lucide-react';
 import { useAuth } from '@/hooks/use-auth';
+import { StorageService } from '@/lib/storage-service';
 
-const SETTINGS_STORAGE_KEY_PREFIX = 'sativar-settings-';
 
 type CompanySettings = {
     name: string;
@@ -44,51 +44,22 @@ export default function SettingsPage() {
     const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
 
-    const getStorageKey = useCallback(() => {
+    const getSettingsKey = useCallback(() => {
         if (!user) return null;
-        return `${SETTINGS_STORAGE_KEY_PREFIX}${user.uid}`;
+        return `settings-${user.uid}`;
     }, [user]);
-
-    const getSettingsFromStorage = useCallback(() => {
-        const storageKey = getStorageKey();
-        if (!storageKey) return emptySettings;
-
-        try {
-            const storedSettings = localStorage.getItem(storageKey);
-            if (storedSettings) {
-                const parsed = JSON.parse(storedSettings);
-                return { ...emptySettings, ...parsed };
-            }
-            return emptySettings;
-        } catch (error) {
-            console.error("Error reading settings from localStorage:", error);
-            return emptySettings;
-        }
-    }, [getStorageKey]);
-
-    const setSettingsToStorage = useCallback((newSettings: CompanySettings) => {
-        const storageKey = getStorageKey();
-        if (!storageKey) {
-            toast({ title: "Erro", description: "Usuário não autenticado.", variant: "destructive" });
-            return;
-        };
-
-        try {
-            localStorage.setItem(storageKey, JSON.stringify(newSettings));
-        } catch (error) {
-            console.error("Error writing settings to localStorage:", error);
-            toast({ title: "Erro", description: "Não foi possível salvar as configurações.", variant: "destructive" });
-        }
-    }, [getStorageKey, toast]);
-
 
     useEffect(() => {
         if(user) {
             setIsLoading(true);
-            setSettings(getSettingsFromStorage());
+            const key = getSettingsKey();
+            if (key) {
+                const storedSettings = StorageService.getItem<CompanySettings>('settings', key);
+                setSettings(storedSettings || emptySettings);
+            }
             setIsLoading(false);
         }
-    }, [user, getSettingsFromStorage]);
+    }, [user, getSettingsKey]);
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
         const { id, value } = e.target;
@@ -115,8 +86,13 @@ export default function SettingsPage() {
     };
 
     const handleSaveSettings = async () => {
+        const key = getSettingsKey();
+        if (!key) {
+            toast({ title: "Erro", description: "Usuário não autenticado.", variant: "destructive" });
+            return;
+        }
         setIsSaving(true);
-        setSettingsToStorage(settings);
+        StorageService.setCollection(key, settings); // Note: Here we use the key as the collection name for user-specific settings
         setIsSaving(false);
         toast({ title: "Sucesso!", description: "Configurações salvas com sucesso." });
     };

@@ -22,6 +22,7 @@ export default function SignupPage() {
   const { user, signup } = useAuth();
   const router = useRouter();
   const { toast } = useToast();
+  const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -34,6 +35,14 @@ export default function SignupPage() {
   }, [user, router]);
 
   const handleSignup = async () => {
+    if (!name) {
+       toast({
+        title: "Erro",
+        description: "O campo nome é obrigatório.",
+        variant: "destructive",
+      });
+      return;
+    }
     if (password !== confirmPassword) {
       toast({
         title: "Erro",
@@ -44,12 +53,12 @@ export default function SignupPage() {
     }
     setIsLoading(true);
     try {
-      await signup(email, password);
+      await signup(email, password, name);
       toast({
         title: "Sucesso!",
-        description: "Sua conta foi criada. Você será redirecionado para o login.",
+        description: "Sua conta foi criada. Você será redirecionado.",
       });
-      router.push("/login");
+      router.push("/dashboard");
     } catch (error: any) {
         let description = "Ocorreu um erro ao criar a conta.";
         if (error.code === 'auth/email-already-in-use') {
@@ -81,6 +90,18 @@ export default function SignupPage() {
         </CardHeader>
         <CardContent>
           <div className="grid gap-4">
+             <div className="grid gap-2">
+              <Label htmlFor="name">Nome Completo</Label>
+              <Input
+                id="name"
+                type="text"
+                placeholder="Seu nome"
+                required
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                disabled={isLoading}
+              />
+            </div>
             <div className="grid gap-2">
               <Label htmlFor="email">Email</Label>
               <Input

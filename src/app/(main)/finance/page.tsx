@@ -24,26 +24,8 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Responsive
 import { cn } from '@/lib/utils';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
+import { StorageService } from '@/lib/storage-service';
 
-const EXPENSES_STORAGE_KEY = 'sativar-expenses';
-const INVOICES_STORAGE_KEY = 'sativar-invoices';
-const CATEGORIES_STORAGE_KEY = 'sativar-expenseCategories';
-
-
-// Helper to handle Timestamp serialization in JSON
-const replacer = (key: any, value: any) => {
-    if (value instanceof Timestamp) {
-        return { __type: 'Timestamp', value: { seconds: value.seconds, nanoseconds: value.nanoseconds } };
-    }
-    return value;
-};
-
-const reviver = (key: any, value: any) => {
-    if (value && value.__type === 'Timestamp') {
-        return new Timestamp(value.value.seconds, value.value.nanoseconds);
-    }
-    return value;
-};
 
 type ExpenseCategory = {
     id: string;
@@ -107,39 +89,18 @@ export default function FinancePage() {
     const [currentDate, setCurrentDate] = useState(new Date());
     const [cashFlowView, setCashFlowView] = useState<'daily' | 'monthly' | 'yearly'>('monthly');
     
-    const getDataFromStorage = useCallback((key: string, reviverFn: (key: any, value: any) => any) => {
-        try {
-            const storedData = localStorage.getItem(key);
-            return storedData ? JSON.parse(storedData, reviverFn) : [];
-        } catch (error) {
-            console.error(`Error reading ${key} from localStorage:`, error);
-            toast({ title: "Erro", description: "Não foi possível ler os dados do armazenamento local.", variant: "destructive" });
-            return [];
-        }
-    }, [toast]);
-
-    const setDataToStorage = useCallback((key: string, data: any, replacerFn: (key: any, value: any) => any) => {
-         try {
-            localStorage.setItem(key, JSON.stringify(data, replacerFn));
-        } catch (error) {
-             console.error(`Error writing ${key} to localStorage:`, error);
-            toast({ title: "Erro", description: "Não foi possível salvar os dados no armazenamento local.", variant: "destructive" });
-        }
-    }, [toast])
-
-
     useEffect(() => {
         setIsLoading(true);
-        const storedExpenses = getDataFromStorage(EXPENSES_STORAGE_KEY, reviver);
-        const storedInvoices = getDataFromStorage(INVOICES_STORAGE_KEY, reviver);
-        const storedCategories = getDataFromStorage(CATEGORIES_STORAGE_KEY, reviver);
+        const storedExpenses = StorageService.getCollection<Expense>('expenses');
+        const storedInvoices = StorageService.getCollection<Invoice>('invoices');
+        const storedCategories = StorageService.getCollection<ExpenseCategory>('expenseCategories');
         
         setExpenses(storedExpenses.sort((a: Expense, b: Expense) => b.dueDate.toMillis() - a.dueDate.toMillis()));
         setInvoices(storedInvoices.sort((a: Invoice, b: Invoice) => b.dueDate.toMillis() - a.dueDate.toMillis()));
         setCategories(storedCategories.sort((a: ExpenseCategory, b: ExpenseCategory) => a.name.localeCompare(b.name)));
         
         setIsLoading(false);
-    }, [getDataFromStorage]);
+    }, []);
     
     const cashFlowReport = useMemo(() => {
         let start, end;
@@ -240,15 +201,13 @@ export default function FinancePage() {
             return;
         }
 
-        const newExpense: Expense = {
+        const newExpense: Omit<Expense, 'id'> = {
             ...currentExpense,
-            id: crypto.randomUUID(),
             status: "Pendente",
         };
 
-        const updatedExpenses = [...expenses, newExpense].sort((a: Expense, b: Expense) => b.dueDate.toMillis() - a.dueDate.toMillis());
-        setDataToStorage(EXPENSES_STORAGE_KEY, updatedExpenses, replacer);
-        setExpenses(updatedExpenses);
+        const addedExpense = StorageService.addItem<Expense>('expenses', newExpense);
+        setExpenses(prev => [...prev, addedExpense].sort((a,b) => b.dueDate.toMillis() - a.dueDate.toMillis()));
 
         toast({ title: "Sucesso", description: "Despesa adicionada com sucesso." });
         setIsSheetOpen(false);
@@ -256,16 +215,16 @@ export default function FinancePage() {
     };
     
     const handleUpdateExpenseStatus = async (expenseId: string, status: Expense['status']) => {
-        const updatedExpenses = expenses.map(exp => exp.id === expenseId ? { ...exp, status } : exp);
-        setDataToStorage(EXPENSES_STORAGE_KEY, updatedExpenses, replacer);
-        setExpenses(updatedExpenses);
-        toast({ title: "Sucesso", description: `Despesa marcada como ${status}.`});
+        const updatedExpense = StorageService.updateItem<Expense>('expenses', expenseId, { status });
+        if (updatedExpense) {
+            setExpenses(prev => prev.map(exp => exp.id === expenseId ? updatedExpense : exp));
+            toast({ title: "Sucesso", description: `Despesa marcada como ${status}.`});
+        }
     };
 
     const handleDeleteExpense = async (expenseId: string) => {
-        const updatedExpenses = expenses.filter(exp => exp.id !== expenseId);
-        setDataToStorage(EXPENSES_STORAGE_KEY, updatedExpenses, replacer);
-        setExpenses(updatedExpenses);
+        StorageService.deleteItem('expenses', expenseId);
+        setExpenses(prev => prev.filter(exp => exp.id !== expenseId));
         toast({ title: "Sucesso", description: "Despesa excluída com sucesso." });
     };
 
@@ -275,10 +234,8 @@ export default function FinancePage() {
             return;
         }
        
-        const newCategory: ExpenseCategory = { name: newCategoryName, id: crypto.randomUUID() };
-        const updatedCategories = [...categories, newCategory].sort((a,b) => a.name.localeCompare(b.name));
-        setDataToStorage(CATEGORIES_STORAGE_KEY, updatedCategories, replacer);
-        setCategories(updatedCategories);
+        const newCategory = StorageService.addItem<ExpenseCategory>('expenseCategories', { name: newCategoryName });
+        setCategories(prev => [...prev, newCategory].sort((a,b) => a.name.localeCompare(b.name)));
 
         toast({ title: "Sucesso!", description: `Categoria "${newCategoryName}" adicionada.` });
         setCurrentExpense(prev => ({ ...prev, category: newCategory.id }));

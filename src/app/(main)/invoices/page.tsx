@@ -24,26 +24,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
-
-const CLIENTS_STORAGE_KEY = 'sativar-clients';
-const PLANS_STORAGE_KEY = 'sativar-plans';
-const INVOICES_STORAGE_KEY = 'sativar-invoices';
-const SETTINGS_STORAGE_KEY = 'sativar-settings';
-
-// Helper to handle Timestamp serialization in JSON
-const replacer = (key: any, value: any) => {
-    if (value instanceof Timestamp) {
-        return { __type: 'Timestamp', value: { seconds: value.seconds, nanoseconds: value.nanoseconds } };
-    }
-    return value;
-};
-
-const reviver = (key: any, value: any) => {
-    if (value && value.__type === 'Timestamp') {
-        return new Timestamp(value.value.seconds, value.value.nanoseconds);
-    }
-    return value;
-};
+import { StorageService } from '@/lib/storage-service';
 
 
 type Plan = {
@@ -123,26 +104,6 @@ export default function InvoicesPage() {
         paymentMethod: undefined,
         paymentNotes: '',
     });
-
-    const getDataFromStorage = useCallback((key: string) => {
-        try {
-            const storedData = localStorage.getItem(key);
-            return storedData ? JSON.parse(storedData, reviver) : [];
-        } catch (error) {
-            console.error(`Error reading ${key} from localStorage:`, error);
-            toast({ title: "Erro", description: `Não foi possível ler os dados de ${key}.`, variant: "destructive" });
-            return [];
-        }
-    }, [toast]);
-
-    const setDataToStorage = useCallback((key: string, data: any) => {
-         try {
-            localStorage.setItem(key, JSON.stringify(data, replacer));
-        } catch (error) {
-             console.error(`Error writing ${key} to localStorage:`, error);
-            toast({ title: "Erro", description: `Não foi possível salvar os dados em ${key}.`, variant: "destructive" });
-        }
-    }, [toast]);
     
     const processInvoices = useCallback((invoicesData: Invoice[]) => {
         const today = startOfDay(new Date());
@@ -159,29 +120,28 @@ export default function InvoicesPage() {
         });
         
         if (hasUpdates) {
-           setDataToStorage(INVOICES_STORAGE_KEY, updatedInvoices);
+           StorageService.setCollection('invoices', updatedInvoices);
         }
 
         return updatedInvoices.sort((a,b) => b.issueDate.toMillis() - a.issueDate.toMillis());
-    }, [setDataToStorage]);
+    }, []);
     
     useEffect(() => {
         setIsLoading(true);
-        const storedInvoices = getDataFromStorage(INVOICES_STORAGE_KEY);
+        const storedInvoices = StorageService.getCollection<Invoice>('invoices');
         const processed = processInvoices(storedInvoices);
         setInvoices(processed);
         setIsLoading(false);
 
-        // Simple listener for storage changes from other tabs
         const handleStorageChange = () => {
-             const storedInvoices = getDataFromStorage(INVOICES_STORAGE_KEY);
+             const storedInvoices = StorageService.getCollection<Invoice>('invoices');
              const processed = processInvoices(storedInvoices);
              setInvoices(processed);
         }
         window.addEventListener('storage', handleStorageChange);
         return () => window.removeEventListener('storage', handleStorageChange);
 
-    }, [getDataFromStorage, processInvoices]);
+    }, [processInvoices]);
     
     const groupedInvoices = useMemo(() => {
         return invoices.reduce((acc, invoice) => {
@@ -201,7 +161,7 @@ export default function InvoicesPage() {
     const handleGenerateInvoices = async () => {
         setIsGenerating(true);
         try {
-            const allClients: Client[] = getDataFromStorage(CLIENTS_STORAGE_KEY);
+            const allClients: Client[] = StorageService.getCollection<Client>('clients');
             const activeClients = allClients.filter(client => client.status === "Ativo" && client.plans && client.plans.length > 0);
 
             if (activeClients.length === 0) {
@@ -210,14 +170,14 @@ export default function InvoicesPage() {
                 return;
             }
 
-            const allPlans: Plan[] = getDataFromStorage(PLANS_STORAGE_KEY);
+            const allPlans: Plan[] = StorageService.getCollection<Plan>('plans');
             const plansMap = allPlans.reduce((acc, plan) => {
                 acc[plan.id] = plan;
                 return acc;
             }, {} as Record<string, Plan>);
 
-            const allInvoices: Invoice[] = getDataFromStorage(INVOICES_STORAGE_KEY);
-            let newInvoices: Invoice[] = [];
+            const allInvoices: Invoice[] = StorageService.getCollection<Invoice>('invoices');
+            let newInvoices: Omit<Invoice, 'id'>[] = [];
             const today = startOfDay(new Date());
 
             for (const client of activeClients) {
@@ -230,7 +190,6 @@ export default function InvoicesPage() {
                     if (plan.type === 'one-time') {
                         if (clientPlanInvoices.length === 0) {
                              newInvoices.push({
-                                id: crypto.randomUUID(),
                                 clientId: client.id,
                                 clientName: client.name,
                                 amount: plan.price,
@@ -253,7 +212,6 @@ export default function InvoicesPage() {
                         const activationDate = clientPlan.planActivationDate.toDate();
                         if ((isBefore(activationDate, today) || isEqual(startOfDay(activationDate), today)) && clientPlanInvoices.length === 0) {
                            newInvoices.push({
-                                id: crypto.randomUUID(),
                                 clientId: client.id,
                                 clientName: client.name,
                                 amount: plan.price,
@@ -280,7 +238,6 @@ export default function InvoicesPage() {
                             }
                             
                             newInvoices.push({
-                                id: crypto.randomUUID(),
                                 clientId: client.id,
                                 clientName: client.name,
                                 amount: plan.price,
@@ -298,9 +255,8 @@ export default function InvoicesPage() {
 
 
             if (newInvoices.length > 0) {
-                const updatedInvoices = [...allInvoices, ...newInvoices];
-                setDataToStorage(INVOICES_STORAGE_KEY, updatedInvoices);
-                setInvoices(processInvoices(updatedInvoices));
+                const added = StorageService.addItems('invoices', newInvoices);
+                setInvoices(prev => processInvoices([...prev, ...added]));
                 toast({ title: "Sucesso!", description: `${newInvoices.length} nova(s) fatura(s) foram geradas.` });
             } else {
                 toast({ title: "Nenhuma ação necessária", description: "Todos os clientes estão com as faturas em dia." });
@@ -316,21 +272,16 @@ export default function InvoicesPage() {
 
 
     const handleUpdateStatus = async (invoiceId: string, status: 'Pendente' | 'Vencida') => {
-       const updatedInvoices = invoices.map(inv => {
-           if (inv.id === invoiceId) {
-               return {
-                   ...inv,
-                   status,
-                   paymentDate: undefined,
-                   paymentMethod: undefined,
-                   paymentNotes: undefined
-               };
-           }
-           return inv;
+       const updatedInvoice = StorageService.updateItem<Invoice>(invoiceId, {
+            status,
+            paymentDate: undefined,
+            paymentMethod: undefined,
+            paymentNotes: undefined
        });
-       setDataToStorage(INVOICES_STORAGE_KEY, updatedInvoices);
-       setInvoices(processInvoices(updatedInvoices));
-       toast({ title: "Sucesso", description: `Fatura marcada como ${status}.`});
+       if(updatedInvoice) {
+           setInvoices(prev => processInvoices(prev.map(inv => inv.id === invoiceId ? updatedInvoice : inv)));
+           toast({ title: "Sucesso", description: `Fatura marcada como ${status}.`});
+       }
     };
     
     const handleOpenPaymentModal = (invoice: Invoice) => {
@@ -349,30 +300,25 @@ export default function InvoicesPage() {
             return;
         }
 
-        const updatedInvoices = invoices.map(inv => {
-            if (inv.id === selectedInvoice.id) {
-                return {
-                    ...inv,
-                    status: 'Paga' as const,
-                    paymentDate: Timestamp.fromDate(paymentDetails.paymentDate!),
-                    paymentMethod: paymentDetails.paymentMethod,
-                    paymentNotes: paymentDetails.paymentNotes,
-                };
-            }
-            return inv;
+        const updatedInvoice = StorageService.updateItem<Invoice>(selectedInvoice.id, {
+            status: 'Paga',
+            paymentDate: Timestamp.fromDate(paymentDetails.paymentDate!),
+            paymentMethod: paymentDetails.paymentMethod,
+            paymentNotes: paymentDetails.paymentNotes,
         });
 
-        setDataToStorage(INVOICES_STORAGE_KEY, updatedInvoices);
-        setInvoices(processInvoices(updatedInvoices));
+        if (updatedInvoice) {
+            setInvoices(prev => processInvoices(prev.map(inv => inv.id === selectedInvoice.id ? updatedInvoice : inv)));
+            toast({ title: "Sucesso", description: `Fatura marcada como Paga.`});
+        }
 
-        toast({ title: "Sucesso", description: `Fatura marcada como Paga.`});
         setIsPaymentModalOpen(false);
         setSelectedInvoice(null);
     };
 
 
     const handlePrepareReminder = async (invoice: Invoice) => {
-        const allClients: Client[] = getDataFromStorage(CLIENTS_STORAGE_KEY);
+        const allClients: Client[] = StorageService.getCollection<Client>('clients');
         const client = allClients.find(c => c.id === invoice.clientId);
 
         if (!client || !client.whatsapp) {
@@ -384,7 +330,7 @@ export default function InvoicesPage() {
             return;
         }
 
-        const allPlans: Plan[] = getDataFromStorage(PLANS_STORAGE_KEY);
+        const allPlans: Plan[] = StorageService.getCollection<Plan>('plans');
         const plan = allPlans.find(p => p.id === invoice.planId);
         
         if (!plan) {
@@ -416,9 +362,8 @@ export default function InvoicesPage() {
     }
 
     const handleDeleteInvoice = async (invoiceId: string) => {
-        const updatedInvoices = invoices.filter(inv => inv.id !== invoiceId);
-        setDataToStorage(INVOICES_STORAGE_KEY, updatedInvoices);
-        setInvoices(processInvoices(updatedInvoices));
+        StorageService.deleteItem('invoices', invoiceId);
+        setInvoices(prev => processInvoices(prev.filter(inv => inv.id !== invoiceId)));
         toast({ title: "Sucesso", description: "Fatura excluída com sucesso." });
     };
 
@@ -432,9 +377,8 @@ export default function InvoicesPage() {
             return;
         }
 
-        const updatedInvoices = invoices.filter(inv => !unpaidInvoiceIds.includes(inv.id));
-        setDataToStorage(INVOICES_STORAGE_KEY, updatedInvoices);
-        setInvoices(processInvoices(updatedInvoices));
+        StorageService.deleteItems('invoices', unpaidInvoiceIds);
+        setInvoices(prev => processInvoices(prev.filter(inv => !unpaidInvoiceIds.includes(inv.id))));
         toast({ title: "Sucesso!", description: `${unpaidInvoiceIds.length} fatura(s) foram excluídas.`});
     }
     
@@ -445,13 +389,9 @@ export default function InvoicesPage() {
                 return;
             }
             
-            const allClients: Client[] = getDataFromStorage(CLIENTS_STORAGE_KEY);
-            const client = allClients.find(c => c.id === invoice.clientId);
-            
-            const allPlans: Plan[] = getDataFromStorage(PLANS_STORAGE_KEY);
-            const plan = allPlans.find(p => p.id === invoice.planId);
-            
-            const company: CompanySettings | null = getDataFromStorage(SETTINGS_STORAGE_KEY);
+            const client = StorageService.getItem<Client>('clients', invoice.clientId);
+            const plan = StorageService.getItem<Plan>('plans', invoice.planId);
+            const company: CompanySettings | null = StorageService.getCollection<CompanySettings>('settings');
 
             if (!client || !plan) {
                 toast({ title: 'Erro', description: 'Não foi possível encontrar os dados do cliente ou do plano.', variant: 'destructive' });

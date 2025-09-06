@@ -9,6 +9,7 @@ import {
   createUserWithEmailAndPassword,
   signOut,
   signInWithPopup,
+  updateProfile,
 } from "firebase/auth";
 import React, {
   createContext,
@@ -25,7 +26,7 @@ interface AuthContextType {
   loading: boolean;
   login: (email: string, pass: string) => Promise<any>;
   loginWithGoogle: () => Promise<any>;
-  signup: (email: string, pass: string) => Promise<any>;
+  signup: (email: string, pass: string, name?: string) => Promise<any>;
   logout: () => Promise<any>;
 }
 
@@ -51,8 +52,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return signInWithPopup(auth, googleProvider);
   }
 
-  const signup = (email: string, pass: string) => {
-    return createUserWithEmailAndPassword(auth, email, pass);
+  const signup = async (email: string, pass: string, name?: string) => {
+    const userCredential = await createUserWithEmailAndPassword(auth, email, pass);
+    if (userCredential.user && name) {
+      await updateProfile(userCredential.user, { displayName: name });
+      // To get the updated user object in the context, we need to refresh it.
+      // A simple way is to re-set the state, but onAuthStateChanged will handle it.
+      // For immediate UI update, you might need to manually set it.
+       setUser(auth.currentUser);
+    }
+    return userCredential;
   };
 
   const logout = () => {
@@ -68,7 +77,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       signup,
       logout,
     }),
-    [user, loading, login, loginWithGoogle, signup, logout]
+    [user, loading]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

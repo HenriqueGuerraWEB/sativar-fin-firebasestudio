@@ -13,8 +13,8 @@ import { Label } from "@/components/ui/label";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
+import { StorageService } from '@/lib/storage-service';
 
-const CATEGORIES_STORAGE_KEY = 'sativar-expenseCategories';
 
 type Category = {
     id: string;
@@ -32,32 +32,12 @@ export default function ExpenseCategoriesPage() {
     const [isSheetOpen, setIsSheetOpen] = useState(false);
     const [currentCategory, setCurrentCategory] = useState<Omit<Category, 'id'> | Category>(emptyCategory);
 
-    const getCategoriesFromStorage = useCallback((): Category[] => {
-        try {
-            const storedCategories = localStorage.getItem(CATEGORIES_STORAGE_KEY);
-            return storedCategories ? JSON.parse(storedCategories) : [];
-        } catch (error) {
-            console.error("Error reading categories from localStorage:", error);
-            toast({ title: "Erro", description: "Não foi possível ler as categorias.", variant: "destructive" });
-            return [];
-        }
-    }, [toast]);
-    
-    const setCategoriesToStorage = useCallback((categories: Category[]) => {
-        try {
-            localStorage.setItem(CATEGORIES_STORAGE_KEY, JSON.stringify(categories));
-        } catch (error) {
-            console.error("Error writing categories to localStorage:", error);
-            toast({ title: "Erro", description: "Não foi possível salvar as categorias.", variant: "destructive" });
-        }
-    }, [toast]);
-
     useEffect(() => {
         setIsLoading(true);
-        const storedCategories = getCategoriesFromStorage();
+        const storedCategories = StorageService.getCollection<Category>('expenseCategories');
         setCategories(storedCategories.sort((a, b) => a.name.localeCompare(b.name)));
         setIsLoading(false);
-    }, [getCategoriesFromStorage]);
+    }, []);
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const { id, value } = e.target;
@@ -74,21 +54,17 @@ export default function ExpenseCategoriesPage() {
             return;
         }
 
-        const currentCategories = getCategoriesFromStorage();
-        let updatedCategories;
-
         if ('id' in currentCategory) {
-            updatedCategories = currentCategories.map(cat => 
-                cat.id === currentCategory.id ? { ...cat, name: currentCategory.name } : cat
-            );
+            const updatedCategory = StorageService.updateItem<Category>('expenseCategories', currentCategory.id, { name: currentCategory.name });
+            if (updatedCategory) {
+                setCategories(prev => 
+                    prev.map(cat => cat.id === currentCategory.id ? updatedCategory : cat).sort((a, b) => a.name.localeCompare(b.name))
+                );
+            }
         } else {
-            const newCategory: Category = { id: crypto.randomUUID(), name: currentCategory.name };
-            updatedCategories = [...currentCategories, newCategory];
+            const newCategory = StorageService.addItem<Category>('expenseCategories', { name: currentCategory.name });
+            setCategories(prev => [...prev, newCategory].sort((a, b) => a.name.localeCompare(b.name)));
         }
-
-        updatedCategories.sort((a, b) => a.name.localeCompare(b.name));
-        setCategoriesToStorage(updatedCategories);
-        setCategories(updatedCategories);
 
         toast({ title: "Sucesso", description: `Categoria ${'id' in currentCategory ? 'atualizada' : 'adicionada'} com sucesso.` });
         setIsSheetOpen(false);
@@ -106,10 +82,8 @@ export default function ExpenseCategoriesPage() {
     };
 
     const handleDelete = async (categoryId: string) => {
-        const currentCategories = getCategoriesFromStorage();
-        const updatedCategories = currentCategories.filter(cat => cat.id !== categoryId);
-        setCategoriesToStorage(updatedCategories);
-        setCategories(updatedCategories);
+        StorageService.deleteItem('expenseCategories', categoryId);
+        setCategories(prev => prev.filter(cat => cat.id !== categoryId));
         toast({ title: "Sucesso", description: "Categoria excluída com sucesso." });
     };
 
