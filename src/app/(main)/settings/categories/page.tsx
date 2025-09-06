@@ -13,8 +13,9 @@ import { Label } from "@/components/ui/label";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/firebase';
-import { collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc, query, orderBy } from "firebase/firestore";
+import { collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc, query, orderBy, getDocs } from "firebase/firestore";
 import { Skeleton } from '@/components/ui/skeleton';
+import { useAuth } from '@/hooks/use-auth';
 
 type Category = {
     id: string;
@@ -27,30 +28,49 @@ const emptyCategory: Omit<Category, 'id'> = {
 
 export default function ExpenseCategoriesPage() {
     const { toast } = useToast();
+    const { user, loading: authLoading } = useAuth();
     const [categories, setCategories] = useState<Category[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isSheetOpen, setIsSheetOpen] = useState(false);
     const [currentCategory, setCurrentCategory] = useState<Omit<Category, 'id'> | Category>(emptyCategory);
 
     useEffect(() => {
-        setIsLoading(true);
+        if(authLoading) {
+            setIsLoading(true);
+            return;
+        }
+
+        const fetchInitialData = async () => {
+             try {
+                const categoriesQuery = query(collection(db, "expenseCategories"), orderBy("name"));
+                const categoriesSnapshot = await getDocs(categoriesQuery);
+                setCategories(categoriesSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Category)));
+             } catch (error) {
+                console.error("Error fetching initial categories: ", error);
+                toast({ title: "Erro", description: "Não foi possível carregar as categorias.", variant: "destructive" });
+             } finally {
+                setIsLoading(false);
+             }
+        }
+
+        fetchInitialData();
+
         const q = query(collection(db, "expenseCategories"), orderBy("name"));
         const unsubscribe = onSnapshot(q, (querySnapshot) => {
             const categoriesData: Category[] = querySnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Category));
             setCategories(categoriesData);
-            setIsLoading(false);
+            if(isLoading) setIsLoading(false);
         }, (error) => {
             console.error("Error fetching categories: ", error);
             toast({
                 title: "Erro",
-                description: "Não foi possível carregar as categorias.",
+                description: "Não foi possível carregar as categorias em tempo real.",
                 variant: "destructive",
             });
-            setIsLoading(false);
         });
 
         return () => unsubscribe();
-    }, [toast]);
+    }, [authLoading, toast]);
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const { id, value } = e.target;
@@ -213,3 +233,5 @@ export default function ExpenseCategoriesPage() {
         </div>
     );
 }
+
+    

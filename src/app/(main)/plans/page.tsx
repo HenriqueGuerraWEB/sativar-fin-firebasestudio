@@ -14,10 +14,12 @@ import { Textarea } from '@/components/ui/textarea';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/firebase';
-import { collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc, query } from "firebase/firestore";
+import { collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc, query, getDocs } from "firebase/firestore";
 import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
+import { useAuth } from '@/hooks/use-auth';
+
 
 type Plan = {
     id: string;
@@ -40,30 +42,49 @@ const emptyPlan: Omit<Plan, 'id'> = {
 
 export default function PlansPage() {
     const { toast } = useToast();
+    const { user, loading: authLoading } = useAuth();
     const [plans, setPlans] = useState<Plan[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isSheetOpen, setIsSheetOpen] = useState(false);
     const [currentPlan, setCurrentPlan] = useState<Omit<Plan, 'id'> | Plan>(emptyPlan);
 
     useEffect(() => {
-        setIsLoading(true);
+        if(authLoading) {
+            setIsLoading(true);
+            return;
+        }
+
+        const fetchInitialData = async () => {
+             try {
+                const plansQuery = query(collection(db, "plans"));
+                const plansSnapshot = await getDocs(plansQuery);
+                setPlans(plansSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Plan)));
+             } catch (error) {
+                console.error("Error fetching initial plans: ", error);
+                toast({ title: "Erro", description: "Não foi possível carregar os planos.", variant: "destructive" });
+             } finally {
+                setIsLoading(false);
+             }
+        }
+
+        fetchInitialData();
+        
         const q = query(collection(db, "plans"));
         const unsubscribe = onSnapshot(q, (querySnapshot) => {
             const plansData: Plan[] = querySnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Plan));
             setPlans(plansData);
-            setIsLoading(false);
+            if(isLoading) setIsLoading(false);
         }, (error) => {
             console.error("Error fetching plans: ", error);
             toast({
                 title: "Erro",
-                description: "Não foi possível carregar os planos.",
+                description: "Não foi possível carregar os planos em tempo real.",
                 variant: "destructive",
             });
-            setIsLoading(false);
         });
 
         return () => unsubscribe();
-    }, [toast]);
+    }, [authLoading, toast]);
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
         const { id, value } = e.target;
@@ -319,3 +340,5 @@ export default function PlansPage() {
         </div>
     );
 }
+
+    

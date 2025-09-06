@@ -25,7 +25,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
-
+import { useAuth } from '@/hooks/use-auth';
 
 type Plan = {
     id: string;
@@ -87,6 +87,7 @@ type GroupedInvoices = {
 
 export default function InvoicesPage() {
     const { toast } = useToast();
+    const { user, loading: authLoading } = useAuth();
     const [invoices, setInvoices] = useState<Invoice[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isGenerating, setIsGenerating] = useState(false);
@@ -106,45 +107,62 @@ export default function InvoicesPage() {
     });
     
     useEffect(() => {
-        setIsLoading(true);
+        if(authLoading) {
+            setIsLoading(true);
+            return;
+        }
+
         const q = query(collection(db, "invoices"), orderBy("issueDate", "desc"));
-        const unsubscribe = onSnapshot(q, (querySnapshot) => {
-            const invoicesData: Invoice[] = querySnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Invoice));
-            
-            const today = startOfDay(new Date());
-            const updatePromises: Promise<void>[] = [];
-
-            const updatedInvoices = invoicesData.map(invoice => {
-                if (!invoice.dueDate) return invoice; // Skip if dueDate is missing
-                const dueDate = invoice.dueDate.toDate();
-                if (invoice.status === 'Pendente' && isBefore(dueDate, today)) {
-                    const invoiceRef = doc(db, "invoices", invoice.id);
-                    updatePromises.push(updateDoc(invoiceRef, { status: 'Vencida' }));
-                    return {...invoice, status: 'Vencida'};
-                }
-                return invoice;
-            });
-            
-            if (updatePromises.length > 0) {
-                Promise.all(updatePromises).then(() => {
-                     // The state will be updated by the new data from the snapshot listener automatically
-                });
+        
+        const fetchInitialData = async () => {
+            try {
+                const querySnapshot = await getDocs(q);
+                const invoicesData = processInvoices(querySnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Invoice)));
+                setInvoices(invoicesData);
+            } catch (error) {
+                console.error("Error fetching invoices: ", error);
+                toast({ title: "Erro", description: "Não foi possível carregar as faturas.", variant: "destructive" });
+            } finally {
+                setIsLoading(false);
             }
+        };
 
-            setInvoices(updatedInvoices);
-            setIsLoading(false);
+        fetchInitialData();
+
+        const unsubscribe = onSnapshot(q, (querySnapshot) => {
+            const invoicesData = processInvoices(querySnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Invoice)));
+            setInvoices(invoicesData);
+            if(isLoading) setIsLoading(false);
         }, (error) => {
             console.error("Error fetching invoices: ", error);
-            toast({
-                title: "Erro",
-                description: "Não foi possível carregar as faturas.",
-                variant: "destructive",
-            });
-            setIsLoading(false);
         });
 
         return () => unsubscribe();
-    }, [toast]);
+    }, [authLoading, toast]);
+
+    const processInvoices = (invoicesData: Invoice[]) => {
+        const today = startOfDay(new Date());
+        const batch = writeBatch(db);
+        let hasUpdates = false;
+
+        const updatedInvoices = invoicesData.map(invoice => {
+            if (!invoice.dueDate) return invoice;
+            const dueDate = invoice.dueDate.toDate();
+            if (invoice.status === 'Pendente' && isBefore(dueDate, today)) {
+                const invoiceRef = doc(db, "invoices", invoice.id);
+                batch.update(invoiceRef, { status: 'Vencida' });
+                hasUpdates = true;
+                return {...invoice, status: 'Vencida' as const};
+            }
+            return invoice;
+        });
+        
+        if (hasUpdates) {
+            batch.commit().catch(err => console.error("Failed to batch update invoice statuses", err));
+        }
+
+        return updatedInvoices;
+    }
     
     const groupedInvoices = useMemo(() => {
         return invoices.reduce((acc, invoice) => {
@@ -616,9 +634,12 @@ export default function InvoicesPage() {
                     {isLoading ? (
                         <div className="space-y-4">
                             {Array.from({ length: 3 }).map((_, i) => (
-                                <div key={i}>
-                                    <Skeleton className="h-8 w-1/3 mb-2" />
-                                    <Skeleton className="h-12 w-full" />
+                                <div key={i} className="p-4 border rounded-lg">
+                                    <Skeleton className="h-7 w-1/3 mb-4" />
+                                    <div className="space-y-2">
+                                       <Skeleton className="h-10 w-full" />
+                                       <Skeleton className="h-10 w-full" />
+                                    </div>
                                 </div>
                             ))}
                         </div>
@@ -836,3 +857,5 @@ export default function InvoicesPage() {
         </div>
     );
 }
+
+    

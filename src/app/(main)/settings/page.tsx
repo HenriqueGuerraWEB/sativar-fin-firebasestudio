@@ -8,11 +8,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/firebase';
-import { doc, onSnapshot, setDoc } from "firebase/firestore";
+import { doc, onSnapshot, setDoc, getDoc } from "firebase/firestore";
 import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
 import Image from 'next/image';
 import { X } from 'lucide-react';
+import { useAuth } from '@/hooks/use-auth';
+
 
 type CompanySettings = {
     name: string;
@@ -38,27 +40,46 @@ const emptySettings: CompanySettings = {
 
 export default function SettingsPage() {
     const { toast } = useToast();
+    const { user, loading: authLoading } = useAuth();
     const [settings, setSettings] = useState<CompanySettings>(emptySettings);
     const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
 
     useEffect(() => {
-        setIsLoading(true);
+        if(authLoading) {
+            setIsLoading(true);
+            return;
+        }
+
         const settingsRef = doc(db, "settings", "company");
+        
+        const fetchInitialData = async () => {
+            try {
+                const docSnap = await getDoc(settingsRef);
+                 if (docSnap.exists()) {
+                    setSettings(docSnap.data() as CompanySettings);
+                }
+            } catch (error) {
+                 console.error("Error fetching settings:", error);
+                 toast({ title: "Erro", description: "Não foi possível carregar as configurações.", variant: "destructive" });
+            } finally {
+                setIsLoading(false);
+            }
+        }
+
+        fetchInitialData();
+
         const unsubscribe = onSnapshot(settingsRef, (docSnap) => {
             if (docSnap.exists()) {
                 setSettings(docSnap.data() as CompanySettings);
-            } else {
-                console.log("No company settings found, using empty defaults.");
             }
-            setIsLoading(false);
+            if (isLoading) setIsLoading(false);
         }, (error) => {
-            console.error("Error fetching settings:", error);
-            toast({ title: "Erro", description: "Não foi possível carregar as configurações.", variant: "destructive" });
-            setIsLoading(false);
+            console.error("Error setting up settings listener:", error);
         });
+
         return () => unsubscribe();
-    }, [toast]);
+    }, [authLoading, toast]);
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
         const { id, value } = e.target;
@@ -204,3 +225,5 @@ export default function SettingsPage() {
         </div>
     );
 }
+
+    

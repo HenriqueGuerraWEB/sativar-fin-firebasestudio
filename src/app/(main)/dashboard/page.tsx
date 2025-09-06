@@ -49,10 +49,12 @@ export default function DashboardPage() {
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
-        if (authLoading) return; // Don't fetch data until authentication state is resolved
+        if (authLoading) {
+            setIsLoading(true);
+            return;
+        };
 
         const fetchData = async () => {
-            setIsLoading(true);
             try {
                 const clientsQuery = query(collection(db, "clients"));
                 const invoicesQuery = query(collection(db, "invoices"));
@@ -298,35 +300,39 @@ export default function DashboardPage() {
             <CardDescription>Faturas vencendo hoje e vencidas.</CardDescription>
           </CardHeader>
           <CardContent>
-            <Table>
-                <TableHeader>
-                    <TableRow>
-                        <TableHead>Cliente</TableHead>
-                        <TableHead>Vencimento</TableHead>
-                        <TableHead className="text-right">Valor</TableHead>
-                    </TableRow>
-                </TableHeader>
-                <TableBody>
-                    {isLoading ? Array.from({ length: 4 }).map((_, i) => (
-                        <TableRow key={i}>
-                            <TableCell><Skeleton className="h-5 w-24" /></TableCell>
-                            <TableCell><Skeleton className="h-5 w-20" /></TableCell>
-                            <TableCell className="text-right"><Skeleton className="h-5 w-16 ml-auto" /></TableCell>
+            <div className="overflow-x-auto">
+                <Table>
+                    <TableHeader>
+                        <TableRow>
+                            <TableHead>Cliente</TableHead>
+                            <TableHead>Vencimento</TableHead>
+                            <TableHead className="text-right">Valor</TableHead>
                         </TableRow>
-                    )) : importantNotices.map((invoice) => (
-                        <TableRow key={invoice.id}>
-                            <TableCell className="font-medium">{invoice.clientName}</TableCell>
-                            <TableCell>
-                                <Badge variant={invoice.status === 'Vencida' ? 'destructive' : 'secondary'}>{invoice.friendlyDueDate}</Badge>
-                            </TableCell>
-                            <TableCell className="text-right">{invoice.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</TableCell>
-                        </TableRow>
-                    ))}
-                </TableBody>
-            </Table>
+                    </TableHeader>
+                    <TableBody>
+                        {isLoading ? Array.from({ length: 4 }).map((_, i) => (
+                            <TableRow key={i}>
+                                <TableCell><Skeleton className="h-5 w-24" /></TableCell>
+                                <TableCell><Skeleton className="h-5 w-20" /></TableCell>
+                                <TableCell className="text-right"><Skeleton className="h-5 w-16 ml-auto" /></TableCell>
+                            </TableRow>
+                        )) : importantNotices.map((invoice) => (
+                            <TableRow key={invoice.id}>
+                                <TableCell className="font-medium">{invoice.clientName}</TableCell>
+                                <TableCell>
+                                    <Badge variant={invoice.status === 'Vencida' ? 'destructive' : 'secondary'}>{invoice.friendlyDueDate}</Badge>
+                                </TableCell>
+                                <TableCell className="text-right">{invoice.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</TableCell>
+                            </TableRow>
+                        ))}
+                    </TableBody>
+                </Table>
+            </div>
           </CardContent>
         </Card>
       </div>
     </div>
   );
 }
+
+    
