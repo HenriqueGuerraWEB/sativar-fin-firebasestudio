@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -14,8 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { db } from '@/lib/firebase';
-import { collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc, query, Timestamp, orderBy, getDocs } from "firebase/firestore";
+import { Timestamp } from "firebase/firestore";
 import { Skeleton } from '@/components/ui/skeleton';
 import { format, startOfDay, endOfDay, startOfMonth, endOfMonth, startOfYear, endOfYear, eachDayOfInterval, eachMonthOfInterval, getMonth, getYear, subYears, subMonths } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -26,6 +25,25 @@ import { cn } from '@/lib/utils';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 
+const EXPENSES_STORAGE_KEY = 'sativar-expenses';
+const INVOICES_STORAGE_KEY = 'sativar-invoices';
+const CATEGORIES_STORAGE_KEY = 'sativar-expenseCategories';
+
+
+// Helper to handle Timestamp serialization in JSON
+const replacer = (key: any, value: any) => {
+    if (value instanceof Timestamp) {
+        return { __type: 'Timestamp', value: { seconds: value.seconds, nanoseconds: value.nanoseconds } };
+    }
+    return value;
+};
+
+const reviver = (key: any, value: any) => {
+    if (value && value.__type === 'Timestamp') {
+        return new Timestamp(value.value.seconds, value.value.nanoseconds);
+    }
+    return value;
+};
 
 type ExpenseCategory = {
     id: string;
@@ -88,57 +106,40 @@ export default function FinancePage() {
     // State for cash flow date range
     const [currentDate, setCurrentDate] = useState(new Date());
     const [cashFlowView, setCashFlowView] = useState<'daily' | 'monthly' | 'yearly'>('monthly');
+    
+    const getDataFromStorage = useCallback((key: string, reviverFn: (key: any, value: any) => any) => {
+        try {
+            const storedData = localStorage.getItem(key);
+            return storedData ? JSON.parse(storedData, reviverFn) : [];
+        } catch (error) {
+            console.error(`Error reading ${key} from localStorage:`, error);
+            toast({ title: "Erro", description: "Não foi possível ler os dados do armazenamento local.", variant: "destructive" });
+            return [];
+        }
+    }, [toast]);
+
+    const setDataToStorage = useCallback((key: string, data: any, replacerFn: (key: any, value: any) => any) => {
+         try {
+            localStorage.setItem(key, JSON.stringify(data, replacerFn));
+        } catch (error) {
+             console.error(`Error writing ${key} to localStorage:`, error);
+            toast({ title: "Erro", description: "Não foi possível salvar os dados no armazenamento local.", variant: "destructive" });
+        }
+    }, [toast])
+
 
     useEffect(() => {
-        const fetchInitialData = async () => {
-            setIsLoading(true);
-            try {
-                const expenseQuery = query(collection(db, "expenses"), orderBy("dueDate", "desc"));
-                const invoiceQuery = query(collection(db, "invoices"), orderBy("dueDate", "desc"));
-                const categoryQuery = query(collection(db, "expenseCategories"), orderBy("name"));
-
-                const [expenseSnapshot, invoiceSnapshot, categorySnapshot] = await Promise.all([
-                    getDocs(expenseQuery),
-                    getDocs(invoiceQuery),
-                    getDocs(categoryQuery)
-                ]);
-
-                setExpenses(expenseSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Expense)));
-                setInvoices(invoiceSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Invoice)));
-                setCategories(categorySnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as ExpenseCategory)));
-
-            } catch (error) {
-                console.error("Error fetching initial data:", error);
-                toast({ title: "Erro", description: "Não foi possível carregar os dados financeiros.", variant: "destructive" });
-            } finally {
-                setIsLoading(false);
-            }
-        };
-
-        fetchInitialData();
-
-        const expenseQuery = query(collection(db, "expenses"), orderBy("dueDate", "desc"));
-        const invoiceQuery = query(collection(db, "invoices"), orderBy("dueDate", "desc"));
-        const categoryQuery = query(collection(db, "expenseCategories"), orderBy("name"));
-
-        const unsubExpenses = onSnapshot(expenseQuery, (snapshot) => {
-            setExpenses(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Expense)));
-        });
-
-        const unsubInvoices = onSnapshot(invoiceQuery, (snapshot) => {
-            setInvoices(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Invoice)));
-        });
+        setIsLoading(true);
+        const storedExpenses = getDataFromStorage(EXPENSES_STORAGE_KEY, reviver);
+        const storedInvoices = getDataFromStorage(INVOICES_STORAGE_KEY, reviver);
+        const storedCategories = getDataFromStorage(CATEGORIES_STORAGE_KEY, reviver);
         
-        const unsubCategories = onSnapshot(categoryQuery, (snapshot) => {
-            setCategories(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as ExpenseCategory)));
-        });
-
-        return () => {
-            unsubExpenses();
-            unsubInvoices();
-            unsubCategories();
-        };
-    }, [toast]);
+        setExpenses(storedExpenses.sort((a: Expense, b: Expense) => b.dueDate.toMillis() - a.dueDate.toMillis()));
+        setInvoices(storedInvoices.sort((a: Invoice, b: Invoice) => b.dueDate.toMillis() - a.dueDate.toMillis()));
+        setCategories(storedCategories.sort((a: ExpenseCategory, b: ExpenseCategory) => a.name.localeCompare(b.name)));
+        
+        setIsLoading(false);
+    }, [getDataFromStorage]);
     
     const cashFlowReport = useMemo(() => {
         let start, end;
@@ -239,43 +240,33 @@ export default function FinancePage() {
             return;
         }
 
-        try {
-            await addDoc(collection(db, "expenses"), {
-                ...currentExpense,
-                status: "Pendente",
-            });
-            toast({ title: "Sucesso", description: "Despesa adicionada com sucesso." });
-            setIsSheetOpen(false);
-            setCurrentExpense(emptyExpense);
-        } catch (error) {
-            console.error("Error saving expense:", error);
-            toast({ title: "Erro", description: "Não foi possível salvar a despesa.", variant: "destructive" });
-        }
+        const newExpense: Expense = {
+            ...currentExpense,
+            id: crypto.randomUUID(),
+            status: "Pendente",
+        };
+
+        const updatedExpenses = [...expenses, newExpense].sort((a: Expense, b: Expense) => b.dueDate.toMillis() - a.dueDate.toMillis());
+        setDataToStorage(EXPENSES_STORAGE_KEY, updatedExpenses, replacer);
+        setExpenses(updatedExpenses);
+
+        toast({ title: "Sucesso", description: "Despesa adicionada com sucesso." });
+        setIsSheetOpen(false);
+        setCurrentExpense(emptyExpense);
     };
     
     const handleUpdateExpenseStatus = async (expenseId: string, status: Expense['status']) => {
-        try {
-            const expenseRef = doc(db, "expenses", expenseId);
-            await updateDoc(expenseRef, { status });
-            toast({ title: "Sucesso", description: `Despesa marcada como ${status}.`});
-        } catch (error) {
-            console.error("Error updating expense status: ", error);
-            toast({ title: "Erro", description: "Não foi possível atualizar o status da despesa.", variant: "destructive" });
-        }
+        const updatedExpenses = expenses.map(exp => exp.id === expenseId ? { ...exp, status } : exp);
+        setDataToStorage(EXPENSES_STORAGE_KEY, updatedExpenses, replacer);
+        setExpenses(updatedExpenses);
+        toast({ title: "Sucesso", description: `Despesa marcada como ${status}.`});
     };
 
     const handleDeleteExpense = async (expenseId: string) => {
-        try {
-            await deleteDoc(doc(db, "expenses", expenseId));
-            toast({ title: "Sucesso", description: "Despesa excluída com sucesso." });
-        } catch (error) {
-            console.error("Error deleting expense: ", error);
-            toast({
-                title: "Erro",
-                description: "Não foi possível excluir a despesa.",
-                variant: "destructive",
-            });
-        }
+        const updatedExpenses = expenses.filter(exp => exp.id !== expenseId);
+        setDataToStorage(EXPENSES_STORAGE_KEY, updatedExpenses, replacer);
+        setExpenses(updatedExpenses);
+        toast({ title: "Sucesso", description: "Despesa excluída com sucesso." });
     };
 
     const handleSaveNewCategory = async () => {
@@ -283,17 +274,16 @@ export default function FinancePage() {
             toast({ title: "Erro", description: "O nome da categoria não pode estar vazio.", variant: "destructive" });
             return;
         }
-        try {
-            const newCategory = { name: newCategoryName };
-            await addDoc(collection(db, "expenseCategories"), newCategory);
-            toast({ title: "Sucesso!", description: `Categoria "${newCategoryName}" adicionada.` });
-            setCurrentExpense(prev => ({ ...prev, category: newCategoryName }));
-            setNewCategoryName("");
-            setIsCategoryDialogOpen(false);
-        } catch (error) {
-            console.error("Error saving new category: ", error);
-            toast({ title: "Erro", description: "Não foi possível salvar a nova categoria.", variant: "destructive" });
-        }
+       
+        const newCategory: ExpenseCategory = { name: newCategoryName, id: crypto.randomUUID() };
+        const updatedCategories = [...categories, newCategory].sort((a,b) => a.name.localeCompare(b.name));
+        setDataToStorage(CATEGORIES_STORAGE_KEY, updatedCategories, replacer);
+        setCategories(updatedCategories);
+
+        toast({ title: "Sucesso!", description: `Categoria "${newCategoryName}" adicionada.` });
+        setCurrentExpense(prev => ({ ...prev, category: newCategoryName }));
+        setNewCategoryName("");
+        setIsCategoryDialogOpen(false);
     };
     
     const handleAnalyze = () => {
@@ -703,3 +693,6 @@ export default function FinancePage() {
         </div>
     );
 }
+
+
+    

@@ -1,20 +1,18 @@
 
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from '@/hooks/use-toast';
-import { db } from '@/lib/firebase';
-import { doc, onSnapshot, setDoc, getDoc } from "firebase/firestore";
 import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
 import Image from 'next/image';
 import { X } from 'lucide-react';
-import { useAuth } from '@/hooks/use-auth';
 
+const SETTINGS_STORAGE_KEY = 'sativar-settings';
 
 type CompanySettings = {
     name: string;
@@ -40,46 +38,41 @@ const emptySettings: CompanySettings = {
 
 export default function SettingsPage() {
     const { toast } = useToast();
-    const { user, loading: authLoading } = useAuth();
     const [settings, setSettings] = useState<CompanySettings>(emptySettings);
     const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
 
+    const getSettingsFromStorage = useCallback(() => {
+        try {
+            const storedSettings = localStorage.getItem(SETTINGS_STORAGE_KEY);
+            // It's an object, not an array
+            if (storedSettings) {
+                const parsed = JSON.parse(storedSettings);
+                // Merge with empty settings to ensure all keys are present
+                return { ...emptySettings, ...parsed };
+            }
+            return emptySettings;
+        } catch (error) {
+            console.error("Error reading settings from localStorage:", error);
+            return emptySettings;
+        }
+    }, []);
+
+    const setSettingsToStorage = useCallback((newSettings: CompanySettings) => {
+        try {
+            localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(newSettings));
+        } catch (error) {
+            console.error("Error writing settings to localStorage:", error);
+            toast({ title: "Erro", description: "Não foi possível salvar as configurações.", variant: "destructive" });
+        }
+    }, [toast]);
+
+
     useEffect(() => {
-        if(authLoading) {
-            setIsLoading(true);
-            return;
-        }
-
-        const settingsRef = doc(db, "settings", "company");
-        
-        const fetchInitialData = async () => {
-            try {
-                const docSnap = await getDoc(settingsRef);
-                 if (docSnap.exists()) {
-                    setSettings(docSnap.data() as CompanySettings);
-                }
-            } catch (error) {
-                 console.error("Error fetching settings:", error);
-                 toast({ title: "Erro", description: "Não foi possível carregar as configurações.", variant: "destructive" });
-            } finally {
-                setIsLoading(false);
-            }
-        }
-
-        fetchInitialData();
-
-        const unsubscribe = onSnapshot(settingsRef, (docSnap) => {
-            if (docSnap.exists()) {
-                setSettings(docSnap.data() as CompanySettings);
-            }
-            if (isLoading) setIsLoading(false);
-        }, (error) => {
-            console.error("Error setting up settings listener:", error);
-        });
-
-        return () => unsubscribe();
-    }, [authLoading, toast]);
+        setIsLoading(true);
+        setSettings(getSettingsFromStorage());
+        setIsLoading(false);
+    }, [getSettingsFromStorage]);
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
         const { id, value } = e.target;
@@ -107,16 +100,9 @@ export default function SettingsPage() {
 
     const handleSaveSettings = async () => {
         setIsSaving(true);
-        try {
-            const settingsRef = doc(db, "settings", "company");
-            await setDoc(settingsRef, settings, { merge: true });
-            toast({ title: "Sucesso!", description: "Configurações salvas com sucesso." });
-        } catch (error) {
-            console.error("Error saving settings: ", error);
-            toast({ title: "Erro", description: "Não foi possível salvar as configurações.", variant: "destructive" });
-        } finally {
-            setIsSaving(false);
-        }
+        setSettingsToStorage(settings);
+        setIsSaving(false);
+        toast({ title: "Sucesso!", description: "Configurações salvas com sucesso." });
     };
 
     return (
@@ -225,5 +211,7 @@ export default function SettingsPage() {
         </div>
     );
 }
+
+    
 
     

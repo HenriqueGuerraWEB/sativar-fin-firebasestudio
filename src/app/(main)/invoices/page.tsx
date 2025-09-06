@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -10,8 +10,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
 import { MoreHorizontal, PlusCircle, Printer, Calendar as CalendarIcon, ChevronDown, Shapes, Trash2 } from "lucide-react";
 import type { VariantProps } from 'class-variance-authority';
 import { useToast } from '@/hooks/use-toast';
-import { db } from '@/lib/firebase';
-import { collection, onSnapshot, query, Timestamp, orderBy, addDoc, doc, updateDoc, getDocs, where, deleteDoc, getDoc, writeBatch } from "firebase/firestore";
+import { Timestamp } from "firebase/firestore";
 import { Skeleton } from '@/components/ui/skeleton';
 import { format, addDays, addMonths, addYears, isBefore, startOfDay, subDays, subMonths, subYears, isEqual } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -25,7 +24,27 @@ import { Calendar } from '@/components/ui/calendar';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
-import { useAuth } from '@/hooks/use-auth';
+
+const CLIENTS_STORAGE_KEY = 'sativar-clients';
+const PLANS_STORAGE_KEY = 'sativar-plans';
+const INVOICES_STORAGE_KEY = 'sativar-invoices';
+const SETTINGS_STORAGE_KEY = 'sativar-settings';
+
+// Helper to handle Timestamp serialization in JSON
+const replacer = (key: any, value: any) => {
+    if (value instanceof Timestamp) {
+        return { __type: 'Timestamp', value: { seconds: value.seconds, nanoseconds: value.nanoseconds } };
+    }
+    return value;
+};
+
+const reviver = (key: any, value: any) => {
+    if (value && value.__type === 'Timestamp') {
+        return new Timestamp(value.value.seconds, value.value.nanoseconds);
+    }
+    return value;
+};
+
 
 type Plan = {
     id: string;
@@ -87,7 +106,6 @@ type GroupedInvoices = {
 
 export default function InvoicesPage() {
     const { toast } = useToast();
-    const { user, loading: authLoading } = useAuth();
     const [invoices, setInvoices] = useState<Invoice[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isGenerating, setIsGenerating] = useState(false);
@@ -105,52 +123,35 @@ export default function InvoicesPage() {
         paymentMethod: undefined,
         paymentNotes: '',
     });
-    
-    useEffect(() => {
-        if(authLoading) {
-            setIsLoading(true);
-            return;
+
+    const getDataFromStorage = useCallback((key: string) => {
+        try {
+            const storedData = localStorage.getItem(key);
+            return storedData ? JSON.parse(storedData, reviver) : [];
+        } catch (error) {
+            console.error(`Error reading ${key} from localStorage:`, error);
+            toast({ title: "Erro", description: `Não foi possível ler os dados de ${key}.`, variant: "destructive" });
+            return [];
         }
+    }, [toast]);
 
-        const q = query(collection(db, "invoices"), orderBy("issueDate", "desc"));
-        
-        const fetchInitialData = async () => {
-            try {
-                const querySnapshot = await getDocs(q);
-                const invoicesData = processInvoices(querySnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Invoice)));
-                setInvoices(invoicesData);
-            } catch (error) {
-                console.error("Error fetching invoices: ", error);
-                toast({ title: "Erro", description: "Não foi possível carregar as faturas.", variant: "destructive" });
-            } finally {
-                setIsLoading(false);
-            }
-        };
-
-        fetchInitialData();
-
-        const unsubscribe = onSnapshot(q, (querySnapshot) => {
-            const invoicesData = processInvoices(querySnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Invoice)));
-            setInvoices(invoicesData);
-            if(isLoading) setIsLoading(false);
-        }, (error) => {
-            console.error("Error fetching invoices: ", error);
-        });
-
-        return () => unsubscribe();
-    }, [authLoading, toast]);
-
-    const processInvoices = (invoicesData: Invoice[]) => {
+    const setDataToStorage = useCallback((key: string, data: any) => {
+         try {
+            localStorage.setItem(key, JSON.stringify(data, replacer));
+        } catch (error) {
+             console.error(`Error writing ${key} to localStorage:`, error);
+            toast({ title: "Erro", description: `Não foi possível salvar os dados em ${key}.`, variant: "destructive" });
+        }
+    }, [toast]);
+    
+    const processInvoices = useCallback((invoicesData: Invoice[]) => {
         const today = startOfDay(new Date());
-        const batch = writeBatch(db);
         let hasUpdates = false;
 
         const updatedInvoices = invoicesData.map(invoice => {
             if (!invoice.dueDate) return invoice;
             const dueDate = invoice.dueDate.toDate();
             if (invoice.status === 'Pendente' && isBefore(dueDate, today)) {
-                const invoiceRef = doc(db, "invoices", invoice.id);
-                batch.update(invoiceRef, { status: 'Vencida' });
                 hasUpdates = true;
                 return {...invoice, status: 'Vencida' as const};
             }
@@ -158,11 +159,29 @@ export default function InvoicesPage() {
         });
         
         if (hasUpdates) {
-            batch.commit().catch(err => console.error("Failed to batch update invoice statuses", err));
+           setDataToStorage(INVOICES_STORAGE_KEY, updatedInvoices);
         }
 
-        return updatedInvoices;
-    }
+        return updatedInvoices.sort((a,b) => b.issueDate.toMillis() - a.issueDate.toMillis());
+    }, [setDataToStorage]);
+    
+    useEffect(() => {
+        setIsLoading(true);
+        const storedInvoices = getDataFromStorage(INVOICES_STORAGE_KEY);
+        const processed = processInvoices(storedInvoices);
+        setInvoices(processed);
+        setIsLoading(false);
+
+        // Simple listener for storage changes from other tabs
+        const handleStorageChange = () => {
+             const storedInvoices = getDataFromStorage(INVOICES_STORAGE_KEY);
+             const processed = processInvoices(storedInvoices);
+             setInvoices(processed);
+        }
+        window.addEventListener('storage', handleStorageChange);
+        return () => window.removeEventListener('storage', handleStorageChange);
+
+    }, [getDataFromStorage, processInvoices]);
     
     const groupedInvoices = useMemo(() => {
         return invoices.reduce((acc, invoice) => {
@@ -182,11 +201,8 @@ export default function InvoicesPage() {
     const handleGenerateInvoices = async () => {
         setIsGenerating(true);
         try {
-            const clientsQuery = query(collection(db, "clients"), where("status", "==", "Ativo"));
-            const clientsSnapshot = await getDocs(clientsQuery);
-            const activeClients = clientsSnapshot.docs
-                .map(doc => ({ ...doc.data(), id: doc.id } as Client))
-                .filter(client => client.plans && client.plans.length > 0);
+            const allClients: Client[] = getDataFromStorage(CLIENTS_STORAGE_KEY);
+            const activeClients = allClients.filter(client => client.status === "Ativo" && client.plans && client.plans.length > 0);
 
             if (activeClients.length === 0) {
                 toast({ title: "Nenhuma ação necessária", description: "Não há clientes ativos com planos para gerar faturas." });
@@ -194,17 +210,14 @@ export default function InvoicesPage() {
                 return;
             }
 
-            const plansSnapshot = await getDocs(query(collection(db, "plans")));
-            const plansMap = plansSnapshot.docs.reduce((acc, doc) => {
-                acc[doc.id] = { ...doc.data(), id: doc.id } as Plan;
+            const allPlans: Plan[] = getDataFromStorage(PLANS_STORAGE_KEY);
+            const plansMap = allPlans.reduce((acc, plan) => {
+                acc[plan.id] = plan;
                 return acc;
             }, {} as Record<string, Plan>);
 
-            const invoicesSnapshot = await getDocs(query(collection(db, "invoices")));
-            const allInvoices = invoicesSnapshot.docs.map(doc => doc.data() as Invoice);
-
-            const batch = writeBatch(db);
-            let generatedCount = 0;
+            const allInvoices: Invoice[] = getDataFromStorage(INVOICES_STORAGE_KEY);
+            let newInvoices: Invoice[] = [];
             const today = startOfDay(new Date());
 
             for (const client of activeClients) {
@@ -214,11 +227,10 @@ export default function InvoicesPage() {
 
                     const clientPlanInvoices = allInvoices.filter(inv => inv.clientId === client.id && inv.planId === clientPlan.planId);
 
-                    // Handle one-time plans
                     if (plan.type === 'one-time') {
                         if (clientPlanInvoices.length === 0) {
-                            const newInvoiceRef = doc(collection(db, "invoices"));
-                            batch.set(newInvoiceRef, {
+                             newInvoices.push({
+                                id: crypto.randomUUID(),
                                 clientId: client.id,
                                 clientName: client.name,
                                 amount: plan.price,
@@ -228,23 +240,20 @@ export default function InvoicesPage() {
                                 planId: clientPlan.planId,
                                 planName: plan.name,
                             });
-                            generatedCount++;
                         }
                         continue;
                     }
                     
-                    // Handle recurring plans
                     if (plan.type === 'recurring' && plan.recurrencePeriod && plan.recurrenceValue) {
                         
                         let lastBilledDueDate = clientPlanInvoices.length > 0
                             ? clientPlanInvoices.sort((a, b) => b.dueDate.toMillis() - a.dueDate.toMillis())[0].dueDate.toDate()
                             : subDays(clientPlan.planActivationDate.toDate(), 1);
 
-                        // Ensure activation date itself is considered for billing if it's in the past and no invoice exists
                         const activationDate = clientPlan.planActivationDate.toDate();
                         if ((isBefore(activationDate, today) || isEqual(startOfDay(activationDate), today)) && clientPlanInvoices.length === 0) {
-                           const newInvoiceRef = doc(collection(db, "invoices"));
-                           batch.set(newInvoiceRef, {
+                           newInvoices.push({
+                                id: crypto.randomUUID(),
                                 clientId: client.id,
                                 clientName: client.name,
                                 amount: plan.price,
@@ -254,10 +263,8 @@ export default function InvoicesPage() {
                                 planId: clientPlan.planId,
                                 planName: plan.name,
                             });
-                            generatedCount++;
                             lastBilledDueDate = activationDate;
                         }
-
 
                         while (true) {
                             let nextDueDate: Date;
@@ -272,8 +279,8 @@ export default function InvoicesPage() {
                                 break;
                             }
                             
-                            const newInvoiceRef = doc(collection(db, "invoices"));
-                            batch.set(newInvoiceRef, {
+                            newInvoices.push({
+                                id: crypto.randomUUID(),
                                 clientId: client.id,
                                 clientName: client.name,
                                 amount: plan.price,
@@ -283,7 +290,6 @@ export default function InvoicesPage() {
                                 planId: clientPlan.planId,
                                 planName: plan.name,
                             });
-                            generatedCount++;
                             lastBilledDueDate = nextDueDate;
                         }
                     }
@@ -291,9 +297,11 @@ export default function InvoicesPage() {
             }
 
 
-            if (generatedCount > 0) {
-                await batch.commit();
-                toast({ title: "Sucesso!", description: `${generatedCount} nova(s) fatura(s) foram geradas.` });
+            if (newInvoices.length > 0) {
+                const updatedInvoices = [...allInvoices, ...newInvoices];
+                setDataToStorage(INVOICES_STORAGE_KEY, updatedInvoices);
+                setInvoices(processInvoices(updatedInvoices));
+                toast({ title: "Sucesso!", description: `${newInvoices.length} nova(s) fatura(s) foram geradas.` });
             } else {
                 toast({ title: "Nenhuma ação necessária", description: "Todos os clientes estão com as faturas em dia." });
             }
@@ -308,19 +316,21 @@ export default function InvoicesPage() {
 
 
     const handleUpdateStatus = async (invoiceId: string, status: 'Pendente' | 'Vencida') => {
-        try {
-            const invoiceRef = doc(db, "invoices", invoiceId);
-            await updateDoc(invoiceRef, { 
-                status,
-                paymentDate: null,
-                paymentMethod: null,
-                paymentNotes: null,
-             });
-            toast({ title: "Sucesso", description: `Fatura marcada como ${status}.`});
-        } catch (error) {
-            console.error("Error updating status: ", error);
-            toast({ title: "Erro", description: "Não foi possível atualizar o status da fatura.", variant: "destructive" });
-        }
+       const updatedInvoices = invoices.map(inv => {
+           if (inv.id === invoiceId) {
+               return {
+                   ...inv,
+                   status,
+                   paymentDate: undefined,
+                   paymentMethod: undefined,
+                   paymentNotes: undefined
+               };
+           }
+           return inv;
+       });
+       setDataToStorage(INVOICES_STORAGE_KEY, updatedInvoices);
+       setInvoices(processInvoices(updatedInvoices));
+       toast({ title: "Sucesso", description: `Fatura marcada como ${status}.`});
     };
     
     const handleOpenPaymentModal = (invoice: Invoice) => {
@@ -339,66 +349,60 @@ export default function InvoicesPage() {
             return;
         }
 
-        try {
-            const invoiceRef = doc(db, "invoices", selectedInvoice.id);
-            await updateDoc(invoiceRef, {
-                status: 'Paga',
-                paymentDate: Timestamp.fromDate(paymentDetails.paymentDate),
-                paymentMethod: paymentDetails.paymentMethod,
-                paymentNotes: paymentDetails.paymentNotes,
-            });
-            toast({ title: "Sucesso", description: `Fatura marcada como Paga.`});
-            setIsPaymentModalOpen(false);
-            setSelectedInvoice(null);
-        } catch (error) {
-             console.error("Error confirming payment: ", error);
-            toast({ title: "Erro", description: "Não foi possível confirmar o pagamento.", variant: "destructive" });
-        }
+        const updatedInvoices = invoices.map(inv => {
+            if (inv.id === selectedInvoice.id) {
+                return {
+                    ...inv,
+                    status: 'Paga' as const,
+                    paymentDate: Timestamp.fromDate(paymentDetails.paymentDate!),
+                    paymentMethod: paymentDetails.paymentMethod,
+                    paymentNotes: paymentDetails.paymentNotes,
+                };
+            }
+            return inv;
+        });
+
+        setDataToStorage(INVOICES_STORAGE_KEY, updatedInvoices);
+        setInvoices(processInvoices(updatedInvoices));
+
+        toast({ title: "Sucesso", description: `Fatura marcada como Paga.`});
+        setIsPaymentModalOpen(false);
+        setSelectedInvoice(null);
     };
 
 
     const handlePrepareReminder = async (invoice: Invoice) => {
-        try {
-            const clientRef = doc(db, 'clients', invoice.clientId);
-            const planRef = doc(db, 'plans', invoice.planId);
-            
-            const [clientDoc, planDoc] = await Promise.all([getDoc(clientRef), getDoc(planRef)]);
+        const allClients: Client[] = getDataFromStorage(CLIENTS_STORAGE_KEY);
+        const client = allClients.find(c => c.id === invoice.clientId);
 
-            if (!clientDoc.exists() || !clientDoc.data().whatsapp) {
-                toast({
-                    title: 'Erro',
-                    description: 'O cliente não possui um número de WhatsApp cadastrado.',
-                    variant: 'destructive',
-                });
-                return;
-            }
-            if (!planDoc.exists()) {
-                toast({ title: 'Erro', description: 'Plano não encontrado para esta fatura.', variant: 'destructive'});
-                return;
-            }
-            
-            const clientData = clientDoc.data() as Client;
-            const planData = planDoc.data() as Plan;
-            setClientForReminder(clientData);
-            setSelectedInvoice(invoice);
-
-            const dueDate = format(invoice.dueDate.toDate(), 'dd/MM/yyyy', { locale: ptBR });
-            const amount = invoice.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-
-            const serviceTypeText = planData.type === 'recurring' ? 'do seu plano' : 'do serviço';
-            const text = `Olá, ${invoice.clientName}!\n\nEste é um lembrete sobre a fatura ${serviceTypeText} pendente.\n\nValor: ${amount}\nVencimento: ${dueDate}\n\nAgradecemos a sua atenção.`.trim();
-            
-            setReminderText(text);
-            setIsReminderModalOpen(true);
-
-        } catch (err) {
-            console.error('Failed to prepare reminder: ', err);
+        if (!client || !client.whatsapp) {
             toast({
                 title: 'Erro',
-                description: 'Não foi possível preparar o lembrete.',
+                description: 'O cliente não foi encontrado ou não possui um número de WhatsApp cadastrado.',
                 variant: 'destructive',
             });
+            return;
         }
+
+        const allPlans: Plan[] = getDataFromStorage(PLANS_STORAGE_KEY);
+        const plan = allPlans.find(p => p.id === invoice.planId);
+        
+        if (!plan) {
+            toast({ title: 'Erro', description: 'Plano não encontrado para esta fatura.', variant: 'destructive'});
+            return;
+        }
+        
+        setClientForReminder(client);
+        setSelectedInvoice(invoice);
+
+        const dueDate = format(invoice.dueDate.toDate(), 'dd/MM/yyyy', { locale: ptBR });
+        const amount = invoice.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+        const serviceTypeText = plan.type === 'recurring' ? 'do seu plano' : 'do serviço';
+        const text = `Olá, ${invoice.clientName}!\n\nEste é um lembrete sobre a fatura ${serviceTypeText} pendente.\n\nValor: ${amount}\nVencimento: ${dueDate}\n\nAgradecemos a sua atenção.`.trim();
+        
+        setReminderText(text);
+        setIsReminderModalOpen(true);
     };
     
     const handleSendWhatsappReminder = () => {
@@ -412,65 +416,47 @@ export default function InvoicesPage() {
     }
 
     const handleDeleteInvoice = async (invoiceId: string) => {
-        try {
-            await deleteDoc(doc(db, "invoices", invoiceId));
-            toast({ title: "Sucesso", description: "Fatura excluída com sucesso." });
-        } catch (error) {
-            console.error("Error deleting invoice: ", error);
-            toast({
-                title: "Erro",
-                description: "Não foi possível excluir a fatura.",
-                variant: "destructive",
-            });
-        }
+        const updatedInvoices = invoices.filter(inv => inv.id !== invoiceId);
+        setDataToStorage(INVOICES_STORAGE_KEY, updatedInvoices);
+        setInvoices(processInvoices(updatedInvoices));
+        toast({ title: "Sucesso", description: "Fatura excluída com sucesso." });
     };
 
     const handleDeleteUnpaidInvoices = async (invoicesToDelete: Invoice[]) => {
-        const unpaidInvoices = invoicesToDelete.filter(inv => inv.status !== 'Paga');
-        if (unpaidInvoices.length === 0) {
+        const unpaidInvoiceIds = invoicesToDelete
+            .filter(inv => inv.status !== 'Paga')
+            .map(inv => inv.id);
+
+        if (unpaidInvoiceIds.length === 0) {
             toast({ title: "Nenhuma ação necessária", description: "Não há faturas pendentes ou vencidas para excluir." });
             return;
         }
 
-        try {
-            const batch = writeBatch(db);
-            unpaidInvoices.forEach(invoice => {
-                const invoiceRef = doc(db, "invoices", invoice.id);
-                batch.delete(invoiceRef);
-            });
-            await batch.commit();
-            toast({ title: "Sucesso!", description: `${unpaidInvoices.length} fatura(s) foram excluídas.`});
-        } catch (error) {
-             console.error("Error deleting unpaid invoices: ", error);
-            toast({ title: "Erro", description: "Não foi possível excluir as faturas.", variant: "destructive" });
-        }
+        const updatedInvoices = invoices.filter(inv => !unpaidInvoiceIds.includes(inv.id));
+        setDataToStorage(INVOICES_STORAGE_KEY, updatedInvoices);
+        setInvoices(processInvoices(updatedInvoices));
+        toast({ title: "Sucesso!", description: `${unpaidInvoiceIds.length} fatura(s) foram excluídas.`});
     }
     
     const handlePrint = async (invoice: Invoice) => {
         try {
-            if (!invoice.clientId || !invoice.planId) {
+             if (!invoice.clientId || !invoice.planId) {
                 toast({ title: 'Erro', description: 'Dados da fatura incompletos para impressão.', variant: 'destructive' });
                 return;
             }
+            
+            const allClients: Client[] = getDataFromStorage(CLIENTS_STORAGE_KEY);
+            const client = allClients.find(c => c.id === invoice.clientId);
+            
+            const allPlans: Plan[] = getDataFromStorage(PLANS_STORAGE_KEY);
+            const plan = allPlans.find(p => p.id === invoice.planId);
+            
+            const company: CompanySettings | null = getDataFromStorage(SETTINGS_STORAGE_KEY);
 
-            const clientRef = doc(db, 'clients', invoice.clientId);
-            const planRef = doc(db, 'plans', invoice.planId);
-            const settingsRef = doc(db, 'settings', 'company');
-
-            const [clientDoc, planDoc, settingsDoc] = await Promise.all([
-                getDoc(clientRef),
-                getDoc(planRef),
-                getDoc(settingsRef)
-            ]);
-
-            if (!clientDoc.exists() || !planDoc.exists()) {
+            if (!client || !plan) {
                 toast({ title: 'Erro', description: 'Não foi possível encontrar os dados do cliente ou do plano.', variant: 'destructive' });
                 return;
             }
-
-            const client = clientDoc.data() as Client;
-            const plan = planDoc.data() as Plan;
-            const company = settingsDoc.exists() ? settingsDoc.data() as CompanySettings : null;
 
             const dueDate = invoice.dueDate.toDate();
             let billingPeriod = format(dueDate, 'dd/MM/yyyy');
@@ -857,5 +843,7 @@ export default function InvoicesPage() {
         </div>
     );
 }
+
+    
 
     

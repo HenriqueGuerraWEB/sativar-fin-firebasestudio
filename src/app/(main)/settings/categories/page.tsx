@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -12,10 +12,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { useToast } from '@/hooks/use-toast';
-import { db } from '@/lib/firebase';
-import { collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc, query, orderBy, getDocs } from "firebase/firestore";
 import { Skeleton } from '@/components/ui/skeleton';
-import { useAuth } from '@/hooks/use-auth';
+
+const CATEGORIES_STORAGE_KEY = 'sativar-expenseCategories';
 
 type Category = {
     id: string;
@@ -28,49 +27,37 @@ const emptyCategory: Omit<Category, 'id'> = {
 
 export default function ExpenseCategoriesPage() {
     const { toast } = useToast();
-    const { user, loading: authLoading } = useAuth();
     const [categories, setCategories] = useState<Category[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isSheetOpen, setIsSheetOpen] = useState(false);
     const [currentCategory, setCurrentCategory] = useState<Omit<Category, 'id'> | Category>(emptyCategory);
 
+    const getCategoriesFromStorage = useCallback((): Category[] => {
+        try {
+            const storedCategories = localStorage.getItem(CATEGORIES_STORAGE_KEY);
+            return storedCategories ? JSON.parse(storedCategories) : [];
+        } catch (error) {
+            console.error("Error reading categories from localStorage:", error);
+            toast({ title: "Erro", description: "Não foi possível ler as categorias.", variant: "destructive" });
+            return [];
+        }
+    }, [toast]);
+    
+    const setCategoriesToStorage = useCallback((categories: Category[]) => {
+        try {
+            localStorage.setItem(CATEGORIES_STORAGE_KEY, JSON.stringify(categories));
+        } catch (error) {
+            console.error("Error writing categories to localStorage:", error);
+            toast({ title: "Erro", description: "Não foi possível salvar as categorias.", variant: "destructive" });
+        }
+    }, [toast]);
+
     useEffect(() => {
-        if(authLoading) {
-            setIsLoading(true);
-            return;
-        }
-
-        const fetchInitialData = async () => {
-             try {
-                const categoriesQuery = query(collection(db, "expenseCategories"), orderBy("name"));
-                const categoriesSnapshot = await getDocs(categoriesQuery);
-                setCategories(categoriesSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Category)));
-             } catch (error) {
-                console.error("Error fetching initial categories: ", error);
-                toast({ title: "Erro", description: "Não foi possível carregar as categorias.", variant: "destructive" });
-             } finally {
-                setIsLoading(false);
-             }
-        }
-
-        fetchInitialData();
-
-        const q = query(collection(db, "expenseCategories"), orderBy("name"));
-        const unsubscribe = onSnapshot(q, (querySnapshot) => {
-            const categoriesData: Category[] = querySnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Category));
-            setCategories(categoriesData);
-            if(isLoading) setIsLoading(false);
-        }, (error) => {
-            console.error("Error fetching categories: ", error);
-            toast({
-                title: "Erro",
-                description: "Não foi possível carregar as categorias em tempo real.",
-                variant: "destructive",
-            });
-        });
-
-        return () => unsubscribe();
-    }, [authLoading, toast]);
+        setIsLoading(true);
+        const storedCategories = getCategoriesFromStorage();
+        setCategories(storedCategories.sort((a, b) => a.name.localeCompare(b.name)));
+        setIsLoading(false);
+    }, [getCategoriesFromStorage]);
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const { id, value } = e.target;
@@ -87,26 +74,25 @@ export default function ExpenseCategoriesPage() {
             return;
         }
 
-        try {
-            if ('id' in currentCategory) {
-                const categoryRef = doc(db, "expenseCategories", currentCategory.id);
-                const { id, ...data } = currentCategory;
-                await updateDoc(categoryRef, data);
-                toast({ title: "Sucesso", description: "Categoria atualizada com sucesso." });
-            } else {
-                await addDoc(collection(db, "expenseCategories"), currentCategory);
-                toast({ title: "Sucesso", description: "Categoria adicionada com sucesso." });
-            }
-            setIsSheetOpen(false);
-            setCurrentCategory(emptyCategory);
-        } catch (error) {
-            console.error("Error saving category: ", error);
-            toast({
-                title: "Erro",
-                description: "Não foi possível salvar a categoria.",
-                variant: "destructive",
-            });
+        const currentCategories = getCategoriesFromStorage();
+        let updatedCategories;
+
+        if ('id' in currentCategory) {
+            updatedCategories = currentCategories.map(cat => 
+                cat.id === currentCategory.id ? { ...cat, name: currentCategory.name } : cat
+            );
+        } else {
+            const newCategory: Category = { id: crypto.randomUUID(), name: currentCategory.name };
+            updatedCategories = [...currentCategories, newCategory];
         }
+
+        updatedCategories.sort((a, b) => a.name.localeCompare(b.name));
+        setCategoriesToStorage(updatedCategories);
+        setCategories(updatedCategories);
+
+        toast({ title: "Sucesso", description: `Categoria ${'id' in currentCategory ? 'atualizada' : 'adicionada'} com sucesso.` });
+        setIsSheetOpen(false);
+        setCurrentCategory(emptyCategory);
     };
 
     const handleAddNew = () => {
@@ -120,17 +106,11 @@ export default function ExpenseCategoriesPage() {
     };
 
     const handleDelete = async (categoryId: string) => {
-        try {
-            await deleteDoc(doc(db, "expenseCategories", categoryId));
-            toast({ title: "Sucesso", description: "Categoria excluída com sucesso." });
-        } catch (error) {
-            console.error("Error deleting category: ", error);
-            toast({
-                title: "Erro",
-                description: "Não foi possível excluir a categoria.",
-                variant: "destructive",
-            });
-        }
+        const currentCategories = getCategoriesFromStorage();
+        const updatedCategories = currentCategories.filter(cat => cat.id !== categoryId);
+        setCategoriesToStorage(updatedCategories);
+        setCategories(updatedCategories);
+        toast({ title: "Sucesso", description: "Categoria excluída com sucesso." });
     };
 
     return (
@@ -233,5 +213,7 @@ export default function ExpenseCategoriesPage() {
         </div>
     );
 }
+
+    
 
     
