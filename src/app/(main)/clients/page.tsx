@@ -13,8 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { useToast } from '@/hooks/use-toast';
-import { db } from '@/lib/firebase';
-import { collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc, query, Timestamp, getDocs } from "firebase/firestore";
+import { Timestamp } from "firebase/firestore";
 import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -23,32 +22,9 @@ import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { useAuth } from '@/hooks/use-auth';
+import { usePlans, Plan } from '@/hooks/use-plans';
+import { useClients, Client, ClientPlan } from '@/hooks/use-clients';
 
-
-type Plan = {
-    id: string;
-    name: string;
-};
-
-type ClientPlan = {
-    planId: string;
-    planActivationDate: Timestamp;
-};
-
-type Client = {
-    id: string;
-    name: string;
-    taxId: string;
-    contactName: string;
-    email: string;
-    phone: string;
-    whatsapp: string;
-    notes: string;
-    status: "Ativo" | "Inativo";
-    plans: ClientPlan[];
-    createdAt: Timestamp;
-};
 
 const emptyClient: Omit<Client, 'id' | 'status' | 'createdAt'> = {
     name: "",
@@ -63,12 +39,13 @@ const emptyClient: Omit<Client, 'id' | 'status' | 'createdAt'> = {
 
 export default function ClientsPage() {
     const { toast } = useToast();
-    const { user, loading: authLoading } = useAuth();
-    const [clients, setClients] = useState<Client[]>([]);
-    const [plans, setPlans] = useState<Plan[]>([]);
-    const [isLoading, setIsLoading] = useState(true);
+    const { clients, isLoading: clientsLoading, addClient, updateClient, deleteClient } = useClients();
+    const { plans, isLoading: plansLoading } = usePlans();
+    
     const [isSheetOpen, setIsSheetOpen] = useState(false);
     const [currentClient, setCurrentClient] = useState<Omit<Client, 'id' | 'status' | 'createdAt'> | Client>(emptyClient);
+
+    const isLoading = clientsLoading || plansLoading;
 
     const plansMap = useMemo(() => {
         return plans.reduce((acc, plan) => {
@@ -76,57 +53,6 @@ export default function ClientsPage() {
             return acc;
         }, {} as Record<string, string>);
     }, [plans]);
-
-    useEffect(() => {
-        if(authLoading) {
-            setIsLoading(true);
-            return;
-        }
-
-        const fetchInitialData = async () => {
-             try {
-                const clientQuery = query(collection(db, "clients"));
-                const planQuery = query(collection(db, "plans"));
-
-                const [clientSnapshot, planSnapshot] = await Promise.all([
-                    getDocs(clientQuery),
-                    getDocs(planQuery)
-                ]);
-
-                setClients(clientSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Client)));
-                setPlans(planSnapshot.docs.map(doc => ({ id: doc.id, name: doc.data().name } as Plan)));
-             } catch (error) {
-                console.error("Error fetching initial data: ", error);
-                toast({ title: "Erro", description: "Não foi possível carregar os dados.", variant: "destructive" });
-             } finally {
-                setIsLoading(false);
-             }
-        }
-
-        fetchInitialData();
-
-        const clientQuery = query(collection(db, "clients"));
-        const planQuery = query(collection(db, "plans"));
-
-        const unsubClients = onSnapshot(clientQuery, (querySnapshot) => {
-            const clientsData: Client[] = querySnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Client));
-            setClients(clientsData);
-        }, (error) => {
-            console.error("Error fetching clients: ", error);
-        });
-
-        const unsubPlans = onSnapshot(planQuery, (querySnapshot) => {
-            const plansData: Plan[] = querySnapshot.docs.map(doc => ({ id: doc.id, name: doc.data().name } as Plan));
-            setPlans(plansData);
-        }, (error) => {
-             console.error("Error fetching plans: ", error);
-        });
-
-        return () => {
-            unsubClients();
-            unsubPlans();
-        };
-    }, [authLoading, toast]);
 
     const formatPhoneNumber = (value: string) => {
         if (!value) return value;
@@ -195,15 +121,13 @@ export default function ClientsPage() {
 
         try {
             if ('id' in currentClient) {
-                const clientRef = doc(db, "clients", currentClient.id);
                 const { id, ...clientData } = currentClient;
-                await updateDoc(clientRef, clientData);
+                await updateClient(id, clientData);
                 toast({ title: "Sucesso", description: "Cliente atualizado com sucesso." });
             } else {
-                await addDoc(collection(db, "clients"), {
+                await addClient({
                     ...currentClient,
                     status: "Ativo",
-                    createdAt: Timestamp.now()
                 });
                 toast({ title: "Sucesso", description: "Cliente adicionado com sucesso." });
             }
@@ -231,7 +155,7 @@ export default function ClientsPage() {
 
     const handleDelete = async (clientId: string) => {
         try {
-            await deleteDoc(doc(db, "clients", clientId));
+            await deleteClient(clientId);
             toast({ title: "Sucesso", description: "Cliente excluído com sucesso." });
         } catch (error) {
             console.error("Error deleting client: ", error);
@@ -461,5 +385,7 @@ export default function ClientsPage() {
         </div>
     );
 }
+
+    
 
     
