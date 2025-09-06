@@ -10,9 +10,10 @@ import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
 import Image from 'next/image';
-import { X } from 'lucide-react';
+import { X, Server } from 'lucide-react';
 import { useAuth } from '@/hooks/use-auth';
 import { StorageService } from '@/lib/storage-service';
+import { cn } from '@/lib/utils';
 
 
 type CompanySettings = {
@@ -43,10 +44,14 @@ export default function SettingsPage() {
     const [settings, setSettings] = useState<CompanySettings>(emptySettings);
     const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
+    const [isTesting, setIsTesting] = useState(false);
+    const [dbLogs, setDbLogs] = useState('');
+
 
     const getSettingsKey = useCallback(() => {
         if (!user) return null;
-        return `settings-${user.uid}`;
+        // In a real app, this might be tied to a company ID, but for now, we use a single key.
+        return `company-settings`;
     }, [user]);
 
     useEffect(() => {
@@ -54,8 +59,14 @@ export default function SettingsPage() {
             setIsLoading(true);
             const key = getSettingsKey();
             if (key) {
-                const storedSettings = StorageService.getItem<CompanySettings>('settings', key);
-                setSettings(storedSettings || emptySettings);
+                const storedSettings = StorageService.getItem<CompanySettings & {id: string}>(key, 'single-settings');
+                if (storedSettings) {
+                    setSettings(storedSettings);
+                } else {
+                     const initialSettings = { ...emptySettings, id: 'single-settings' };
+                    StorageService.addItem(key, initialSettings);
+                    setSettings(initialSettings);
+                }
             }
             setIsLoading(false);
         }
@@ -92,16 +103,51 @@ export default function SettingsPage() {
             return;
         }
         setIsSaving(true);
-        StorageService.setCollection(key, settings); // Note: Here we use the key as the collection name for user-specific settings
+        StorageService.updateItem(key, 'single-settings', settings);
         setIsSaving(false);
         toast({ title: "Sucesso!", description: "Configurações salvas com sucesso." });
     };
 
+    const handleTestConnection = () => {
+        setIsTesting(true);
+        let logs = `[${new Date().toISOString()}] Iniciando teste de conexão...\n`;
+        
+        setTimeout(() => {
+            try {
+                logs += `[${new Date().toISOString()}] Verificando o tipo de armazenamento atual...\n`;
+                // Simulate checking connection type
+                logs += `[${new Date().toISOString()}] INFO: A aplicação está atualmente configurada para usar 'localStorage'.\n`;
+                
+                // Test localStorage access
+                localStorage.setItem('__db_test__', 'success');
+                const testResult = localStorage.getItem('__db_test__');
+                localStorage.removeItem('__db_test__');
+
+                if (testResult === 'success') {
+                    logs += `[${new Date().toISOString()}] SUCESSO: A leitura e escrita no localStorage foi bem-sucedida.\n`;
+                    logs += `[${new Date().toISOString()}] STATUS: Conexão local está ativa e funcional.\n`;
+                } else {
+                    throw new Error('Falha ao ler/escrever no localStorage.');
+                }
+
+                toast({ title: "Sucesso", description: "A conexão com o armazenamento local foi testada com sucesso." });
+            } catch (error: any) {
+                logs += `[${new Date().toISOString()}] ERRO: Ocorreu um erro ao testar a conexão.\n`;
+                logs += `[${new Date().toISOString()}] Detalhes: ${error.message}\n`;
+                toast({ title: "Erro de Conexão", description: "Falha ao testar a conexão com o armazenamento local.", variant: "destructive"});
+            } finally {
+                logs += `[${new Date().toISOString()}] Teste de conexão finalizado.`;
+                setDbLogs(logs);
+                setIsTesting(false);
+            }
+        }, 1500);
+    }
+
     return (
         <div className="flex flex-col gap-8">
             <div>
-                <h1 className="text-3xl font-bold tracking-tight">Configurações da Empresa</h1>
-                <p className="text-muted-foreground">Gerencie as configurações da sua empresa.</p>
+                <h1 className="text-3xl font-bold tracking-tight">Configurações</h1>
+                <p className="text-muted-foreground">Gerencie as configurações da sua empresa e do sistema.</p>
             </div>
             {isLoading ? (
                 <Card>
@@ -193,7 +239,55 @@ export default function SettingsPage() {
                         </CardContent>
                     </Card>
                 </div>
-                <div className="flex justify-end mt-8">
+
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Conexão com Banco de Dados</CardTitle>
+                        <CardDescription>Configure e teste a conexão com seu banco de dados PostgreSQL. Atualmente usando: <strong>localStorage</strong>.</CardDescription>
+                    </CardHeader>
+                    <CardContent className="grid gap-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                            <div className="grid gap-2">
+                                <Label htmlFor="dbHost">Host</Label>
+                                <Input id="dbHost" placeholder="localhost" disabled />
+                            </div>
+                            <div className="grid gap-2">
+                                <Label htmlFor="dbPort">Porta</Label>
+                                <Input id="dbPort" placeholder="5432" disabled />
+                            </div>
+                             <div className="grid gap-2">
+                                <Label htmlFor="dbUser">Usuário</Label>
+                                <Input id="dbUser" placeholder="postgres" disabled />
+                            </div>
+                             <div className="grid gap-2">
+                                <Label htmlFor="dbPassword">Senha</Label>
+                                <Input id="dbPassword" type="password" placeholder="••••••••" disabled />
+                            </div>
+                        </div>
+                         <div className="grid gap-2">
+                                <Label htmlFor="dbName">Nome do Banco</Label>
+                                <Input id="dbName" placeholder="sativar_db" disabled />
+                        </div>
+
+                         <div>
+                            <Button onClick={handleTestConnection} disabled={isTesting}>
+                                <Server className="mr-2 h-4 w-4" />
+                                {isTesting ? 'Testando...' : 'Testar Conexão'}
+                            </Button>
+                        </div>
+                        
+                        {dbLogs && (
+                             <div className="grid gap-2">
+                                <Label>Logs de Conexão</Label>
+                                <pre className="mt-2 h-48 w-full whitespace-pre-wrap rounded-md bg-muted p-4 text-sm font-mono text-muted-foreground">
+                                    {dbLogs}
+                                </pre>
+                            </div>
+                        )}
+                    </CardContent>
+                </Card>
+
+                <div className="flex justify-end mt-4">
                     <Button onClick={handleSaveSettings} disabled={isLoading || isSaving}>
                         {isSaving ? 'Salvando...' : 'Salvar Alterações'}
                     </Button>
@@ -203,3 +297,5 @@ export default function SettingsPage() {
         </div>
     );
 }
+
+    
