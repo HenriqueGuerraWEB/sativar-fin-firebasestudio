@@ -1,11 +1,10 @@
 
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/use-auth';
-import { db } from '@/lib/firebase';
-import { collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc, query, Timestamp, orderBy } from "firebase/firestore";
+import { Timestamp } from "firebase/firestore";
 
 export type ClientPlan = {
     planId: string;
@@ -26,78 +25,111 @@ export type Client = {
     createdAt: Timestamp;
 };
 
+// Helper to handle Timestamp serialization in JSON
+const replacer = (key: any, value: any) => {
+    if (value instanceof Timestamp) {
+        return { __type: 'Timestamp', value: { seconds: value.seconds, nanoseconds: value.nanoseconds } };
+    }
+    return value;
+};
+
+const reviver = (key: any, value: any) => {
+    if (value && value.__type === 'Timestamp') {
+        return new Timestamp(value.value.seconds, value.value.nanoseconds);
+    }
+    return value;
+};
+
+
+const CLIENTS_STORAGE_KEY = 'sativar-clients';
+
 export function useClients() {
     const { toast } = useToast();
     const { user, loading: authLoading } = useAuth();
     const [clients, setClients] = useState<Client[]>([]);
     const [isLoading, setIsLoading] = useState(true);
 
+    const getClientsFromStorage = useCallback((): Client[] => {
+        if (typeof window === 'undefined') {
+            return [];
+        }
+        try {
+            const storedClients = localStorage.getItem(CLIENTS_STORAGE_KEY);
+            if (storedClients) {
+                return JSON.parse(storedClients, reviver);
+            }
+            return [];
+        } catch (error) {
+            console.error("Error reading clients from localStorage:", error);
+            toast({ title: "Erro", description: "Não foi possível ler os clientes do armazenamento local.", variant: "destructive" });
+            return [];
+        }
+    }, [toast]);
+    
     useEffect(() => {
         if (authLoading) {
             setIsLoading(true);
             return;
         }
         if (!user) {
-            // Should be handled by layout, but as a safeguard:
             setClients([]);
             setIsLoading(false);
             return;
         }
+        
+        setClients(getClientsFromStorage().sort((a,b) => b.createdAt.toMillis() - a.createdAt.toMillis()));
+        setIsLoading(false);
 
-        const q = query(collection(db, "clients"), orderBy("createdAt", "desc"));
-        const unsubscribe = onSnapshot(q, (querySnapshot) => {
-            const clientsData: Client[] = querySnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Client));
-            setClients(clientsData);
-            setIsLoading(false);
-        }, (error) => {
-            console.error("Error fetching clients: ", error);
-            toast({
-                title: "Erro",
-                description: "Não foi possível carregar os clientes.",
-                variant: "destructive",
-            });
-            setIsLoading(false);
-        });
-
-        return () => unsubscribe();
-    }, [user, authLoading, toast]);
+    }, [user, authLoading, getClientsFromStorage]);
 
 
     const addClient = async (clientData: Omit<Client, 'id' | 'createdAt'>) => {
         if (!user) throw new Error("User not authenticated");
         try {
-            await addDoc(collection(db, "clients"), {
+            const currentClients = getClientsFromStorage();
+            const newClient: Client = {
                 ...clientData,
+                id: crypto.randomUUID(),
                 createdAt: Timestamp.now()
-            });
+            };
+            const updatedClients = [...currentClients, newClient];
+            localStorage.setItem(CLIENTS_STORAGE_KEY, JSON.stringify(updatedClients, replacer));
+            setClients(updatedClients.sort((a,b) => b.createdAt.toMillis() - a.createdAt.toMillis()));
+
         } catch (error) {
-            console.error("Error adding client: ", error);
+            console.error("Error adding client to localStorage:", error);
             throw new Error("Failed to add client");
         }
     };
 
     const updateClient = async (clientId: string, clientData: Partial<Omit<Client, 'id'>>) => {
-         if (!user) throw new Error("User not authenticated");
+        if (!user) throw new Error("User not authenticated");
         try {
-            const clientRef = doc(db, "clients", clientId);
-            await updateDoc(clientRef, clientData);
-        } catch (error) {
-            console.error("Error updating client: ", error);
+            const currentClients = getClientsFromStorage();
+            const updatedClients = currentClients.map(client =>
+                client.id === clientId ? { ...client, ...clientData } : client
+            );
+            localStorage.setItem(CLIENTS_STORAGE_KEY, JSON.stringify(updatedClients, replacer));
+            setClients(updatedClients.sort((a,b) => b.createdAt.toMillis() - a.createdAt.toMillis()));
+        } catch (error)
+        {
+            console.error("Error updating client in localStorage:", error);
             throw new Error("Failed to update client");
         }
     };
 
     const deleteClient = async (clientId: string) => {
-         if (!user) throw new Error("User not authenticated");
+        if (!user) throw new Error("User not authenticated");
         try {
-            await deleteDoc(doc(db, "clients", clientId));
+            const currentClients = getClientsFromStorage();
+            const updatedClients = currentClients.filter(client => client.id !== clientId);
+            localStorage.setItem(CLIENTS_STORAGE_KEY, JSON.stringify(updatedClients, replacer));
+            setClients(updatedClients.sort((a,b) => b.createdAt.toMillis() - a.createdAt.toMillis()));
         } catch (error) {
-            console.error("Error deleting client: ", error);
+            console.error("Error deleting client from localStorage:", error);
             throw new Error("Failed to delete client");
         }
     };
 
     return { clients, isLoading, addClient, updateClient, deleteClient };
 }
-
-    
