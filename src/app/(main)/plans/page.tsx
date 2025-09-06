@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -13,23 +13,11 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from '@/components/ui/textarea';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { useToast } from '@/hooks/use-toast';
-import { db } from '@/lib/firebase';
-import { collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc, query, getDocs } from "firebase/firestore";
 import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { useAuth } from '@/hooks/use-auth';
+import { usePlans, Plan } from '@/hooks/use-plans';
 
-
-type Plan = {
-    id: string;
-    name: string;
-    description: string;
-    price: number;
-    type: 'recurring' | 'one-time';
-    recurrenceValue?: number;
-    recurrencePeriod?: 'dias' | 'meses' | 'anos';
-};
 
 const emptyPlan: Omit<Plan, 'id'> = {
     name: "",
@@ -42,49 +30,9 @@ const emptyPlan: Omit<Plan, 'id'> = {
 
 export default function PlansPage() {
     const { toast } = useToast();
-    const { user, loading: authLoading } = useAuth();
-    const [plans, setPlans] = useState<Plan[]>([]);
-    const [isLoading, setIsLoading] = useState(true);
+    const { plans, isLoading, addPlan, updatePlan, deletePlan } = usePlans();
     const [isSheetOpen, setIsSheetOpen] = useState(false);
     const [currentPlan, setCurrentPlan] = useState<Omit<Plan, 'id'> | Plan>(emptyPlan);
-
-    useEffect(() => {
-        if(authLoading) {
-            setIsLoading(true);
-            return;
-        }
-
-        const fetchInitialData = async () => {
-             try {
-                const plansQuery = query(collection(db, "plans"));
-                const plansSnapshot = await getDocs(plansQuery);
-                setPlans(plansSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Plan)));
-             } catch (error) {
-                console.error("Error fetching initial plans: ", error);
-                toast({ title: "Erro", description: "Não foi possível carregar os planos.", variant: "destructive" });
-             } finally {
-                setIsLoading(false);
-             }
-        }
-
-        fetchInitialData();
-        
-        const q = query(collection(db, "plans"));
-        const unsubscribe = onSnapshot(q, (querySnapshot) => {
-            const plansData: Plan[] = querySnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Plan));
-            setPlans(plansData);
-            if(isLoading) setIsLoading(false);
-        }, (error) => {
-            console.error("Error fetching plans: ", error);
-            toast({
-                title: "Erro",
-                description: "Não foi possível carregar os planos em tempo real.",
-                variant: "destructive",
-            });
-        });
-
-        return () => unsubscribe();
-    }, [authLoading, toast]);
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
         const { id, value } = e.target;
@@ -125,12 +73,10 @@ export default function PlansPage() {
 
 
             if ('id' in currentPlan) {
-                const planRef = doc(db, "plans", currentPlan.id);
-                const { id, ...data } = planData;
-                await updateDoc(planRef, data);
+                await updatePlan(currentPlan.id, planData);
                 toast({ title: "Sucesso", description: "Plano atualizado com sucesso." });
             } else {
-                await addDoc(collection(db, "plans"), planData);
+                await addPlan(planData);
                 toast({ title: "Sucesso", description: "Plano adicionado com sucesso." });
             }
             setIsSheetOpen(false);
@@ -157,7 +103,7 @@ export default function PlansPage() {
 
     const handleDelete = async (planId: string) => {
         try {
-            await deleteDoc(doc(db, "plans", planId));
+            await deletePlan(planId);
             toast({ title: "Sucesso", description: "Plano excluído com sucesso." });
         } catch (error) {
             console.error("Error deleting plan: ", error);
@@ -341,4 +287,3 @@ export default function PlansPage() {
     );
 }
 
-    
