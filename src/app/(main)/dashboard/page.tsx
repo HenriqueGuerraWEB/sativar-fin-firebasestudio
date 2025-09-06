@@ -13,6 +13,7 @@ import { collection, onSnapshot, query, where, Timestamp, getDocs } from "fireba
 import { Skeleton } from '@/components/ui/skeleton';
 import { format, subMonths, getMonth, getYear, startOfMonth, endOfMonth, isWithinInterval } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { useAuth } from '@/hooks/use-auth';
 
 type Client = {
     id: string;
@@ -41,12 +42,15 @@ const chartConfig = {
 };
 
 export default function DashboardPage() {
+    const { user, loading: authLoading } = useAuth();
     const [clients, setClients] = useState<Client[]>([]);
     const [invoices, setInvoices] = useState<Invoice[]>([]);
     const [expenses, setExpenses] = useState<Expense[]>([]);
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
+        if (authLoading) return; // Don't fetch data until authentication state is resolved
+
         const fetchData = async () => {
             setIsLoading(true);
             try {
@@ -90,7 +94,7 @@ export default function DashboardPage() {
             unsubInvoices();
             unsubExpenses();
         };
-    }, []);
+    }, [authLoading]);
 
     const activeClientsCount = useMemo(() => clients.filter(c => c.status === 'Ativo').length, [clients]);
     
@@ -326,6 +330,3 @@ export default function DashboardPage() {
     </div>
   );
 }
-
-
-    
