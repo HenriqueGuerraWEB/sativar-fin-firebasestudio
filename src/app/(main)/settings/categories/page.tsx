@@ -120,7 +120,10 @@ export default function ExpenseCategoriesPage() {
                     <h1 className="text-3xl font-bold tracking-tight">Categorias de Despesas</h1>
                     <p className="text-muted-foreground">Gerencie as categorias para suas despesas.</p>
                 </div>
-                <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
+                <Sheet open={isSheetOpen} onOpenChange={(isOpen) => {
+                    setIsSheetOpen(isOpen)
+                    if (!isOpen) setCurrentCategory(emptyCategory);
+                }}>
                     <SheetTrigger asChild>
                         <Button size="sm" className="gap-1 w-full sm:w-auto" onClick={handleAddNew}>
                             <PlusCircle className="h-4 w-4" />
@@ -213,7 +216,3 @@ export default function ExpenseCategoriesPage() {
         </div>
     );
 }
-
-    
-
-    

@@ -281,7 +281,7 @@ export default function FinancePage() {
         setCategories(updatedCategories);
 
         toast({ title: "Sucesso!", description: `Categoria "${newCategoryName}" adicionada.` });
-        setCurrentExpense(prev => ({ ...prev, category: newCategoryName }));
+        setCurrentExpense(prev => ({ ...prev, category: newCategory.id }));
         setNewCategoryName("");
         setIsCategoryDialogOpen(false);
     };
@@ -293,7 +293,7 @@ export default function FinancePage() {
              const adobeCategory = categories.find(c => c.name.toLowerCase().includes('ferramentas'));
             setCurrentExpense({
                 description: "Assinatura Adobe Creative Cloud",
-                category: adobeCategory ? adobeCategory.name : "Ferramentas",
+                category: adobeCategory ? adobeCategory.id : "",
                 amount: 280.00,
                 dueDate: Timestamp.now(),
             })
@@ -356,7 +356,7 @@ export default function FinancePage() {
                                         </SelectTrigger>
                                         <SelectContent>
                                             {categories.map(category => (
-                                                <SelectItem key={category.id} value={category.name}>{category.name}</SelectItem>
+                                                <SelectItem key={category.id} value={category.id}>{category.name}</SelectItem>
                                             ))}
                                         </SelectContent>
                                     </Select>
@@ -441,7 +441,7 @@ export default function FinancePage() {
                                         )) : expenses.map(expense => (
                                             <TableRow key={expense.id}>
                                                 <TableCell className="font-medium">{expense.description}</TableCell>
-                                                <TableCell><Badge variant="outline">{expense.category}</Badge></TableCell>
+                                                <TableCell><Badge variant="outline">{categories.find(c => c.id === expense.category)?.name || 'N/A'}</Badge></TableCell>
                                                 <TableCell>{format(expense.dueDate.toDate(), 'dd/MM/yyyy')}</TableCell>
                                                 <TableCell><Badge variant={expense.status === 'Paga' ? 'secondary' : 'destructive'}>{expense.status}</Badge></TableCell>
                                                 <TableCell className="text-right">{expense.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</TableCell>
@@ -562,7 +562,7 @@ export default function FinancePage() {
                                                     selected={currentDate}
                                                     onSelect={handleDateSelect}
                                                     disabled={(date) =>
-                                                        date > new Date() || date < startOfMonth(new Date())
+                                                        date > new Date() || date < startOfMonth(subMonths(new Date(), 1))
                                                     }
                                                     initialFocus
                                                 />
@@ -693,6 +693,3 @@ export default function FinancePage() {
         </div>
     );
 }
-
-
-    

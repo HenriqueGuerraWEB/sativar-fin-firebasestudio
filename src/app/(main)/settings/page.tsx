@@ -11,8 +11,9 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
 import Image from 'next/image';
 import { X } from 'lucide-react';
+import { useAuth } from '@/hooks/use-auth';
 
-const SETTINGS_STORAGE_KEY = 'sativar-settings';
+const SETTINGS_STORAGE_KEY_PREFIX = 'sativar-settings-';
 
 type CompanySettings = {
     name: string;
@@ -38,17 +39,24 @@ const emptySettings: CompanySettings = {
 
 export default function SettingsPage() {
     const { toast } = useToast();
+    const { user } = useAuth();
     const [settings, setSettings] = useState<CompanySettings>(emptySettings);
     const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
 
+    const getStorageKey = useCallback(() => {
+        if (!user) return null;
+        return `${SETTINGS_STORAGE_KEY_PREFIX}${user.uid}`;
+    }, [user]);
+
     const getSettingsFromStorage = useCallback(() => {
+        const storageKey = getStorageKey();
+        if (!storageKey) return emptySettings;
+
         try {
-            const storedSettings = localStorage.getItem(SETTINGS_STORAGE_KEY);
-            // It's an object, not an array
+            const storedSettings = localStorage.getItem(storageKey);
             if (storedSettings) {
                 const parsed = JSON.parse(storedSettings);
-                // Merge with empty settings to ensure all keys are present
                 return { ...emptySettings, ...parsed };
             }
             return emptySettings;
@@ -56,23 +64,31 @@ export default function SettingsPage() {
             console.error("Error reading settings from localStorage:", error);
             return emptySettings;
         }
-    }, []);
+    }, [getStorageKey]);
 
     const setSettingsToStorage = useCallback((newSettings: CompanySettings) => {
+        const storageKey = getStorageKey();
+        if (!storageKey) {
+            toast({ title: "Erro", description: "Usuário não autenticado.", variant: "destructive" });
+            return;
+        };
+
         try {
-            localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(newSettings));
+            localStorage.setItem(storageKey, JSON.stringify(newSettings));
         } catch (error) {
             console.error("Error writing settings to localStorage:", error);
             toast({ title: "Erro", description: "Não foi possível salvar as configurações.", variant: "destructive" });
         }
-    }, [toast]);
+    }, [getStorageKey, toast]);
 
 
     useEffect(() => {
-        setIsLoading(true);
-        setSettings(getSettingsFromStorage());
-        setIsLoading(false);
-    }, [getSettingsFromStorage]);
+        if(user) {
+            setIsLoading(true);
+            setSettings(getSettingsFromStorage());
+            setIsLoading(false);
+        }
+    }, [user, getSettingsFromStorage]);
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
         const { id, value } = e.target;
@@ -211,7 +227,3 @@ export default function SettingsPage() {
         </div>
     );
 }
-
-    
-
-    
