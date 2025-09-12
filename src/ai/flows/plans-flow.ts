@@ -13,30 +13,12 @@ import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
 import { executeQuery } from '@/lib/db';
 import { randomUUID } from 'crypto';
-
-
-// Schema for a Plan
-export const PlanSchema = z.object({
-  id: z.string(),
-  name: z.string(),
-  description: z.string(),
-  price: z.number(),
-  type: z.enum(['recurring', 'one-time']),
-  recurrenceValue: z.number().nullable().optional(),
-  recurrencePeriod: z.enum(['dias', 'meses', 'anos']).nullable().optional(),
-});
-export type Plan = z.infer<typeof PlanSchema>;
-
-// Input schema for adding a plan (omits 'id')
-export const AddPlanInputSchema = PlanSchema.omit({ id: true });
-export type AddPlanInput = z.infer<typeof AddPlanInputSchema>;
-
-// Input schema for updating a plan (makes all fields optional)
-export const UpdatePlanInputSchema = z.object({
-    planId: z.string(),
-    updates: PlanSchema.omit({ id: true }).partial(),
-});
-export type UpdatePlanInput = z.infer<typeof UpdatePlanInputSchema>;
+import { 
+    PlanSchema,
+    Plan,
+    AddPlanInputSchema,
+    UpdatePlanInputSchema 
+} from '@/lib/types/plan-types';
 
 
 // Flow to get all plans
@@ -90,7 +72,7 @@ export const updatePlan = ai.defineFlow(
     
     if (Object.keys(updates).length === 0) {
         const result = await executeQuery('SELECT * FROM plans WHERE id = ?', [planId]);
-        return result.length > 0 ? result[0] as Plan : null;
+        return result.length > 0 ? (result as Plan[])[0] : null;
     }
 
     // Ensure recurrence fields are null if type is 'one-time'
@@ -106,7 +88,7 @@ export const updatePlan = ai.defineFlow(
     await executeQuery(`UPDATE plans SET ${setClause} WHERE id = ?`, [...values, planId]);
     
     const result = await executeQuery('SELECT * FROM plans WHERE id = ?', [planId]);
-    return result.length > 0 ? result[0] as Plan : null;
+    return result.length > 0 ? (result as Plan[])[0] : null;
   }
 );
 
@@ -115,6 +97,7 @@ export const deletePlan = ai.defineFlow(
   {
     name: 'deletePlan',
     inputSchema: z.string(), // planId
+    outputSchema: z.void(),
   },
   async (planId) => {
     console.log(`[PLANS_FLOW] Deleting plan ${planId} from database...`);

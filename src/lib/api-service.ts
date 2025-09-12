@@ -8,10 +8,8 @@ import {
     addPlan, 
     updatePlan,
     deletePlan,
-    Plan, 
-    AddPlanInput,
-    UpdatePlanInput,
 } from '@/ai/flows/plans-flow';
+import type { Plan, AddPlanInput, UpdatePlanInput } from '@/lib/types/plan-types';
 
 /**
  * ApiService
