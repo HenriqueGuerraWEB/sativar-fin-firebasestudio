@@ -35,7 +35,7 @@ export const getClients = ai.defineFlow(
     // We need to parse it before returning.
     return results.map(client => ({
         ...client,
-        plans: client.plans ? JSON.parse(client.plans) : []
+        plans: client.plans && client.plans.trim() !== '' ? JSON.parse(client.plans) : []
     })) as Client[];
   }
 );
@@ -96,7 +96,7 @@ export const updateClient = ai.defineFlow(
         const result: any[] = await executeQuery('SELECT * FROM clients WHERE id = ?', [clientId]);
         if (result.length > 0) {
             const client = result[0];
-            return { ...client, plans: client.plans ? JSON.parse(client.plans) : [] } as Client;
+            return { ...client, plans: client.plans && client.plans.trim() !== '' ? JSON.parse(client.plans) : [] } as Client;
         }
         return null;
     }
@@ -115,7 +115,7 @@ export const updateClient = ai.defineFlow(
     const result: any[] = await executeQuery('SELECT * FROM clients WHERE id = ?', [clientId]);
      if (result.length > 0) {
         const client = result[0];
-        return { ...client, plans: client.plans ? JSON.parse(client.plans) : [] } as Client;
+        return { ...client, plans: client.plans && client.plans.trim() !== '' ? JSON.parse(client.plans) : [] } as Client;
     }
     return null;
   }
