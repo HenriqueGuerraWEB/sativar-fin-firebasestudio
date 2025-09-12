@@ -23,7 +23,7 @@ const createPool = () => {
 };
 
 // We only want to create the pool once.
-const pool = process.env.DB_HOST ? createPool() : null;
+export const pool = process.env.DB_HOST ? createPool() : null;
 
 /**
  * Executes a SQL query.
