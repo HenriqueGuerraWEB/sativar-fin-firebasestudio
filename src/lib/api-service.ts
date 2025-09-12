@@ -11,13 +11,37 @@ import {
 } from '@/ai/flows/plans-flow';
 import {
     getClients,
-    // addClient is now called directly from the hook
+    addClient as addClientFlow,
     updateClient,
     deleteClient,
 } from '@/ai/flows/clients-flow';
+import {
+    getInvoices,
+    addInvoice,
+    addInvoices,
+    updateInvoice,
+    deleteInvoice,
+    deleteInvoices,
+} from '@/ai/flows/invoices-flow';
+import {
+    getExpenses,
+    addExpense,
+    updateExpense,
+    deleteExpense,
+} from '@/ai/flows/expenses-flow';
+import {
+    getExpenseCategories,
+    addExpenseCategory,
+    updateExpenseCategory,
+    deleteExpenseCategory,
+} from '@/ai/flows/expense-categories-flow';
 import { migrateData } from '@/ai/flows/data-migration-flow';
+
 import type { Plan, AddPlanInput, UpdatePlanInput } from '@/lib/types/plan-types';
 import type { Client, AddClientInput, UpdateClientInput } from '@/lib/types/client-types';
+import type { Invoice, AddInvoiceInput, UpdateInvoiceInput } from '@/lib/types/invoice-types';
+import type { Expense, AddExpenseInput, UpdateExpenseInput } from '@/lib/types/expense-types';
+import type { ExpenseCategory, AddExpenseCategoryInput, UpdateExpenseCategoryInput } from '@/lib/types/expense-category-types';
 
 
 /**
@@ -33,6 +57,12 @@ export const ApiService = {
                 return await getPlans() as T[];
             case 'clients':
                  return await getClients() as T[];
+            case 'invoices':
+                return await getInvoices() as T[];
+            case 'expenses':
+                return await getExpenses() as T[];
+            case 'expenseCategories':
+                return await getExpenseCategories() as T[];
             default:
                 console.warn(`ApiService: No getCollection handler for ${collectionKey}`);
                 return Promise.resolve([]);
@@ -60,20 +90,29 @@ export const ApiService = {
         switch (collectionKey) {
             case 'plans':
                 return await addPlan(itemData as AddPlanInput) as T;
-            // The `addClient` case is removed, as it is now handled directly in the `useClients` hook
-            // to ensure correct type marshalling for the Genkit flow.
+            case 'clients':
+                return await addClientFlow(itemData as AddClientInput) as T;
+            case 'invoices':
+                return await addInvoice(itemData as AddInvoiceInput) as T;
+            case 'expenses':
+                return await addExpense(itemData as AddExpenseInput) as T;
+            case 'expenseCategories':
+                return await addExpenseCategory(itemData as AddExpenseCategoryInput) as T;
             default:
                 console.warn(`ApiService: No addItem handler for ${collectionKey}`);
-                // Returning a mock object for now to avoid breaking hooks' expectations.
                 return Promise.resolve({ ...itemData, id: 'temp-api-id' } as T);
         }
     },
 
     addItems: async <T extends Storable>(collectionKey: string, itemsData: Omit<T, 'id'>[]): Promise<T[]> => {
         console.log(`ApiService: Adding multiple items to ${collectionKey}...`);
-        // This should be implemented with a dedicated bulk-add flow for efficiency.
-        const results = await Promise.all(itemsData.map(item => ApiService.addItem<T>(collectionKey, item)));
-        return results;
+         switch (collectionKey) {
+            case 'invoices':
+                return await addInvoices(itemsData as any[]) as T[];
+            default:
+                const results = await Promise.all(itemsData.map(item => ApiService.addItem<T>(collectionKey, item)));
+                return results;
+        }
     },
 
     updateItem: async <T extends Storable>(collectionKey: string, itemId: string, updates: Partial<Omit<T, 'id'>>): Promise<T | null> => {
@@ -85,6 +124,15 @@ export const ApiService = {
             case 'clients':
                  const clientInput: UpdateClientInput = { clientId: itemId, updates: updates as Partial<Client> };
                  return await updateClient(clientInput) as T | null;
+            case 'invoices':
+                 const invoiceInput: UpdateInvoiceInput = { invoiceId: itemId, updates: updates as Partial<Invoice> };
+                 return await updateInvoice(invoiceInput) as T | null;
+            case 'expenses':
+                 const expenseInput: UpdateExpenseInput = { expenseId: itemId, updates: updates as Partial<Expense> };
+                 return await updateExpense(expenseInput) as T | null;
+            case 'expenseCategories':
+                const categoryInput: UpdateExpenseCategoryInput = { categoryId: itemId, updates: updates as Partial<ExpenseCategory> };
+                return await updateExpenseCategory(categoryInput) as T | null;
             default:
                  console.warn(`ApiService: No updateItem handler for ${collectionKey}`);
                  return Promise.resolve(null);
@@ -98,6 +146,12 @@ export const ApiService = {
                 return await deletePlan(itemId);
              case 'clients':
                 return await deleteClient(itemId);
+            case 'invoices':
+                return await deleteInvoice(itemId);
+            case 'expenses':
+                return await deleteExpense(itemId);
+            case 'expenseCategories':
+                return await deleteExpenseCategory(itemId);
             default:
                 console.warn(`ApiService: No deleteItem handler for ${collectionKey}`);
                 return Promise.resolve();
@@ -106,8 +160,12 @@ export const ApiService = {
 
     deleteItems: async (collectionKey: string, itemIds: string[]): Promise<void> => {
         console.log(`ApiService: Deleting multiple items from ${collectionKey}...`);
-        // This should be implemented with a dedicated bulk-delete flow for efficiency.
-        await Promise.all(itemIds.map(id => ApiService.deleteItem(collectionKey, id)));
-        return Promise.resolve();
+        switch(collectionKey) {
+            case 'invoices':
+                return await deleteInvoices({ invoiceIds: itemIds });
+            default:
+                await Promise.all(itemIds.map(id => ApiService.deleteItem(collectionKey, id)));
+                return Promise.resolve();
+        }
     },
 };
