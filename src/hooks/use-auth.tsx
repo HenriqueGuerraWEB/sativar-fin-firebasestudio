@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, {
@@ -38,25 +39,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [adminExists, setAdminExists] = useState<boolean | null>(null);
 
   useEffect(() => {
-    try {
-      // Check if an admin account exists
-      const users = StorageService.getCollection(USERS_STORAGE_KEY);
-      setAdminExists(users.length > 0);
+    const initializeAuth = async () => {
+        try {
+        // Check if an admin account exists
+        const users = await StorageService.getCollection(USERS_STORAGE_KEY);
+        setAdminExists(users.length > 0);
 
-      // Check for an active session
-      const sessionUserJson = localStorage.getItem(SESSION_STORAGE_KEY);
-      if (sessionUserJson) {
-        setUser(JSON.parse(sessionUserJson));
-      }
-    } catch (e) {
-        console.error("Failed to initialize auth state from localStorage", e);
-    } finally {
-        setLoading(false);
-    }
+        // Check for an active session
+        const sessionUserJson = localStorage.getItem(SESSION_STORAGE_KEY);
+        if (sessionUserJson) {
+            setUser(JSON.parse(sessionUserJson));
+        }
+        } catch (e) {
+            console.error("Failed to initialize auth state from storage", e);
+        } finally {
+            setLoading(false);
+        }
+    };
 
-    const handleStorageChange = (event: StorageEvent) => {
+    initializeAuth();
+
+    const handleStorageChange = async (event: StorageEvent) => {
         if (event.key === USERS_STORAGE_KEY) {
-            const users = StorageService.getCollection(USERS_STORAGE_KEY);
+            const users = await StorageService.getCollection(USERS_STORAGE_KEY);
             setAdminExists(users.length > 0);
         }
         if (event.key === SESSION_STORAGE_KEY) {
@@ -77,9 +82,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const login = useCallback(async (email: string, pass: string): Promise<void> => {
-    const users = StorageService.getCollection(USERS_STORAGE_KEY);
+    const users = await StorageService.getCollection(USERS_STORAGE_KEY);
     const userToLogin = users.find(
-      (u) => u.email === email && u.password === pass // Plain text comparison
+      (u: any) => u.email === email && u.password === pass // Plain text comparison
     );
 
     if (userToLogin) {
@@ -92,7 +97,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const signup = useCallback(async (email: string, pass: string, name: string): Promise<void> => {
-    const users = StorageService.getCollection(USERS_STORAGE_KEY);
+    const users = await StorageService.getCollection(USERS_STORAGE_KEY);
     if (users.length > 0) {
       throw new Error("Um administrador já existe. Não é possível criar outra conta.");
     }
@@ -102,7 +107,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     const newUser = { name, email, password: pass }; // Storing password in plain text
-    StorageService.addItem(USERS_STORAGE_KEY, newUser);
+    await StorageService.addItem(USERS_STORAGE_KEY, newUser);
 
     const userData: User = { name, email };
     localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(userData));
