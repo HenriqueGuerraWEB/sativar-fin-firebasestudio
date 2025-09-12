@@ -3,13 +3,12 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
--import Image from 'next/image';
 import { X, Server } from 'lucide-react';
 import { useAuth } from '@/hooks/use-auth';
 import { StorageService } from '@/lib/storage-service';
@@ -301,6 +300,8 @@ export default function SettingsPage() {
         </div>
     );
 }
+
+    
 
     
 
