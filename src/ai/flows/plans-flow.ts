@@ -11,6 +11,9 @@
 
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
+import { executeQuery } from '@/lib/db';
+import { randomUUID } from 'crypto';
+
 
 // Schema for a Plan
 export const PlanSchema = z.object({
@@ -19,8 +22,8 @@ export const PlanSchema = z.object({
   description: z.string(),
   price: z.number(),
   type: z.enum(['recurring', 'one-time']),
-  recurrenceValue: z.number().optional(),
-  recurrencePeriod: z.enum(['dias', 'meses', 'anos']).optional(),
+  recurrenceValue: z.number().nullable().optional(),
+  recurrencePeriod: z.enum(['dias', 'meses', 'anos']).nullable().optional(),
 });
 export type Plan = z.infer<typeof PlanSchema>;
 
@@ -36,16 +39,6 @@ export const UpdatePlanInputSchema = z.object({
 export type UpdatePlanInput = z.infer<typeof UpdatePlanInputSchema>;
 
 
-/**
- * In-memory store for simulation purposes.
- * In a real scenario, this would interact with a MySQL database.
- */
-let plansStore: Plan[] = [
-    { id: 'plan-1', name: 'Plano Básico', description: 'Acesso básico a todos os recursos.', price: 29.90, type: 'recurring', recurrenceValue: 1, recurrencePeriod: 'meses' },
-    { id: 'plan-2', name: 'Plano Profissional', description: 'Acesso total e suporte prioritário.', price: 79.90, type: 'recurring', recurrenceValue: 1, recurrencePeriod: 'meses' },
-    { id: 'plan-3', name: 'Configuração Inicial', description: 'Serviço de configuração e onboarding.', price: 250.00, type: 'one-time' }
-];
-
 // Flow to get all plans
 export const getPlans = ai.defineFlow(
   {
@@ -53,9 +46,9 @@ export const getPlans = ai.defineFlow(
     outputSchema: z.array(PlanSchema),
   },
   async () => {
-    console.log('[PLANS_FLOW] Fetching all plans...');
-    // TODO: Replace with MySQL query: SELECT * FROM plans;
-    return plansStore;
+    console.log('[PLANS_FLOW] Fetching all plans from database...');
+    const results = await executeQuery('SELECT * FROM plans');
+    return results as Plan[];
   }
 );
 
@@ -67,13 +60,20 @@ export const addPlan = ai.defineFlow(
     outputSchema: PlanSchema,
   },
   async (planData) => {
-    console.log('[PLANS_FLOW] Adding new plan...');
-    // TODO: Replace with MySQL query: INSERT INTO plans (...);
+    console.log('[PLANS_FLOW] Adding new plan to database...');
+    const newPlanId = randomUUID();
     const newPlan: Plan = {
       ...planData,
-      id: `plan-${Math.floor(Math.random() * 10000)}`,
+      id: newPlanId,
+      recurrenceValue: planData.type === 'recurring' ? planData.recurrenceValue : null,
+      recurrencePeriod: planData.type === 'recurring' ? planData.recurrencePeriod : null,
     };
-    plansStore.push(newPlan);
+    
+    await executeQuery(
+      'INSERT INTO plans (id, name, description, price, type, recurrenceValue, recurrencePeriod) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [newPlan.id, newPlan.name, newPlan.description, newPlan.price, newPlan.type, newPlan.recurrenceValue, newPlan.recurrencePeriod]
+    );
+
     return newPlan;
   }
 );
@@ -86,17 +86,27 @@ export const updatePlan = ai.defineFlow(
     outputSchema: PlanSchema.nullable(),
   },
   async ({ planId, updates }) => {
-    console.log(`[PLANS_FLOW] Updating plan ${planId}...`);
-    // TODO: Replace with MySQL query: UPDATE plans SET ... WHERE id = ...;
-    let updatedPlan: Plan | null = null;
-    plansStore = plansStore.map(p => {
-        if (p.id === planId) {
-            updatedPlan = { ...p, ...updates };
-            return updatedPlan;
-        }
-        return p;
-    });
-    return updatedPlan;
+    console.log(`[PLANS_FLOW] Updating plan ${planId} in database...`);
+    
+    if (Object.keys(updates).length === 0) {
+        const result = await executeQuery('SELECT * FROM plans WHERE id = ?', [planId]);
+        return result.length > 0 ? result[0] as Plan : null;
+    }
+
+    // Ensure recurrence fields are null if type is 'one-time'
+    if (updates.type === 'one-time') {
+      updates.recurrenceValue = null;
+      updates.recurrencePeriod = null;
+    }
+
+    const fields = Object.keys(updates);
+    const values = Object.values(updates);
+    const setClause = fields.map(field => `${field} = ?`).join(', ');
+
+    await executeQuery(`UPDATE plans SET ${setClause} WHERE id = ?`, [...values, planId]);
+    
+    const result = await executeQuery('SELECT * FROM plans WHERE id = ?', [planId]);
+    return result.length > 0 ? result[0] as Plan : null;
   }
 );
 
@@ -107,14 +117,8 @@ export const deletePlan = ai.defineFlow(
     inputSchema: z.string(), // planId
   },
   async (planId) => {
-    console.log(`[PLANS_FLOW] Deleting plan ${planId}...`);
-    // TODO: Replace with MySQL query: DELETE FROM plans WHERE id = ...;
-    const initialLength = plansStore.length;
-    plansStore = plansStore.filter(p => p.id !== planId);
-    if (plansStore.length < initialLength) {
-        console.log(`Plan ${planId} deleted.`);
-    } else {
-         console.warn(`Plan ${planId} not found for deletion.`);
-    }
+    console.log(`[PLANS_FLOW] Deleting plan ${planId} from database...`);
+    await executeQuery('DELETE FROM plans WHERE id = ?', [planId]);
+    console.log(`Plan ${planId} deleted.`);
   }
 );

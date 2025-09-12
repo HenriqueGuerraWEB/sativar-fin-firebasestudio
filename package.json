@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "next dev --turbopack -p 9002",
     "genkit:dev": "genkit start -- tsx src/ai/dev.ts",
-    "genkit:watch": "genkit start -- tsx --watch src/ai/dev.ts",
+    "genkit:watch": "genkit start -- tsx --watch src.ts",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
@@ -43,6 +43,7 @@
     "embla-carousel-react": "^8.6.0",
     "genkit": "^1.14.1",
     "lucide-react": "^0.475.0",
+    "mysql2": "^3.10.3",
     "next": "15.3.3",
     "next-themes": "^0.3.0",
     "patch-package": "^8.0.0",
