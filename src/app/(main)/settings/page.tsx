@@ -15,6 +15,7 @@ import { StorageService, LocalStorageService } from '@/lib/storage-service';
 import { cn } from '@/lib/utils';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { migrateData } from '@/ai/flows/data-migration-flow';
+import { testDbConnection } from '@/ai/flows/test-db-connection-flow';
 import { DataMigrationInput } from '@/lib/types/migration-types';
 
 
@@ -52,6 +53,7 @@ export default function SettingsPage() {
     const [dbLogs, setDbLogs] = useState('');
     const [isMigrating, setIsMigrating] = useState(false);
     const [isMigrationAlertOpen, setIsMigrationAlertOpen] = useState(false);
+    const [isDbConnectionOk, setIsDbConnectionOk] = useState(false);
 
 
     useEffect(() => {
@@ -104,42 +106,43 @@ export default function SettingsPage() {
         toast({ title: "Sucesso!", description: "Configurações salvas com sucesso." });
     };
 
-    const handleTestConnection = () => {
+    const handleTestConnection = async () => {
         setIsTesting(true);
+        setIsDbConnectionOk(false);
         let logs = `[${new Date().toISOString()}] Iniciando teste de conexão...\n`;
-        
-        setTimeout(() => {
-            try {
-                logs += `[${new Date().toISOString()}] Verificando o modo de armazenamento...\n`;
-                
-                if (isDbEnabled) {
-                     logs += `[${new Date().toISOString()}] INFO: A aplicação está configurada para usar o banco de dados MySQL.\n`;
-                     logs += `[${new Date().toISOString()}] STATUS: O serviço de API está ativo. A conexão real com o banco de dados é gerenciada pelo servidor.\n`;
-                     toast({ title: "Sucesso", description: "O modo de banco de dados está ativo." });
-                } else {
-                    logs += `[${new Date().toISOString()}] INFO: A aplicação está configurada para usar 'localStorage'.\n`;
-                    localStorage.setItem('__db_test__', 'success');
-                    const testResult = localStorage.getItem('__db_test__');
-                    localStorage.removeItem('__db_test__');
+        logs += `[${new Date().toISOString()}] Verificando o modo de armazenamento...\n`;
+        setDbLogs(logs);
 
-                    if (testResult === 'success') {
-                        logs += `[${new Date().toISOString()}] SUCESSO: A leitura e escrita no localStorage foi bem-sucedida.\n`;
-                        logs += `[${new Date().toISOString()}] STATUS: Conexão local está ativa e funcional.\n`;
-                    } else {
-                        throw new Error('Falha ao ler/escrever no localStorage.');
-                    }
-                     toast({ title: "Sucesso", description: "A conexão com o armazenamento local foi testada com sucesso." });
-                }
-            } catch (error: any) {
-                logs += `[${new Date().toISOString()}] ERRO: Ocorreu um erro ao testar a conexão.\n`;
-                logs += `[${new Date().toISOString()}] Detalhes: ${error.message}\n`;
-                toast({ title: "Erro de Conexão", description: "Falha ao testar a conexão com o armazenamento local.", variant: "destructive"});
-            } finally {
-                logs += `[${new Date().toISOString()}] Teste de conexão finalizado.`;
-                setDbLogs(logs);
-                setIsTesting(false);
+        if (isDbEnabled) {
+            logs += `[${new Date().toISOString()}] INFO: A aplicação está configurada para usar o banco de dados MySQL.\n`;
+            setDbLogs(logs);
+            const result = await testDbConnection();
+            logs += `[${new Date().toISOString()}] RESPOSTA DO SERVIDOR: ${result.message}\n`;
+            if (result.success) {
+                setIsDbConnectionOk(true);
+                toast({ title: "Sucesso!", description: result.message });
+            } else {
+                toast({ title: "Erro de Conexão", description: result.message, variant: "destructive" });
             }
-        }, 1500);
+        } else {
+            logs += `[${new Date().toISOString()}] INFO: A aplicação está configurada para usar 'localStorage'.\n`;
+            try {
+                localStorage.setItem('__db_test__', 'success');
+                const testResult = localStorage.getItem('__db_test__');
+                localStorage.removeItem('__db_test__');
+                if (testResult !== 'success') throw new Error('Falha ao ler/escrever no localStorage.');
+                logs += `[${new Date().toISOString()}] SUCESSO: A leitura e escrita no localStorage foi bem-sucedida.\n`;
+                logs += `[${new Date().toISOString()}] STATUS: Conexão local está ativa e funcional.\n`;
+                toast({ title: "Sucesso", description: "A conexão com o armazenamento local foi testada com sucesso." });
+            } catch (error: any) {
+                logs += `[${new Date().toISOString()}] ERRO: ${error.message}\n`;
+                toast({ title: "Erro de Armazenamento", description: error.message, variant: "destructive" });
+            }
+        }
+
+        logs += `[${new Date().toISOString()}] Teste de conexão finalizado.`;
+        setDbLogs(logs);
+        setIsTesting(false);
     }
     
     const handleStartMigration = () => {
@@ -159,13 +162,15 @@ export default function SettingsPage() {
                 settings: LocalStorageService.getItem('company-settings', 'single-settings') || undefined,
             };
 
-            if (
-                migrationData.clients.length === 0 &&
-                migrationData.plans.length === 0 &&
-                migrationData.invoices.length === 0 &&
-                migrationData.expenses.length === 0 &&
-                migrationData.expenseCategories.length === 0
-            ) {
+            const dataToMigrate = [
+                ...migrationData.clients,
+                ...migrationData.plans,
+                ...migrationData.invoices,
+                ...migrationData.expenses,
+                ...migrationData.expenseCategories
+            ];
+
+            if (dataToMigrate.length === 0) {
                  toast({
                     title: "Nenhum Dado para Migrar",
                     description: "Não há dados no armazenamento local para serem migrados.",
@@ -295,24 +300,24 @@ export default function SettingsPage() {
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                             <div className="grid gap-2">
                                 <Label htmlFor="dbHost">Host</Label>
-                                <Input id="dbHost" placeholder="localhost" />
+                                <Input id="dbHost" placeholder="localhost" disabled />
                             </div>
                             <div className="grid gap-2">
                                 <Label htmlFor="dbPort">Porta</Label>
-                                <Input id="dbPort" placeholder="3306" />
+                                <Input id="dbPort" placeholder="3306" disabled />
                             </div>
                              <div className="grid gap-2">
                                 <Label htmlFor="dbUser">Usuário</Label>
-                                <Input id="dbUser" placeholder="admin" />
+                                <Input id="dbUser" placeholder="admin" disabled />
                             </div>
                              <div className="grid gap-2">
                                 <Label htmlFor="dbPassword">Senha</Label>
-                                <Input id="dbPassword" type="password" placeholder="••••••••" />
+                                <Input id="dbPassword" type="password" placeholder="••••••••" disabled />
                             </div>
                         </div>
                          <div className="grid gap-2">
                                 <Label htmlFor="dbName">Nome do Banco</Label>
-                                <Input id="dbName" placeholder="sativar_db" />
+                                <Input id="dbName" placeholder="sativar_db" disabled />
                         </div>
 
                         <div className="flex flex-wrap gap-2">
@@ -321,7 +326,7 @@ export default function SettingsPage() {
                                 {isTesting ? 'Testando...' : 'Testar Conexão'}
                             </Button>
 
-                            <Button onClick={handleStartMigration} disabled={!isDbEnabled || isMigrating}>
+                            <Button onClick={handleStartMigration} disabled={!isDbEnabled || !isDbConnectionOk || isMigrating}>
                                 {isMigrating ? (
                                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                                 ) : (
