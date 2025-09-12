@@ -17,6 +17,7 @@ import {
     ClientSchema,
     Client,
     AddClientInputSchema,
+    AddClientInput,
     UpdateClientInputSchema 
 } from '@/lib/types/client-types';
 
@@ -29,7 +30,7 @@ export const getClients = ai.defineFlow(
   },
   async () => {
     console.log('[CLIENTS_FLOW] Fetching all clients from database...');
-    const results: any[] = await executeQuery('SELECT * FROM clients ORDER BY createdAt DESC');
+    const results: any[] = await executeQuery('SELECT * FROM clients ORDER BY created_at DESC');
     // The 'plans' column is stored as JSON in the database.
     // We need to parse it before returning.
     return results.map(client => ({
@@ -40,9 +41,9 @@ export const getClients = ai.defineFlow(
 );
 
 // Flow to add a new client
-export const addClient = ai.defineFlow(
+export const addClientFlow = ai.defineFlow(
   {
-    name: 'addClient',
+    name: 'addClientFlow',
     inputSchema: AddClientInputSchema,
     outputSchema: ClientSchema,
   },
@@ -75,6 +76,11 @@ export const addClient = ai.defineFlow(
     return newClient;
   }
 );
+
+export async function addClient(clientData: AddClientInput): Promise<Client> {
+    return addClientFlow(clientData);
+}
+
 
 // Flow to update an existing client
 export const updateClient = ai.defineFlow(

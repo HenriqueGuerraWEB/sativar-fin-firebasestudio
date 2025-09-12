@@ -20,7 +20,7 @@ export const ClientSchema = z.object({
   whatsapp: z.string().nullable().optional(),
   notes: z.string().nullable().optional(),
   status: z.enum(["Ativo", "Inativo"]),
-  plans: z.array(ClientPlanSchema),
+  plans: z.array(ClientPlanSchema).nullable().optional(),
   // Dates from the database may be strings, so we coerce them.
   createdAt: z.coerce.date(),
 });
@@ -36,4 +36,3 @@ export const UpdateClientInputSchema = z.object({
     updates: ClientSchema.omit({ id: true, createdAt: true }).partial(),
 });
 export type UpdateClientInput = z.infer<typeof UpdateClientInputSchema>;
-

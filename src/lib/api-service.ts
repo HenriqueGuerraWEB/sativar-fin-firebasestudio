@@ -11,7 +11,7 @@ import {
 } from '@/ai/flows/plans-flow';
 import {
     getClients,
-    addClient,
+    // addClient is now called directly from the hook
     updateClient,
     deleteClient,
 } from '@/ai/flows/clients-flow';
@@ -60,8 +60,8 @@ export const ApiService = {
         switch (collectionKey) {
             case 'plans':
                 return await addPlan(itemData as AddPlanInput) as T;
-             case 'clients':
-                return await addClient(itemData as AddClientInput) as T;
+            // The `addClient` case is removed, as it is now handled directly in the `useClients` hook
+            // to ensure correct type marshalling for the Genkit flow.
             default:
                 console.warn(`ApiService: No addItem handler for ${collectionKey}`);
                 // Returning a mock object for now to avoid breaking hooks' expectations.

@@ -5,7 +5,10 @@ import { useState, useEffect, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/use-auth';
 import { StorageService } from '@/lib/storage-service';
-import type { Client } from '@/lib/types/client-types';
+import type { AddClientInput, Client } from '@/lib/types/client-types';
+import { addClient as addClientFlow, getClients as getClientsFlow } from '@/ai/flows/clients-flow';
+
+const isDatabaseEnabled = process.env.NEXT_PUBLIC_DATABASE_ENABLED === 'true';
 
 export type { Client, ClientPlan } from '@/lib/types/client-types';
 
@@ -24,7 +27,10 @@ export function useClients() {
         }
         setIsLoading(true);
         try {
-            const clientsFromStorage = await StorageService.getCollection<Client>('clients');
+            const clientsFromStorage = isDatabaseEnabled 
+                ? await getClientsFlow()
+                : await StorageService.getCollection<Client>('clients');
+
             setClients(clientsFromStorage);
         } catch (error) {
             console.error("Failed to load clients:", error);
@@ -46,12 +52,16 @@ export function useClients() {
     }, [user, authLoading, loadClients]);
 
 
-    const addClient = async (clientData: Omit<Client, 'id' | 'createdAt'>) => {
+    const addClient = async (clientData: AddClientInput) => {
         if (!user) throw new Error("User not authenticated");
         try {
-            const newClient = await StorageService.addItem<Client>('clients', clientData);
-            // After adding, reload all clients to get the sorted list from the server
-            await loadClients();
+            let newClient;
+            if (isDatabaseEnabled) {
+                newClient = await addClientFlow(clientData);
+            } else {
+                newClient = await StorageService.addItem<Client>('clients', clientData);
+            }
+            await loadClients(); // Reload to reflect sorted list
             return newClient;
         } catch (error) {
             console.error("Error adding client:", error);
@@ -88,5 +98,3 @@ export function useClients() {
 
     return { clients, isLoading, addClient, updateClient, deleteClient, refreshClients: loadClients };
 }
-
-    
