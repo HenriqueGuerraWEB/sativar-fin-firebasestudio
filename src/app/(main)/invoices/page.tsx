@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
@@ -28,6 +29,7 @@ import { StorageService } from '@/lib/storage-service';
 
 
 type CompanySettings = {
+    id: string;
     name: string;
     address: string;
     phone: string;
@@ -48,7 +50,7 @@ type GroupedInvoices = {
 
 export default function InvoicesPage() {
     const { toast } = useToast();
-    const { invoices, isLoading: invoicesLoading, addInvoices, updateInvoice, deleteInvoice, deleteInvoices, refreshInvoices } = useInvoices();
+    const { invoices, isLoading: invoicesLoading, addInvoices, updateInvoice, deleteInvoice, deleteInvoices } = useInvoices();
     const { clients, isLoading: clientsLoading } = useClients();
     const { plans, isLoading: plansLoading } = usePlans();
     
@@ -335,7 +337,7 @@ export default function InvoicesPage() {
             
             const client = clients.find(c => c.id === invoice.clientId);
             const plan = plans.find(p => p.id === invoice.planId);
-            const company: CompanySettings | null = await StorageService.getItem<CompanySettings>('company-settings', 'single-settings');
+            const company: CompanySettings | null = await StorageService.getItem('company-settings', 'single-settings');
 
             if (!client || !plan) {
                 toast({ title: 'Erro', description: 'Não foi possível encontrar os dados do cliente ou do plano.', variant: 'destructive' });

@@ -1,6 +1,7 @@
+
 "use client";
 
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -23,7 +24,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Calendar } from '@/components/ui/calendar';
 import { useExpenses, Expense } from '@/hooks/use-expenses';
 import { useInvoices, Invoice } from '@/hooks/use-invoices';
-import { useExpenseCategories, ExpenseCategory } from '@/hooks/use-expense-categories';
+import { useExpenseCategories } from '@/hooks/use-expense-categories';
 
 
 const emptyExpense: Omit<Expense, 'id' | 'status'> = {

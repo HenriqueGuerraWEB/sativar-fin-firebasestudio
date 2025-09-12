@@ -17,7 +17,6 @@ import {
 } from '@/ai/flows/clients-flow';
 import {
     getInvoices,
-    addInvoice,
     addInvoices,
     updateInvoice,
     deleteInvoice,
@@ -93,7 +92,9 @@ export const ApiService = {
             case 'clients':
                 return await addClientFlow(itemData as AddClientInput) as T;
             case 'invoices':
-                return await addInvoice(itemData as AddInvoiceInput) as T;
+                // Note: The invoices flow supports adding multiple invoices. This is a single add for consistency.
+                const newInvoices = await addInvoices([itemData as AddInvoiceInput]);
+                return newInvoices[0] as T;
             case 'expenses':
                 return await addExpense(itemData as AddExpenseInput) as T;
             case 'expenseCategories':

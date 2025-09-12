@@ -1,3 +1,4 @@
+
 import { z } from 'zod';
 import { ClientSchema } from './client-types';
 import { PlanSchema } from './plan-types';
@@ -22,7 +23,7 @@ export const DataMigrationInputSchema = z.object({
     clients: z.array(ClientSchema).optional(),
     plans: z.array(PlanSchema).optional(),
     invoices: z.array(InvoiceSchema).optional(),
-    expenses: z.array(ExpenseSchema.extend({ category: z.string() })).optional(), // Expense from local storage has category name
+    expenses: z.array(ExpenseSchema).optional(),
     expenseCategories: z.array(ExpenseCategorySchema).optional(),
     settings: CompanySettingsSchema.optional(),
 });

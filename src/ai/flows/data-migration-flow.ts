@@ -138,7 +138,7 @@ const migrateDataFlow = ai.defineFlow(
                         (input.expenses?.length || 0) === 0 &&
                         (input.expenseCategories?.length || 0) === 0 &&
                         !input.settings
-                        ? 'Nenhum dado local encontrado para migrar, mas a conexão com o banco de dados foi verificada.'
+                        ? 'Nenhum dado local encontrado para migrar, mas a conexão com o banco de dados foi verificada e as tabelas estão prontas.'
                         : 'Migração de dados concluída com sucesso! Todos os dados foram salvos no banco de dados.';
 
 
