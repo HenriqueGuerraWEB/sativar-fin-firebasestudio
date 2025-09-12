@@ -116,28 +116,24 @@ export default function SettingsPage() {
         if (isDbEnabled) {
             logs += `[${new Date().toISOString()}] INFO: A aplicação está configurada para usar o banco de dados MySQL.\n`;
             setDbLogs(logs);
-            const result = await testDbConnection();
-            logs += `[${new Date().toISOString()}] RESPOSTA DO SERVIDOR: ${result.message}\n`;
-            if (result.success) {
-                setIsDbConnectionOk(true);
-                toast({ title: "Sucesso!", description: result.message });
-            } else {
-                toast({ title: "Erro de Conexão", description: result.message, variant: "destructive" });
+            try {
+                const result = await testDbConnection();
+                logs += `[${new Date().toISOString()}] RESPOSTA DO SERVIDOR: ${result.message}\n`;
+                if (result.success) {
+                    setIsDbConnectionOk(true);
+                    toast({ title: "Sucesso!", description: result.message });
+                } else {
+                    toast({ title: "Erro de Conexão", description: result.message, variant: "destructive" });
+                }
+            } catch (error: any) {
+                 logs += `[${new Date().toISOString()}] ERRO CRÍTICO: Falha ao chamar o fluxo de teste. ${error.message}\n`;
+                 toast({ title: "Erro", description: "Não foi possível executar o teste de conexão.", variant: "destructive" });
             }
+
         } else {
             logs += `[${new Date().toISOString()}] INFO: A aplicação está configurada para usar 'localStorage'.\n`;
-            try {
-                localStorage.setItem('__db_test__', 'success');
-                const testResult = localStorage.getItem('__db_test__');
-                localStorage.removeItem('__db_test__');
-                if (testResult !== 'success') throw new Error('Falha ao ler/escrever no localStorage.');
-                logs += `[${new Date().toISOString()}] SUCESSO: A leitura e escrita no localStorage foi bem-sucedida.\n`;
-                logs += `[${new Date().toISOString()}] STATUS: Conexão local está ativa e funcional.\n`;
-                toast({ title: "Sucesso", description: "A conexão com o armazenamento local foi testada com sucesso." });
-            } catch (error: any) {
-                logs += `[${new Date().toISOString()}] ERRO: ${error.message}\n`;
-                toast({ title: "Erro de Armazenamento", description: error.message, variant: "destructive" });
-            }
+            logs += `[${new Date().toISOString()}] AVISO: Para testar a conexão MySQL, defina a variável NEXT_PUBLIC_DATABASE_ENABLED como 'true' no seu ambiente.\n`;
+            toast({ title: "Modo LocalStorage", description: "A aplicação está usando o armazenamento local. A conexão com o MySQL não foi testada." });
         }
 
         logs += `[${new Date().toISOString()}] Teste de conexão finalizado.`;
@@ -281,7 +277,7 @@ export default function SettingsPage() {
                     </CardHeader>
                     <CardContent className="grid gap-6">
                         <div className="flex flex-wrap gap-2">
-                            <Button onClick={handleTestConnection} disabled={isTesting || !isDbEnabled}>
+                            <Button onClick={handleTestConnection} disabled={isTesting}>
                                 <Server className="mr-2 h-4 w-4" />
                                 {isTesting ? 'Testando...' : 'Testar Conexão'}
                             </Button>
@@ -335,3 +331,5 @@ export default function SettingsPage() {
         </div>
     );
 }
+
+    
