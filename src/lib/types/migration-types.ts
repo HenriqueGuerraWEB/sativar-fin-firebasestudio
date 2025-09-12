@@ -28,8 +28,8 @@ const PlanSchema = z.object({
   description: z.string(),
   price: z.number(),
   type: z.enum(['recurring', 'one-time']),
-  recurrenceValue: z.number().optional(),
-  recurrencePeriod: z.enum(['dias', 'meses', 'anos']).optional(),
+  recurrenceValue: z.number().optional().nullable(),
+  recurrencePeriod: z.enum(['dias', 'meses', 'anos']).optional().nullable(),
 });
 
 const InvoiceSchema = z.object({
@@ -62,6 +62,7 @@ const ExpenseCategorySchema = z.object({
 });
 
 const CompanySettingsSchema = z.object({
+    id: z.string(),
     name: z.string(),
     address: z.string(),
     phone: z.string(),
@@ -74,11 +75,11 @@ const CompanySettingsSchema = z.object({
 
 // Input schema for the migration flow
 export const DataMigrationInputSchema = z.object({
-    clients: z.array(ClientSchema),
-    plans: z.array(PlanSchema),
-    invoices: z.array(InvoiceSchema),
-    expenses: z.array(ExpenseSchema),
-    expenseCategories: z.array(ExpenseCategorySchema),
+    clients: z.array(ClientSchema).optional(),
+    plans: z.array(PlanSchema).optional(),
+    invoices: z.array(InvoiceSchema).optional(),
+    expenses: z.array(ExpenseSchema).optional(),
+    expenseCategories: z.array(ExpenseCategorySchema).optional(),
     settings: CompanySettingsSchema.optional(),
 });
 export type DataMigrationInput = z.infer<typeof DataMigrationInputSchema>;
@@ -95,3 +96,5 @@ export const DataMigrationOutputSchema = z.object({
     categoriesMigrated: z.number(),
 });
 export type DataMigrationOutput = z.infer<typeof DataMigrationOutputSchema>;
+
+    

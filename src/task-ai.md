@@ -194,6 +194,19 @@ CREATE TABLE IF NOT EXISTS `invoices` (
   FOREIGN KEY (`client_id`) REFERENCES `clients`(`id`) ON DELETE CASCADE,
   FOREIGN KEY (`plan_id`) REFERENCES `plans`(`id`) ON DELETE SET NULL
 );
+
+-- Tabela de Configurações da Empresa
+CREATE TABLE IF NOT EXISTS `company_settings` (
+  `id` VARCHAR(255) PRIMARY KEY,
+  `name` VARCHAR(255),
+  `cpf` VARCHAR(50),
+  `cnpj` VARCHAR(50),
+  `address` TEXT,
+  `phone` VARCHAR(50),
+  `email` VARCHAR(255),
+  `website` VARCHAR(255),
+  `logo` LONGTEXT
+);
 ```
 
 ## 4. Executando a Aplicação
@@ -224,3 +237,5 @@ npm run genkit:dev
     *   Clique no botão **"Testar Conexão"** para verificar se o backend consegue se comunicar com o banco de dados.
     *   Se o teste for bem-sucedido, o botão **"Iniciar Migração de Dados"** será habilitado. Clique nele para **transferir** os dados do `localStorage` para o MySQL. Se não houver dados, o processo apenas verificará a conexão e as tabelas.
     *   A partir deste ponto, a aplicação usará o MySQL como sua fonte de dados principal.
+
+    

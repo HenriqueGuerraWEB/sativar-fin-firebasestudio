@@ -57,18 +57,21 @@ export default function SettingsPage() {
 
 
     useEffect(() => {
-        if(user) {
-            setIsLoading(true);
-            const storedSettings = LocalStorageService.getItem<CompanySettings & {id: string}>('company-settings', 'single-settings');
-            if (storedSettings) {
-                setSettings(storedSettings);
-            } else {
-                 const initialSettings = { ...emptySettings, id: 'single-settings' };
-                LocalStorageService.addItem('company-settings', initialSettings);
-                setSettings(initialSettings);
+        const loadSettings = async () => {
+            if(user) {
+                setIsLoading(true);
+                const storedSettings = await StorageService.getItem<CompanySettings & {id: string}>('company-settings', 'single-settings');
+                if (storedSettings) {
+                    setSettings(storedSettings);
+                } else {
+                    const initialSettings = { ...emptySettings, id: 'single-settings' };
+                    await StorageService.addItem('company-settings', initialSettings);
+                    setSettings(initialSettings);
+                }
+                setIsLoading(false);
             }
-            setIsLoading(false);
-        }
+        };
+        loadSettings();
     }, [user]);
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -101,7 +104,7 @@ export default function SettingsPage() {
             return;
         }
         setIsSaving(true);
-        LocalStorageService.updateItem('company-settings', 'single-settings', settings);
+        await StorageService.updateItem('company-settings', 'single-settings', settings);
         setIsSaving(false);
         toast({ title: "Sucesso!", description: "Configurações salvas com sucesso." });
     };
@@ -331,5 +334,6 @@ export default function SettingsPage() {
         </div>
     );
 }
+
 
     

@@ -119,46 +119,46 @@ export const LocalStorageService = {
 // This is the "bridge" or "selector". It exports the same interface
 // but dynamically calls either the LocalStorage or ApiService implementation.
 export const StorageService = {
-    getCollection: <T extends Storable>(collectionKey: string): any => {
-        // The API service functions are async, so we must return a promise
-        // for both cases to maintain a consistent interface for the hooks.
+    getCollection: async <T extends Storable>(collectionKey: string): Promise<T[]> => {
         return isDatabaseEnabled 
-            ? ApiService.getCollection<T>(collectionKey)
-            : Promise.resolve(LocalStorageService.getCollection<T>(collectionKey));
+            ? await ApiService.getCollection<T>(collectionKey)
+            : LocalStorageService.getCollection<T>(collectionKey);
     },
-    setCollection: (collectionKey: string, data: any): any => {
+    setCollection: async (collectionKey: string, data: any): Promise<void> => {
          return isDatabaseEnabled 
-            ? ApiService.setCollection(collectionKey, data)
-            : Promise.resolve(LocalStorageService.setCollection(collectionKey, data));
+            ? await ApiService.setCollection(collectionKey, data)
+            : LocalStorageService.setCollection(collectionKey, data);
     },
-    getItem: <T extends Storable>(collectionKey: string, itemId: string): any => {
+    getItem: async <T extends Storable>(collectionKey: string, itemId: string): Promise<T | null> => {
          return isDatabaseEnabled 
-            ? ApiService.getItem<T>(collectionKey, itemId)
-            : Promise.resolve(LocalStorageService.getItem<T>(collectionKey, itemId));
+            ? await ApiService.getItem<T>(collectionKey, itemId)
+            : LocalStorageService.getItem<T>(collectionKey, itemId);
     },
-    addItem: <T extends Storable>(collectionKey: string, itemData: Omit<T, 'id'>): any => {
+    addItem: async <T extends Storable>(collectionKey: string, itemData: Omit<T, 'id'>): Promise<T> => {
          return isDatabaseEnabled 
-            ? ApiService.addItem<T>(collectionKey, itemData)
-            : Promise.resolve(LocalStorageService.addItem<T>(collectionKey, itemData));
+            ? await ApiService.addItem<T>(collectionKey, itemData)
+            : LocalStorageService.addItem<T>(collectionKey, itemData);
     },
-    addItems: <T extends Storable>(collectionKey: string, itemsData: Omit<T, 'id'>[]): any => {
+    addItems: async <T extends Storable>(collectionKey: string, itemsData: Omit<T, 'id'>[]): Promise<T[]> => {
          return isDatabaseEnabled 
-            ? ApiService.addItems<T>(collectionKey, itemsData)
-            : Promise.resolve(LocalStorageService.addItems<T>(collectionKey, itemsData));
+            ? await ApiService.addItems<T>(collectionKey, itemsData)
+            : LocalStorageService.addItems<T>(collectionKey, itemsData);
     },
-    updateItem: <T extends Storable>(collectionKey: string, itemId: string, updates: Partial<Omit<T, 'id'>>): any => {
+    updateItem: async <T extends Storable>(collectionKey: string, itemId: string, updates: Partial<Omit<T, 'id'>>): Promise<T | null> => {
          return isDatabaseEnabled 
-            ? ApiService.updateItem<T>(collectionKey, itemId, updates)
-            : Promise.resolve(LocalStorageService.updateItem<T>(collectionKey, itemId, updates));
+            ? await ApiService.updateItem<T>(collectionKey, itemId, updates)
+            : LocalStorageService.updateItem<T>(collectionKey, itemId, updates);
     },
-    deleteItem: (collectionKey: string, itemId: string): any => {
+    deleteItem: async (collectionKey: string, itemId: string): Promise<void> => {
          return isDatabaseEnabled 
-            ? ApiService.deleteItem(collectionKey, itemId)
-            : Promise.resolve(LocalStorageService.deleteItem(collectionKey, itemId));
+            ? await ApiService.deleteItem(collectionKey, itemId)
+            : LocalStorageService.deleteItem(collectionKey, itemId);
     },
-    deleteItems: (collectionKey: string, itemIds: string[]): any => {
+    deleteItems: async (collectionKey: string, itemIds: string[]): Promise<void> => {
         return isDatabaseEnabled 
-            ? ApiService.deleteItems(collectionKey, itemIds)
-            : Promise.resolve(LocalStorageService.deleteItems(collectionKey, itemIds));
+            ? await ApiService.deleteItems(collectionKey, itemIds)
+            : LocalStorageService.deleteItems(collectionKey, itemIds);
     },
 };
+
+    

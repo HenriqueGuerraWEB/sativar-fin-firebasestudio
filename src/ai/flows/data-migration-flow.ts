@@ -16,7 +16,11 @@ const formatDateForMySQL = (date: Date | string | undefined | null): string | nu
     if (!date) return null;
     // Ensure we have a Date object before formatting
     const dateObj = typeof date === 'string' ? new Date(date) : date;
-    return format(dateObj, 'yyyy-MM-dd HH:mm:ss');
+    try {
+        return format(dateObj, 'yyyy-MM-dd HH:mm:ss');
+    } catch {
+        return null; // Invalid date will throw, return null
+    }
 };
 
 
@@ -109,7 +113,21 @@ const migrateDataFlow = ai.defineFlow(
             console.log(`${input.invoices.length} invoices migrated.`);
         }
 
-        // TODO: Migrate Settings. For now, skipping.
+        // 6. Migrate Settings
+        if (input.settings) {
+            const s = input.settings;
+            const settingsValues = [
+                s.id, s.name, s.cpf, s.cnpj, s.address, s.phone, s.email, s.website, s.logoDataUrl
+            ];
+            await connection.query(
+                `INSERT INTO company_settings (id, name, cpf, cnpj, address, phone, email, website, logo) 
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) 
+                 ON DUPLICATE KEY UPDATE 
+                 name=VALUES(name), cpf=VALUES(cpf), cnpj=VALUES(cnpj), address=VALUES(address), phone=VALUES(phone), email=VALUES(email), website=VALUES(website), logo=VALUES(logo)`,
+                 settingsValues
+            );
+            console.log('Company settings migrated.');
+        }
 
         await connection.commit();
         console.log("Transaction committed successfully.");
@@ -118,7 +136,8 @@ const migrateDataFlow = ai.defineFlow(
                         (input.plans?.length || 0) === 0 &&
                         (input.invoices?.length || 0) === 0 &&
                         (input.expenses?.length || 0) === 0 &&
-                        (input.expenseCategories?.length || 0) === 0
+                        (input.expenseCategories?.length || 0) === 0 &&
+                        !input.settings
                         ? 'Nenhum dado local encontrado para migrar, mas a conexão com o banco de dados foi verificada.'
                         : 'Migração de dados concluída com sucesso! Todos os dados foram salvos no banco de dados.';
 
@@ -142,3 +161,5 @@ const migrateDataFlow = ai.defineFlow(
     }
   }
 );
+
+    
