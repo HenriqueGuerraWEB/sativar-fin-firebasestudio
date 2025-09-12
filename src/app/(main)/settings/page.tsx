@@ -243,7 +243,7 @@ export default function SettingsPage() {
                 <Card>
                     <CardHeader>
                         <CardTitle>Conexão com Banco de Dados</CardTitle>
-                        <CardDescription>Configure e teste a conexão com seu banco de dados PostgreSQL. Atualmente usando: <strong>localStorage</strong>.</CardDescription>
+                        <CardDescription>Configure e teste a conexão com seu banco de dados MySQL. Atualmente usando: <strong>localStorage</strong>.</CardDescription>
                     </CardHeader>
                     <CardContent className="grid gap-6">
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -253,11 +253,11 @@ export default function SettingsPage() {
                             </div>
                             <div className="grid gap-2">
                                 <Label htmlFor="dbPort">Porta</Label>
-                                <Input id="dbPort" placeholder="5432" disabled />
+                                <Input id="dbPort" placeholder="3306" disabled />
                             </div>
                              <div className="grid gap-2">
                                 <Label htmlFor="dbUser">Usuário</Label>
-                                <Input id="dbUser" placeholder="postgres" disabled />
+                                <Input id="dbUser" placeholder="mysql_user" disabled />
                             </div>
                              <div className="grid gap-2">
                                 <Label htmlFor="dbPassword">Senha</Label>
@@ -297,5 +297,7 @@ export default function SettingsPage() {
         </div>
     );
 }
+
+    
 
     
