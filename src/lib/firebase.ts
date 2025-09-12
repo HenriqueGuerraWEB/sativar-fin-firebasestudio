@@ -12,7 +12,6 @@ const firebaseConfig = {
   storageBucket: "sativar-firebase.firebasestorage.app",
   apiKey: "AlzaSyAHAX7P-E2jZIOUZMC1A08AuAAltiXDrOl",
   authDomain: "sativar-firebase.firebaseapp.com",
-  measurementId: "",
   messagingSenderId: "741613626340",
 };
 

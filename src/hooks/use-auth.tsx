@@ -17,13 +17,16 @@ import React, {
   useEffect,
   useState,
   useMemo,
+  useCallback,
 } from "react";
 import { auth, googleProvider } from "@/lib/firebase";
 import { useRouter, usePathname } from "next/navigation";
+import { StorageService } from "@/lib/storage-service";
 
 interface AuthContextType {
   user: User | null;
   loading: boolean;
+  adminExists: boolean | null;
   login: (email: string, pass: string) => Promise<any>;
   loginWithGoogle: () => Promise<any>;
   signup: (email: string, pass: string, name?: string) => Promise<any>;
@@ -35,13 +38,33 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [adminExists, setAdminExists] = useState<boolean | null>(null);
 
   useEffect(() => {
+    const checkAdminStatus = () => {
+      const adminFlag = StorageService.getItem('sativar-config', 'admin_exists');
+      setAdminExists(!!adminFlag);
+    };
+    checkAdminStatus();
+
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       setUser(user);
+      if (user) {
+         const adminFlag = StorageService.getItem('sativar-config', 'admin_exists');
+         if (!adminFlag) {
+            StorageService.addItem('sativar-config', { id: 'admin_exists', value: true });
+            setAdminExists(true);
+         }
+      }
       setLoading(false);
     });
-    return () => unsubscribe();
+
+    window.addEventListener('storage', checkAdminStatus);
+
+    return () => {
+      unsubscribe();
+      window.removeEventListener('storage', checkAdminStatus);
+    };
   }, []);
 
   const login = (email: string, pass: string) => {
@@ -54,12 +77,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signup = async (email: string, pass: string, name?: string) => {
     const userCredential = await createUserWithEmailAndPassword(auth, email, pass);
-    if (userCredential.user && name) {
-      await updateProfile(userCredential.user, { displayName: name });
-      // To get the updated user object in the context, we need to refresh it.
-      // A simple way is to re-set the state, but onAuthStateChanged will handle it.
-      // For immediate UI update, you might need to manually set it.
-       setUser(auth.currentUser);
+    if (userCredential.user) {
+      if (name) {
+        await updateProfile(userCredential.user, { displayName: name });
+      }
+      // Set admin flag
+      StorageService.addItem('sativar-config', { id: 'admin_exists', value: true });
+      setAdminExists(true);
+      setUser(auth.currentUser);
     }
     return userCredential;
   };
@@ -72,12 +97,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     () => ({
       user,
       loading,
+      adminExists,
       login,
       loginWithGoogle,
       signup,
       logout,
     }),
-    [user, loading]
+    [user, loading, adminExists]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

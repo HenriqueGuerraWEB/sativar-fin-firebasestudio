@@ -19,7 +19,7 @@ import { useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
 
 export default function SignupPage() {
-  const { user, signup } = useAuth();
+  const { user, signup, adminExists, loading: authLoading } = useAuth();
   const router = useRouter();
   const { toast } = useToast();
   const [name, setName] = useState("");
@@ -29,12 +29,29 @@ export default function SignupPage() {
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
+    if (authLoading) return; // Wait until auth state is determined
+    
     if (user) {
       router.push("/dashboard");
+    } else if (adminExists) {
+      toast({
+        title: "Acesso Negado",
+        description: "Já existe um administrador para este sistema. Por favor, faça o login.",
+      });
+      router.push("/login");
     }
-  }, [user, router]);
+  }, [user, adminExists, authLoading, router, toast]);
 
   const handleSignup = async () => {
+    if (adminExists) {
+      toast({
+        title: "Cadastro Bloqueado",
+        description: "O registro de novas contas não é permitido.",
+        variant: "destructive",
+      });
+      router.push('/login');
+      return;
+    }
     if (!name) {
        toast({
         title: "Erro",
@@ -75,6 +92,14 @@ export default function SignupPage() {
       setIsLoading(false);
     }
   };
+  
+    if (authLoading || adminExists === null) {
+      return (
+            <div className="flex h-screen w-full items-center justify-center">
+                <div className="h-16 w-16 animate-spin rounded-full border-4 border-solid border-primary border-t-transparent"></div>
+            </div>
+      )
+    }
 
   return (
     <div className="flex h-screen w-full items-center justify-center bg-background px-4">
