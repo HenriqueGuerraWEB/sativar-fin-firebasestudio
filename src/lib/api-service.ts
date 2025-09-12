@@ -2,69 +2,97 @@
 "use client";
 
 import type { Storable } from './storage-service';
-// Import your Genkit flows here when they are created
-// import { getItemsFlow, addItemFlow, etc } from '@/ai/flows/database-flows';
+// Import your Genkit flows here
+import { 
+    getPlans, 
+    addPlan, 
+    updatePlan,
+    deletePlan,
+    Plan, 
+    AddPlanInput,
+    UpdatePlanInput,
+} from '@/ai/flows/plans-flow';
 
 /**
  * ApiService
  * This service acts as the client-side adapter for database operations.
- * It mirrors the interface of the LocalStorageService but calls backend API endpoints instead.
- * 
- * NOTE: For now, these functions are placeholders. They will be implemented to call
- * the actual backend API endpoints (Genkit flows or Next.js API routes) that interact
- * with the MySQL database. Returning empty/default values ensures the app doesn't
- * crash when in database mode before the backend is fully wired up.
+ * It mirrors the interface of the LocalStorageService but calls backend API endpoints (Genkit flows).
  */
 export const ApiService = {
     getCollection: async <T extends Storable>(collectionKey: string): Promise<T[]> => {
         console.log(`ApiService: Fetching collection ${collectionKey}...`);
-        // Example: return await getCollectionFlow(collectionKey);
-        return Promise.resolve([]);
+        switch (collectionKey) {
+            case 'plans':
+                return await getPlans() as T[];
+            // Add cases for other collections here as flows are created
+            // case 'clients':
+            //     return await getClients() as T[];
+            default:
+                console.warn(`ApiService: No getCollection handler for ${collectionKey}`);
+                return Promise.resolve([]);
+        }
     },
 
     setCollection: async (collectionKey: string, data: any): Promise<void> => {
         console.log(`ApiService: Setting collection ${collectionKey}...`);
         // This would likely be a bulk-update or migration endpoint.
-        // Example: return await setCollectionFlow({ collectionKey, data });
+        // To be implemented if needed.
         return Promise.resolve();
     },
 
     getItem: async <T extends Storable>(collectionKey: string, itemId: string): Promise<T | null> => {
         console.log(`ApiService: Fetching item ${itemId} from ${collectionKey}...`);
-        // Example: return await getItemFlow({ collectionKey, itemId });
-        return Promise.resolve(null);
+        // This is inefficient. It's better to create specific `getItem` flows.
+        const collection = await ApiService.getCollection<T>(collectionKey);
+        return Promise.resolve(collection.find(item => item.id === itemId) || null);
     },
 
     addItem: async <T extends Storable>(collectionKey: string, itemData: Omit<T, 'id'>): Promise<T> => {
         console.log(`ApiService: Adding item to ${collectionKey}...`);
-        // Example: return await addItemFlow({ collectionKey, itemData });
-        // Returning a mock object for now to avoid breaking the hooks' expectations.
-        return Promise.resolve({ ...itemData, id: 'temp-api-id' } as T);
+        switch (collectionKey) {
+            case 'plans':
+                return await addPlan(itemData as AddPlanInput) as T;
+            default:
+                console.warn(`ApiService: No addItem handler for ${collectionKey}`);
+                // Returning a mock object for now to avoid breaking hooks' expectations.
+                return Promise.resolve({ ...itemData, id: 'temp-api-id' } as T);
+        }
     },
 
     addItems: async <T extends Storable>(collectionKey: string, itemsData: Omit<T, 'id'>[]): Promise<T[]> => {
         console.log(`ApiService: Adding multiple items to ${collectionKey}...`);
-        // Example: return await addItemsFlow({ collectionKey, itemsData });
-        return Promise.resolve(itemsData.map(item => ({ ...item, id: `temp-api-id-${Math.random()}` } as T)));
+        // This should be implemented with a dedicated bulk-add flow for efficiency.
+        const results = await Promise.all(itemsData.map(item => ApiService.addItem<T>(collectionKey, item)));
+        return results;
     },
 
     updateItem: async <T extends Storable>(collectionKey: string, itemId: string, updates: Partial<Omit<T, 'id'>>): Promise<T | null> => {
         console.log(`ApiService: Updating item ${itemId} in ${collectionKey}...`);
-        // Example: return await updateItemFlow({ collectionKey, itemId, updates });
-        return Promise.resolve(null);
+        switch (collectionKey) {
+            case 'plans':
+                const input: UpdatePlanInput = { planId: itemId, updates: updates as Partial<Plan> };
+                return await updatePlan(input) as T | null;
+            default:
+                 console.warn(`ApiService: No updateItem handler for ${collectionKey}`);
+                 return Promise.resolve(null);
+        }
     },
 
     deleteItem: async (collectionKey: string, itemId: string): Promise<void> => {
         console.log(`ApiService: Deleting item ${itemId} from ${collectionKey}...`);
-        // Example: return await deleteItemFlow({ collectionKey, itemId });
-        return Promise.resolve();
+        switch (collectionKey) {
+            case 'plans':
+                return await deletePlan(itemId);
+            default:
+                console.warn(`ApiService: No deleteItem handler for ${collectionKey}`);
+                return Promise.resolve();
+        }
     },
 
     deleteItems: async (collectionKey: string, itemIds: string[]): Promise<void> => {
         console.log(`ApiService: Deleting multiple items from ${collectionKey}...`);
-        // Example: return await deleteItemsFlow({ collectionKey, itemIds });
+        // This should be implemented with a dedicated bulk-delete flow for efficiency.
+        await Promise.all(itemIds.map(id => ApiService.deleteItem(collectionKey, id)));
         return Promise.resolve();
     },
 };
-
-    
