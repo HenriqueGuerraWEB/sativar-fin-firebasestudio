@@ -31,11 +31,11 @@ export const getClients = ai.defineFlow(
   async () => {
     console.log('[CLIENTS_FLOW] Fetching all clients from database...');
     const results: any[] = await executeQuery('SELECT * FROM clients ORDER BY created_at DESC');
-    // The 'plans' column is stored as JSON in the database.
-    // We need to parse it before returning.
+    // The mysql2 driver automatically parses JSON columns.
+    // We just need to handle the case where the column might be null.
     return results.map(client => ({
         ...client,
-        plans: client.plans && client.plans.trim() !== '' ? JSON.parse(client.plans) : []
+        plans: client.plans || [] // If client.plans is null, default to an empty array.
     })) as Client[];
   }
 );
@@ -96,7 +96,7 @@ export const updateClient = ai.defineFlow(
         const result: any[] = await executeQuery('SELECT * FROM clients WHERE id = ?', [clientId]);
         if (result.length > 0) {
             const client = result[0];
-            return { ...client, plans: client.plans && client.plans.trim() !== '' ? JSON.parse(client.plans) : [] } as Client;
+            return { ...client, plans: client.plans || [] } as Client;
         }
         return null;
     }
@@ -115,7 +115,7 @@ export const updateClient = ai.defineFlow(
     const result: any[] = await executeQuery('SELECT * FROM clients WHERE id = ?', [clientId]);
      if (result.length > 0) {
         const client = result[0];
-        return { ...client, plans: client.plans && client.plans.trim() !== '' ? JSON.parse(client.plans) : [] } as Client;
+        return { ...client, plans: client.plans || [] } as Client;
     }
     return null;
   }
