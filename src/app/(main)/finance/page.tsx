@@ -89,16 +89,21 @@ export default function FinancePage() {
     const [cashFlowView, setCashFlowView] = useState<'daily' | 'monthly' | 'yearly'>('monthly');
     
     useEffect(() => {
-        setIsLoading(true);
-        const storedExpenses = StorageService.getCollection<Expense>('expenses');
-        const storedInvoices = StorageService.getCollection<Invoice>('invoices');
-        const storedCategories = StorageService.getCollection<ExpenseCategory>('expenseCategories');
-        
-        setExpenses(storedExpenses.sort((a: Expense, b: Expense) => b.dueDate.getTime() - a.dueDate.getTime()));
-        setInvoices(storedInvoices.sort((a: Invoice, b: Invoice) => b.dueDate.getTime() - a.dueDate.getTime()));
-        setCategories(storedCategories.sort((a: ExpenseCategory, b: ExpenseCategory) => a.name.localeCompare(b.name)));
-        
-        setIsLoading(false);
+        const loadData = async () => {
+            setIsLoading(true);
+            const [storedExpenses, storedInvoices, storedCategories] = await Promise.all([
+                StorageService.getCollection<Expense>('expenses'),
+                StorageService.getCollection<Invoice>('invoices'),
+                StorageService.getCollection<ExpenseCategory>('expenseCategories'),
+            ]);
+            
+            setExpenses(storedExpenses.sort((a: Expense, b: Expense) => new Date(b.dueDate).getTime() - new Date(a.dueDate).getTime()));
+            setInvoices(storedInvoices.sort((a: Invoice, b: Invoice) => new Date(b.dueDate).getTime() - new Date(a.dueDate).getTime()));
+            setCategories(storedCategories.sort((a: ExpenseCategory, b: ExpenseCategory) => a.name.localeCompare(b.name)));
+            
+            setIsLoading(false);
+        };
+        loadData();
     }, []);
     
     const cashFlowReport = useMemo(() => {
@@ -114,16 +119,16 @@ export default function FinancePage() {
             end = endOfYear(currentDate);
         }
 
-        const paidInvoices = invoices.filter(inv => inv.status === 'Paga' && inv.dueDate >= start && inv.dueDate <= end);
-        const paidExpenses = expenses.filter(exp => exp.status === 'Paga' && exp.dueDate >= start && exp.dueDate <= end);
+        const paidInvoices = invoices.filter(inv => inv.status === 'Paga' && new Date(inv.dueDate) >= start && new Date(inv.dueDate) <= end);
+        const paidExpenses = expenses.filter(exp => exp.status === 'Paga' && new Date(exp.dueDate) >= start && new Date(exp.dueDate) <= end);
 
         const totalIncome = paidInvoices.reduce((sum, inv) => sum + inv.amount, 0);
         const totalExpenses = paidExpenses.reduce((sum, exp) => sum + exp.amount, 0);
         const balance = totalIncome - totalExpenses;
 
         const transactions: Transaction[] = [
-            ...paidInvoices.map(inv => ({ id: inv.id, date: inv.dueDate, description: `Fatura: ${inv.clientName}`, amount: inv.amount, type: 'Entrada' as const })),
-            ...paidExpenses.map(exp => ({ id: exp.id, date: exp.dueDate, description: exp.description, amount: exp.amount, type: 'Saída' as const })),
+            ...paidInvoices.map(inv => ({ id: inv.id, date: new Date(inv.dueDate), description: `Fatura: ${inv.clientName}`, amount: inv.amount, type: 'Entrada' as const })),
+            ...paidExpenses.map(exp => ({ id: exp.id, date: new Date(exp.dueDate), description: exp.description, amount: exp.amount, type: 'Saída' as const })),
         ].sort((a, b) => b.date.getTime() - a.date.getTime());
         
         let chartData: CashFlowData[] = [];
@@ -144,20 +149,22 @@ export default function FinancePage() {
         }
 
         paidInvoices.forEach(inv => {
+            const invDate = new Date(inv.dueDate);
             if (cashFlowView === 'monthly') {
-                const dayIndex = inv.dueDate.getDate() - 1;
+                const dayIndex = invDate.getDate() - 1;
                 if (chartData[dayIndex]) chartData[dayIndex].Entradas += inv.amount;
             } else if (cashFlowView === 'yearly') {
-                const monthIndex = getMonth(inv.dueDate);
+                const monthIndex = getMonth(invDate);
                 if (chartData[monthIndex]) chartData[monthIndex].Entradas += inv.amount;
             }
         });
         paidExpenses.forEach(exp => {
+             const expDate = new Date(exp.dueDate);
             if (cashFlowView === 'monthly') {
-                const dayIndex = exp.dueDate.getDate() - 1;
+                const dayIndex = expDate.getDate() - 1;
                 if(chartData[dayIndex]) chartData[dayIndex].Saídas += exp.amount;
             } else if (cashFlowView === 'yearly') {
-                const monthIndex = getMonth(exp.dueDate);
+                const monthIndex = getMonth(expDate);
                 if(chartData[monthIndex]) chartData[monthIndex].Saídas += exp.amount;
             }
         });
@@ -200,13 +207,13 @@ export default function FinancePage() {
             return;
         }
 
-        const newExpense: Omit<Expense, 'id'> = {
+        const newExpenseData: Omit<Expense, 'id'> = {
             ...currentExpense,
             status: "Pendente",
         };
 
-        const addedExpense = StorageService.addItem<Expense>('expenses', newExpense);
-        setExpenses(prev => [...prev, addedExpense].sort((a,b) => b.dueDate.getTime() - a.dueDate.getTime()));
+        const addedExpense = await StorageService.addItem<Expense>('expenses', newExpenseData);
+        setExpenses(prev => [...prev, addedExpense].sort((a,b) => new Date(b.dueDate).getTime() - new Date(a.dueDate).getTime()));
 
         toast({ title: "Sucesso", description: "Despesa adicionada com sucesso." });
         setIsSheetOpen(false);
@@ -214,7 +221,7 @@ export default function FinancePage() {
     };
     
     const handleUpdateExpenseStatus = async (expenseId: string, status: Expense['status']) => {
-        const updatedExpense = StorageService.updateItem<Expense>('expenses', expenseId, { status });
+        const updatedExpense = await StorageService.updateItem<Expense>('expenses', expenseId, { status });
         if (updatedExpense) {
             setExpenses(prev => prev.map(exp => exp.id === expenseId ? updatedExpense : exp));
             toast({ title: "Sucesso", description: `Despesa marcada como ${status}.`});
@@ -222,7 +229,7 @@ export default function FinancePage() {
     };
 
     const handleDeleteExpense = async (expenseId: string) => {
-        StorageService.deleteItem('expenses', expenseId);
+        await StorageService.deleteItem('expenses', expenseId);
         setExpenses(prev => prev.filter(exp => exp.id !== expenseId));
         toast({ title: "Sucesso", description: "Despesa excluída com sucesso." });
     };
@@ -233,7 +240,7 @@ export default function FinancePage() {
             return;
         }
        
-        const newCategory = StorageService.addItem<ExpenseCategory>('expenseCategories', { name: newCategoryName });
+        const newCategory = await StorageService.addItem<ExpenseCategory>('expenseCategories', { name: newCategoryName });
         setCategories(prev => [...prev, newCategory].sort((a,b) => a.name.localeCompare(b.name)));
 
         toast({ title: "Sucesso!", description: `Categoria "${newCategoryName}" adicionada.` });
@@ -398,7 +405,7 @@ export default function FinancePage() {
                                             <TableRow key={expense.id}>
                                                 <TableCell className="font-medium">{expense.description}</TableCell>
                                                 <TableCell><Badge variant="outline">{categories.find(c => c.id === expense.category)?.name || 'N/A'}</Badge></TableCell>
-                                                <TableCell>{format(expense.dueDate, 'dd/MM/yyyy')}</TableCell>
+                                                <TableCell>{format(new Date(expense.dueDate), 'dd/MM/yyyy')}</TableCell>
                                                 <TableCell><Badge variant={expense.status === 'Paga' ? 'secondary' : 'destructive'}>{expense.status}</Badge></TableCell>
                                                 <TableCell className="text-right">{expense.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</TableCell>
                                                 <TableCell>
@@ -475,7 +482,7 @@ export default function FinancePage() {
                                         )) : invoices.filter(invoice => invoice.status === 'Paga').map(invoice => (
                                             <TableRow key={invoice.id}>
                                                 <TableCell className="font-medium">{invoice.clientName}</TableCell>
-                                                <TableCell>{format(invoice.dueDate, 'dd/MM/yyyy')}</TableCell>
+                                                <TableCell>{format(new Date(invoice.dueDate), 'dd/MM/yyyy')}</TableCell>
                                                 <TableCell className="text-right">{invoice.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</TableCell>
                                             </TableRow>
                                         ))}
@@ -649,3 +656,5 @@ export default function FinancePage() {
         </div>
     );
 }
+
+    

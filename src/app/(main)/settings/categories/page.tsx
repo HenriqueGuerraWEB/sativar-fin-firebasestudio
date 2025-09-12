@@ -33,10 +33,13 @@ export default function ExpenseCategoriesPage() {
     const [currentCategory, setCurrentCategory] = useState<Omit<Category, 'id'> | Category>(emptyCategory);
 
     useEffect(() => {
-        setIsLoading(true);
-        const storedCategories = StorageService.getCollection<Category>('expenseCategories');
-        setCategories(storedCategories.sort((a, b) => a.name.localeCompare(b.name)));
-        setIsLoading(false);
+        const loadCategories = async () => {
+            setIsLoading(true);
+            const storedCategories = await StorageService.getCollection<Category>('expenseCategories');
+            setCategories(storedCategories.sort((a, b) => a.name.localeCompare(b.name)));
+            setIsLoading(false);
+        };
+        loadCategories();
     }, []);
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -55,14 +58,14 @@ export default function ExpenseCategoriesPage() {
         }
 
         if ('id' in currentCategory) {
-            const updatedCategory = StorageService.updateItem<Category>('expenseCategories', currentCategory.id, { name: currentCategory.name });
+            const updatedCategory = await StorageService.updateItem<Category>('expenseCategories', currentCategory.id, { name: currentCategory.name });
             if (updatedCategory) {
                 setCategories(prev => 
                     prev.map(cat => cat.id === currentCategory.id ? updatedCategory : cat).sort((a, b) => a.name.localeCompare(b.name))
                 );
             }
         } else {
-            const newCategory = StorageService.addItem<Category>('expenseCategories', { name: currentCategory.name });
+            const newCategory = await StorageService.addItem<Category>('expenseCategories', { name: currentCategory.name });
             setCategories(prev => [...prev, newCategory].sort((a, b) => a.name.localeCompare(b.name)));
         }
 
@@ -82,7 +85,7 @@ export default function ExpenseCategoriesPage() {
     };
 
     const handleDelete = async (categoryId: string) => {
-        StorageService.deleteItem('expenseCategories', categoryId);
+        await StorageService.deleteItem('expenseCategories', categoryId);
         setCategories(prev => prev.filter(cat => cat.id !== categoryId));
         toast({ title: "Sucesso", description: "Categoria excluída com sucesso." });
     };
@@ -190,3 +193,5 @@ export default function ExpenseCategoriesPage() {
         </div>
     );
 }
+
+    

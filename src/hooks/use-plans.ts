@@ -21,21 +21,22 @@ export function usePlans() {
     const [plans, setPlans] = useState<Plan[]>([]);
     const [isLoading, setIsLoading] = useState(true);
 
-    const getPlansFromStorage = useCallback((): Plan[] => {
-        return StorageService.getCollection<Plan>('plans');
-    }, []);
-    
     useEffect(() => {
-        setPlans(getPlansFromStorage());
-        setIsLoading(false);
-    }, [getPlansFromStorage]);
+        const loadPlans = async () => {
+            setIsLoading(true);
+            const plansFromStorage = await StorageService.getCollection<Plan>('plans');
+            setPlans(plansFromStorage);
+            setIsLoading(false);
+        }
+        loadPlans();
+    }, []);
 
     const addPlan = async (planData: Omit<Plan, 'id'>) => {
         try {
-            const newPlan = StorageService.addItem<Plan>('plans', planData);
+            const newPlan = await StorageService.addItem<Plan>('plans', planData);
             setPlans(prev => [...prev, newPlan]);
         } catch (error) {
-            console.error("Error adding plan to localStorage:", error);
+            console.error("Error adding plan:", error);
             toast({ title: "Erro", description: "Não foi possível adicionar o plano.", variant: "destructive"});
             throw new Error("Failed to add plan");
         }
@@ -43,12 +44,12 @@ export function usePlans() {
 
     const updatePlan = async (planId: string, planData: Partial<Omit<Plan, 'id'>>) => {
         try {
-            const updatedPlan = StorageService.updateItem<Plan>('plans', planId, planData);
+            const updatedPlan = await StorageService.updateItem<Plan>('plans', planId, planData);
             if (updatedPlan) {
                 setPlans(prev => prev.map(p => p.id === planId ? updatedPlan : p));
             }
         } catch (error) {
-            console.error("Error updating plan in localStorage:", error);
+            console.error("Error updating plan:", error);
             toast({ title: "Erro", description: "Não foi possível atualizar o plano.", variant: "destructive"});
             throw new Error("Failed to update plan");
         }
@@ -56,10 +57,10 @@ export function usePlans() {
 
     const deletePlan = async (planId: string) => {
         try {
-            StorageService.deleteItem('plans', planId);
+            await StorageService.deleteItem('plans', planId);
             setPlans(prev => prev.filter(p => p.id !== planId));
         } catch (error) {
-            console.error("Error deleting plan from localStorage:", error);
+            console.error("Error deleting plan:", error);
             toast({ title: "Erro", description: "Não foi possível excluir o plano.", variant: "destructive"});
             throw new Error("Failed to delete plan");
         }
@@ -67,3 +68,5 @@ export function usePlans() {
 
     return { plans, isLoading, addPlan, updatePlan, deletePlan };
 }
+
+    

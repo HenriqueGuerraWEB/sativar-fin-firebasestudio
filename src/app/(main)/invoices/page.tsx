@@ -106,41 +106,38 @@ export default function InvoicesPage() {
     
     const processInvoices = useCallback((invoicesData: Invoice[]) => {
         const today = startOfDay(new Date());
-        let hasUpdates = false;
+        const updatePromises: Promise<any>[] = [];
 
         const updatedInvoices = invoicesData.map(invoice => {
-            if (!invoice.dueDate) return invoice;
-            const dueDate = invoice.dueDate;
+             const dueDate = new Date(invoice.dueDate);
             if (invoice.status === 'Pendente' && isBefore(dueDate, today)) {
-                hasUpdates = true;
+                updatePromises.push(StorageService.updateItem('invoices', invoice.id, { status: 'Vencida' as const }));
                 return {...invoice, status: 'Vencida' as const};
             }
             return invoice;
         });
         
-        if (hasUpdates) {
-           StorageService.setCollection('invoices', updatedInvoices);
-        }
-
-        return updatedInvoices.sort((a,b) => b.issueDate.getTime() - a.issueDate.getTime());
+        return updatedInvoices.sort((a,b) => new Date(b.issueDate).getTime() - new Date(a.issueDate).getTime());
     }, []);
-    
-    useEffect(() => {
+
+    const loadInvoices = useCallback(async () => {
         setIsLoading(true);
-        const storedInvoices = StorageService.getCollection<Invoice>('invoices');
+        const storedInvoices = await StorageService.getCollection<Invoice>('invoices');
         const processed = processInvoices(storedInvoices);
         setInvoices(processed);
         setIsLoading(false);
+    }, [processInvoices]);
+    
+    useEffect(() => {
+        loadInvoices();
 
         const handleStorageChange = () => {
-             const storedInvoices = StorageService.getCollection<Invoice>('invoices');
-             const processed = processInvoices(storedInvoices);
-             setInvoices(processed);
+            loadInvoices();
         }
         window.addEventListener('storage', handleStorageChange);
         return () => window.removeEventListener('storage', handleStorageChange);
 
-    }, [processInvoices]);
+    }, [loadInvoices]);
     
     const groupedInvoices = useMemo(() => {
         return invoices.reduce((acc, invoice) => {
@@ -152,7 +149,7 @@ export default function InvoicesPage() {
                 };
             }
             acc[clientId].invoices.push(invoice);
-            acc[clientId].invoices.sort((a,b) => b.dueDate.getTime() - a.dueDate.getTime());
+            acc[clientId].invoices.sort((a,b) => new Date(b.dueDate).getTime() - new Date(a.dueDate).getTime());
             return acc;
         }, {} as GroupedInvoices);
     }, [invoices]);
@@ -160,7 +157,7 @@ export default function InvoicesPage() {
     const handleGenerateInvoices = async () => {
         setIsGenerating(true);
         try {
-            const allClients: Client[] = StorageService.getCollection<Client>('clients');
+            const allClients: Client[] = await StorageService.getCollection<Client>('clients');
             const activeClients = allClients.filter(client => client.status === "Ativo" && client.plans && client.plans.length > 0);
 
             if (activeClients.length === 0) {
@@ -169,14 +166,14 @@ export default function InvoicesPage() {
                 return;
             }
 
-            const allPlans: Plan[] = StorageService.getCollection<Plan>('plans');
+            const allPlans: Plan[] = await StorageService.getCollection<Plan>('plans');
             const plansMap = allPlans.reduce((acc, plan) => {
                 acc[plan.id] = plan;
                 return acc;
             }, {} as Record<string, Plan>);
 
-            const allInvoices: Invoice[] = StorageService.getCollection<Invoice>('invoices');
-            let newInvoices: Omit<Invoice, 'id'>[] = [];
+            const allInvoices: Invoice[] = await StorageService.getCollection<Invoice>('invoices');
+            let newInvoicesData: Omit<Invoice, 'id'>[] = [];
             const today = startOfDay(new Date());
 
             for (const client of activeClients) {
@@ -185,15 +182,16 @@ export default function InvoicesPage() {
                     if (!plan) continue;
 
                     const clientPlanInvoices = allInvoices.filter(inv => inv.clientId === client.id && inv.planId === clientPlan.planId);
+                    const activationDate = new Date(clientPlan.planActivationDate);
 
                     if (plan.type === 'one-time') {
                         if (clientPlanInvoices.length === 0) {
-                             newInvoices.push({
+                             newInvoicesData.push({
                                 clientId: client.id,
                                 clientName: client.name,
                                 amount: plan.price,
                                 issueDate: new Date(),
-                                dueDate: clientPlan.planActivationDate,
+                                dueDate: activationDate,
                                 status: 'Pendente' as const,
                                 planId: clientPlan.planId,
                                 planName: plan.name,
@@ -205,12 +203,13 @@ export default function InvoicesPage() {
                     if (plan.type === 'recurring' && plan.recurrencePeriod && plan.recurrenceValue) {
                         
                         let lastBilledDueDate = clientPlanInvoices.length > 0
-                            ? clientPlanInvoices.sort((a, b) => b.dueDate.getTime() - a.dueDate.getTime())[0].dueDate
-                            : subDays(clientPlan.planActivationDate, 1);
+                            ? clientPlanInvoices.sort((a, b) => new Date(b.dueDate).getTime() - new Date(a.dueDate).getTime())[0].dueDate
+                            : subDays(activationDate, 1);
+                        lastBilledDueDate = new Date(lastBilledDueDate);
 
-                        const activationDate = clientPlan.planActivationDate;
+
                         if ((isBefore(activationDate, today) || isEqual(startOfDay(activationDate), today)) && clientPlanInvoices.length === 0) {
-                           newInvoices.push({
+                           newInvoicesData.push({
                                 clientId: client.id,
                                 clientName: client.name,
                                 amount: plan.price,
@@ -236,7 +235,7 @@ export default function InvoicesPage() {
                                 break;
                             }
                             
-                            newInvoices.push({
+                            newInvoicesData.push({
                                 clientId: client.id,
                                 clientName: client.name,
                                 amount: plan.price,
@@ -253,10 +252,11 @@ export default function InvoicesPage() {
             }
 
 
-            if (newInvoices.length > 0) {
-                const added = StorageService.addItems('invoices', newInvoices);
-                setInvoices(prev => processInvoices([...prev, ...added]));
-                toast({ title: "Sucesso!", description: `${newInvoices.length} nova(s) fatura(s) foram geradas.` });
+            if (newInvoicesData.length > 0) {
+                const addedInvoices = await StorageService.addItems('invoices', newInvoicesData);
+                const currentInvoices = await StorageService.getCollection<Invoice>('invoices');
+                setInvoices(processInvoices(currentInvoices));
+                toast({ title: "Sucesso!", description: `${newInvoicesData.length} nova(s) fatura(s) foram geradas.` });
             } else {
                 toast({ title: "Nenhuma ação necessária", description: "Todos os clientes estão com as faturas em dia." });
             }
@@ -271,7 +271,7 @@ export default function InvoicesPage() {
 
 
     const handleUpdateStatus = async (invoiceId: string, status: 'Pendente' | 'Vencida') => {
-       const updatedInvoice = StorageService.updateItem<Invoice>('invoices', invoiceId, {
+       const updatedInvoice = await StorageService.updateItem<Invoice>('invoices', invoiceId, {
             status,
             paymentDate: undefined,
             paymentMethod: undefined,
@@ -299,7 +299,7 @@ export default function InvoicesPage() {
             return;
         }
 
-        const updatedInvoice = StorageService.updateItem<Invoice>('invoices', selectedInvoice.id, {
+        const updatedInvoice = await StorageService.updateItem<Invoice>('invoices', selectedInvoice.id, {
             status: 'Paga',
             paymentDate: paymentDetails.paymentDate!,
             paymentMethod: paymentDetails.paymentMethod,
@@ -317,7 +317,7 @@ export default function InvoicesPage() {
 
 
     const handlePrepareReminder = async (invoice: Invoice) => {
-        const allClients: Client[] = StorageService.getCollection<Client>('clients');
+        const allClients: Client[] = await StorageService.getCollection<Client>('clients');
         const client = allClients.find(c => c.id === invoice.clientId);
 
         if (!client || !client.whatsapp) {
@@ -329,7 +329,7 @@ export default function InvoicesPage() {
             return;
         }
 
-        const allPlans: Plan[] = StorageService.getCollection<Plan>('plans');
+        const allPlans: Plan[] = await StorageService.getCollection<Plan>('plans');
         const plan = allPlans.find(p => p.id === invoice.planId);
         
         if (!plan) {
@@ -340,7 +340,7 @@ export default function InvoicesPage() {
         setClientForReminder(client);
         setSelectedInvoice(invoice);
 
-        const dueDate = format(invoice.dueDate, 'dd/MM/yyyy', { locale: ptBR });
+        const dueDate = format(new Date(invoice.dueDate), 'dd/MM/yyyy', { locale: ptBR });
         const amount = invoice.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
         const serviceTypeText = plan.type === 'recurring' ? 'do seu plano' : 'do serviço';
@@ -361,7 +361,7 @@ export default function InvoicesPage() {
     }
 
     const handleDeleteInvoice = async (invoiceId: string) => {
-        StorageService.deleteItem('invoices', invoiceId);
+        await StorageService.deleteItem('invoices', invoiceId);
         setInvoices(prev => processInvoices(prev.filter(inv => inv.id !== invoiceId)));
         toast({ title: "Sucesso", description: "Fatura excluída com sucesso." });
     };
@@ -376,7 +376,7 @@ export default function InvoicesPage() {
             return;
         }
 
-        StorageService.deleteItems('invoices', unpaidInvoiceIds);
+        await StorageService.deleteItems('invoices', unpaidInvoiceIds);
         setInvoices(prev => processInvoices(prev.filter(inv => !unpaidInvoiceIds.includes(inv.id))));
         toast({ title: "Sucesso!", description: `${unpaidInvoiceIds.length} fatura(s) foram excluídas.`});
     }
@@ -388,16 +388,16 @@ export default function InvoicesPage() {
                 return;
             }
             
-            const client = StorageService.getItem<Client>('clients', invoice.clientId);
-            const plan = StorageService.getItem<Plan>('plans', invoice.planId);
-            const company: CompanySettings | null = StorageService.getItem<CompanySettings>('company-settings', 'single-settings');
+            const client = await StorageService.getItem<Client>('clients', invoice.clientId);
+            const plan = await StorageService.getItem<Plan>('plans', invoice.planId);
+            const company: CompanySettings | null = await StorageService.getItem<CompanySettings>('company-settings', 'single-settings');
 
             if (!client || !plan) {
                 toast({ title: 'Erro', description: 'Não foi possível encontrar os dados do cliente ou do plano.', variant: 'destructive' });
                 return;
             }
 
-            const dueDate = invoice.dueDate;
+            const dueDate = new Date(invoice.dueDate);
             let billingPeriod = format(dueDate, 'dd/MM/yyyy');
             if (plan.type === 'recurring' && plan.recurrencePeriod && plan.recurrenceValue) {
                 let startDate: Date;
@@ -464,8 +464,8 @@ export default function InvoicesPage() {
                                     </div>
                                     <div class="text-left sm:text-right">
                                         <h3 class="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-2">Detalhes da Fatura</h3>
-                                        <p class="text-gray-600"><span class="font-medium">Data de Emissão:</span> ${format(invoice.issueDate, 'dd/MM/yyyy')}</p>
-                                        <p class="text-gray-600"><span class="font-medium">Data de Vencimento:</span> ${format(invoice.dueDate, 'dd/MM/yyyy')}</p>
+                                        <p class="text-gray-600"><span class="font-medium">Data de Emissão:</span> ${format(new Date(invoice.issueDate), 'dd/MM/yyyy')}</p>
+                                        <p class="text-gray-600"><span class="font-medium">Data de Vencimento:</span> ${format(new Date(invoice.dueDate), 'dd/MM/yyyy')}</p>
                                         <div class="mt-2">
                                             <span class="px-3 py-1 text-sm font-semibold rounded-full status-${invoice.status}">${invoice.status}</span>
                                         </div>
@@ -635,8 +635,8 @@ export default function InvoicesPage() {
                                                     <TableRow key={invoice.id}>
                                                         <TableCell className="font-medium">#{invoice.id.substring(0, 7).toUpperCase()}</TableCell>
                                                         <TableCell>{invoice.planName || 'N/A'}</TableCell>
-                                                        <TableCell className="hidden md:table-cell">{invoice.paymentDate ? format(invoice.paymentDate, 'dd/MM/yyyy') : 'N/A'}</TableCell>
-                                                        <TableCell>{invoice.dueDate ? format(invoice.dueDate, 'dd/MM/yyyy') : 'N/A'}</TableCell>
+                                                        <TableCell className="hidden md:table-cell">{invoice.paymentDate ? format(new Date(invoice.paymentDate), 'dd/MM/yyyy') : 'N/A'}</TableCell>
+                                                        <TableCell>{invoice.dueDate ? format(new Date(invoice.dueDate), 'dd/MM/yyyy') : 'N/A'}</TableCell>
                                                         <TableCell>
                                                             <Badge variant={getStatusVariant(invoice.status)} className={cn("whitespace-nowrap", getStatusClass(invoice.status))}>
                                                                 {invoice.status}
@@ -782,3 +782,5 @@ export default function InvoicesPage() {
         </div>
     );
 }
+
+    

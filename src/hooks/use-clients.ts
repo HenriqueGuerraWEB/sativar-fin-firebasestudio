@@ -30,26 +30,27 @@ export function useClients() {
     const { user, loading: authLoading } = useAuth();
     const [clients, setClients] = useState<Client[]>([]);
     const [isLoading, setIsLoading] = useState(true);
-
-    const getClientsFromStorage = useCallback((): Client[] => {
-        return StorageService.getCollection<Client>('clients');
-    }, []);
     
     useEffect(() => {
-        if (authLoading) {
+        const loadClients = async () => {
+            if (authLoading) {
+                setIsLoading(true);
+                return;
+            }
+            if (!user) {
+                setClients([]);
+                setIsLoading(false);
+                return;
+            }
+            
             setIsLoading(true);
-            return;
-        }
-        if (!user) {
-            setClients([]);
+            const clientsFromStorage = await StorageService.getCollection<Client>('clients');
+            setClients(clientsFromStorage.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
             setIsLoading(false);
-            return;
-        }
-        
-        setClients(getClientsFromStorage().sort((a,b) => b.createdAt.getTime() - a.createdAt.getTime()));
-        setIsLoading(false);
+        };
 
-    }, [user, authLoading, getClientsFromStorage]);
+        loadClients();
+    }, [user, authLoading]);
 
 
     const addClient = async (clientData: Omit<Client, 'id' | 'createdAt'>) => {
@@ -59,11 +60,11 @@ export function useClients() {
                 ...clientData,
                 createdAt: new Date()
             };
-            const newClient = StorageService.addItem<Client>('clients', newClientData);
-            setClients(prev => [...prev, newClient].sort((a,b) => b.createdAt.getTime() - a.createdAt.getTime()));
+            const newClient = await StorageService.addItem<Client>('clients', newClientData);
+            setClients(prev => [...prev, newClient].sort((a,b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
 
         } catch (error) {
-            console.error("Error adding client to localStorage:", error);
+            console.error("Error adding client:", error);
             throw new Error("Failed to add client");
         }
     };
@@ -71,13 +72,13 @@ export function useClients() {
     const updateClient = async (clientId: string, clientData: Partial<Omit<Client, 'id'>>) => {
         if (!user) throw new Error("User not authenticated");
         try {
-            const updatedClient = StorageService.updateItem<Client>('clients', clientId, clientData);
+            const updatedClient = await StorageService.updateItem<Client>('clients', clientId, clientData);
             if (updatedClient) {
-                 setClients(prev => prev.map(client => client.id === clientId ? updatedClient : client).sort((a,b) => b.createdAt.getTime() - a.createdAt.getTime()));
+                 setClients(prev => prev.map(client => client.id === clientId ? updatedClient : client).sort((a,b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
             }
         } catch (error)
         {
-            console.error("Error updating client in localStorage:", error);
+            console.error("Error updating client:", error);
             throw new Error("Failed to update client");
         }
     };
@@ -85,13 +86,15 @@ export function useClients() {
     const deleteClient = async (clientId: string) => {
         if (!user) throw new Error("User not authenticated");
         try {
-            StorageService.deleteItem('clients', clientId);
-            setClients(prev => prev.filter(client => client.id !== clientId).sort((a,b) => b.createdAt.getTime() - a.createdAt.getTime()));
+            await StorageService.deleteItem('clients', clientId);
+            setClients(prev => prev.filter(client => client.id !== clientId).sort((a,b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
         } catch (error) {
-            console.error("Error deleting client from localStorage:", error);
+            console.error("Error deleting client:", error);
             throw new Error("Failed to delete client");
         }
     };
 
     return { clients, isLoading, addClient, updateClient, deleteClient };
 }
+
+    

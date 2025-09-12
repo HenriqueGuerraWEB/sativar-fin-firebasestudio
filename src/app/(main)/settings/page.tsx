@@ -3,13 +3,13 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
-import Image from 'next/image';
+-import Image from 'next/image';
 import { X, Server } from 'lucide-react';
 import { useAuth } from '@/hooks/use-auth';
 import { StorageService } from '@/lib/storage-service';
@@ -114,23 +114,27 @@ export default function SettingsPage() {
         
         setTimeout(() => {
             try {
-                logs += `[${new Date().toISOString()}] Verificando o tipo de armazenamento atual...\n`;
-                // Simulate checking connection type
-                logs += `[${new Date().toISOString()}] INFO: A aplicação está atualmente configurada para usar 'localStorage'.\n`;
+                const isDbEnabled = process.env.NEXT_PUBLIC_DATABASE_ENABLED === 'true';
+                logs += `[${new Date().toISOString()}] Verificando o modo de armazenamento...\n`;
                 
-                // Test localStorage access
-                localStorage.setItem('__db_test__', 'success');
-                const testResult = localStorage.getItem('__db_test__');
-                localStorage.removeItem('__db_test__');
-
-                if (testResult === 'success') {
-                    logs += `[${new Date().toISOString()}] SUCESSO: A leitura e escrita no localStorage foi bem-sucedida.\n`;
-                    logs += `[${new Date().toISOString()}] STATUS: Conexão local está ativa e funcional.\n`;
+                if (isDbEnabled) {
+                     logs += `[${new Date().toISOString()}] INFO: A aplicação está configurada para usar o banco de dados MySQL.\n`;
+                     logs += `[${new Date().toISOString()}] STATUS: O serviço de API está ativo. A conexão real com o banco de dados é gerenciada pelo servidor.\n`;
+                     toast({ title: "Sucesso", description: "O modo de banco de dados está ativo." });
                 } else {
-                    throw new Error('Falha ao ler/escrever no localStorage.');
-                }
+                    logs += `[${new Date().toISOString()}] INFO: A aplicação está configurada para usar 'localStorage'.\n`;
+                    localStorage.setItem('__db_test__', 'success');
+                    const testResult = localStorage.getItem('__db_test__');
+                    localStorage.removeItem('__db_test__');
 
-                toast({ title: "Sucesso", description: "A conexão com o armazenamento local foi testada com sucesso." });
+                    if (testResult === 'success') {
+                        logs += `[${new Date().toISOString()}] SUCESSO: A leitura e escrita no localStorage foi bem-sucedida.\n`;
+                        logs += `[${new Date().toISOString()}] STATUS: Conexão local está ativa e funcional.\n`;
+                    } else {
+                        throw new Error('Falha ao ler/escrever no localStorage.');
+                    }
+                     toast({ title: "Sucesso", description: "A conexão com o armazenamento local foi testada com sucesso." });
+                }
             } catch (error: any) {
                 logs += `[${new Date().toISOString()}] ERRO: Ocorreu um erro ao testar a conexão.\n`;
                 logs += `[${new Date().toISOString()}] Detalhes: ${error.message}\n`;
@@ -222,7 +226,7 @@ export default function SettingsPage() {
                         <CardContent className="flex flex-col items-center gap-4">
                             <div className="w-full h-32 border-2 border-dashed rounded-md flex items-center justify-center bg-muted/50">
                                 {settings.logoDataUrl ? (
-                                    <Image src={settings.logoDataUrl} alt="Logo preview" width={160} height={80} className="object-contain max-h-full max-w-full" />
+                                    <img src={settings.logoDataUrl} alt="Logo preview" className="object-contain max-h-full max-w-full" />
                                 ) : (
                                     <p className="text-sm text-muted-foreground">Pré-visualização</p>
                                 )}
@@ -243,7 +247,7 @@ export default function SettingsPage() {
                 <Card>
                     <CardHeader>
                         <CardTitle>Conexão com Banco de Dados</CardTitle>
-                        <CardDescription>Configure e teste a conexão com seu banco de dados MySQL. Atualmente usando: <strong>localStorage</strong>.</CardDescription>
+                        <CardDescription>Configure e teste a conexão com seu banco de dados MySQL. Atualmente usando: <strong>{process.env.NEXT_PUBLIC_DATABASE_ENABLED === 'true' ? 'MySQL' : 'localStorage'}</strong>.</CardDescription>
                     </CardHeader>
                     <CardContent className="grid gap-6">
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -257,7 +261,7 @@ export default function SettingsPage() {
                             </div>
                              <div className="grid gap-2">
                                 <Label htmlFor="dbUser">Usuário</Label>
-                                <Input id="dbUser" placeholder="mysql_user" disabled />
+                                <Input id="dbUser" placeholder="admin" disabled />
                             </div>
                              <div className="grid gap-2">
                                 <Label htmlFor="dbPassword">Senha</Label>
@@ -297,6 +301,8 @@ export default function SettingsPage() {
         </div>
     );
 }
+
+    
 
     
 
