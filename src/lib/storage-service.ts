@@ -42,7 +42,8 @@ const reviver = (key: any, value: any) => {
 export type Storable = { id: string; [key: string]: any };
 
 // LocalStorage Implementation
-const LocalStorageService = {
+// We export this so we can use it directly for migration preparation.
+export const LocalStorageService = {
     getFullKey: (collectionKey: string) => `sativar-${collectionKey}`,
 
     getCollection: <T extends Storable>(collectionKey: string): T[] => {
@@ -161,5 +162,3 @@ export const StorageService = {
             : Promise.resolve(LocalStorageService.deleteItems(collectionKey, itemIds));
     },
 };
-
-    

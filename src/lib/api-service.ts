@@ -9,6 +9,7 @@ import {
     updatePlan,
     deletePlan,
 } from '@/ai/flows/plans-flow';
+import { migrateData } from '@/ai/flows/data-migration-flow';
 import type { Plan, AddPlanInput, UpdatePlanInput } from '@/lib/types/plan-types';
 
 /**
@@ -34,7 +35,9 @@ export const ApiService = {
     setCollection: async (collectionKey: string, data: any): Promise<void> => {
         console.log(`ApiService: Setting collection ${collectionKey}...`);
         // This would likely be a bulk-update or migration endpoint.
-        // To be implemented if needed.
+        if (collectionKey === 'migrate-all') {
+            return await migrateData(data);
+        }
         return Promise.resolve();
     },
 

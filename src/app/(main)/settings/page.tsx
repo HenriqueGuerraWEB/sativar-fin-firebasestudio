@@ -9,10 +9,13 @@ import { Label } from "@/components/ui/label";
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
-import { X, Server } from 'lucide-react';
+import { X, Server, Send, Loader2 } from 'lucide-react';
 import { useAuth } from '@/hooks/use-auth';
-import { StorageService } from '@/lib/storage-service';
+import { StorageService, LocalStorageService } from '@/lib/storage-service';
 import { cn } from '@/lib/utils';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { migrateData } from '@/ai/flows/data-migration-flow';
+import { DataMigrationInput } from '@/lib/types/migration-types';
 
 
 type CompanySettings = {
@@ -37,6 +40,8 @@ const emptySettings: CompanySettings = {
     cnpj: '',
 };
 
+const isDbEnabled = process.env.NEXT_PUBLIC_DATABASE_ENABLED === 'true';
+
 export default function SettingsPage() {
     const { toast } = useToast();
     const { user } = useAuth();
@@ -45,31 +50,26 @@ export default function SettingsPage() {
     const [isSaving, setIsSaving] = useState(false);
     const [isTesting, setIsTesting] = useState(false);
     const [dbLogs, setDbLogs] = useState('');
+    const [isPreparingMigration, setIsPreparingMigration] = useState(false);
+    const [isMigrating, setIsMigrating] = useState(false);
+    const [migrationData, setMigrationData] = useState<DataMigrationInput | null>(null);
+    const [isMigrationAlertOpen, setIsMigrationAlertOpen] = useState(false);
 
-
-    const getSettingsKey = useCallback(() => {
-        if (!user) return null;
-        // In a real app, this might be tied to a company ID, but for now, we use a single key.
-        return `company-settings`;
-    }, [user]);
 
     useEffect(() => {
         if(user) {
             setIsLoading(true);
-            const key = getSettingsKey();
-            if (key) {
-                const storedSettings = StorageService.getItem<CompanySettings & {id: string}>(key, 'single-settings');
-                if (storedSettings) {
-                    setSettings(storedSettings);
-                } else {
-                     const initialSettings = { ...emptySettings, id: 'single-settings' };
-                    StorageService.addItem(key, initialSettings);
-                    setSettings(initialSettings);
-                }
+            const storedSettings = LocalStorageService.getItem<CompanySettings & {id: string}>('company-settings', 'single-settings');
+            if (storedSettings) {
+                setSettings(storedSettings);
+            } else {
+                 const initialSettings = { ...emptySettings, id: 'single-settings' };
+                LocalStorageService.addItem('company-settings', initialSettings);
+                setSettings(initialSettings);
             }
             setIsLoading(false);
         }
-    }, [user, getSettingsKey]);
+    }, [user]);
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
         const { id, value } = e.target;
@@ -96,13 +96,12 @@ export default function SettingsPage() {
     };
 
     const handleSaveSettings = async () => {
-        const key = getSettingsKey();
-        if (!key) {
+        if (!user) {
             toast({ title: "Erro", description: "Usuário não autenticado.", variant: "destructive" });
             return;
         }
         setIsSaving(true);
-        StorageService.updateItem(key, 'single-settings', settings);
+        LocalStorageService.updateItem('company-settings', 'single-settings', settings);
         setIsSaving(false);
         toast({ title: "Sucesso!", description: "Configurações salvas com sucesso." });
     };
@@ -113,7 +112,6 @@ export default function SettingsPage() {
         
         setTimeout(() => {
             try {
-                const isDbEnabled = process.env.NEXT_PUBLIC_DATABASE_ENABLED === 'true';
                 logs += `[${new Date().toISOString()}] Verificando o modo de armazenamento...\n`;
                 
                 if (isDbEnabled) {
@@ -144,6 +142,59 @@ export default function SettingsPage() {
                 setIsTesting(false);
             }
         }, 1500);
+    }
+    
+    const handlePrepareMigration = () => {
+        setIsPreparingMigration(true);
+        try {
+            const data: DataMigrationInput = {
+                clients: LocalStorageService.getCollection('clients'),
+                plans: LocalStorageService.getCollection('plans'),
+                invoices: LocalStorageService.getCollection('invoices'),
+                expenses: LocalStorageService.getCollection('expenses'),
+                expenseCategories: LocalStorageService.getCollection('expenseCategories'),
+                settings: LocalStorageService.getItem('company-settings', 'single-settings') || undefined,
+            };
+            setMigrationData(data);
+            toast({ title: "Dados Prontos!", description: "Os dados do localStorage foram preparados para a migração." });
+        } catch (error: any) {
+             toast({ title: "Erro ao Preparar", description: error.message, variant: "destructive" });
+        } finally {
+            setIsPreparingMigration(false);
+        }
+    }
+    
+    const handleStartMigration = async () => {
+        if (!migrationData) {
+            toast({ title: "Erro", description: "Nenhum dado preparado para migração. Clique em 'Preparar Migração' primeiro.", variant: "destructive" });
+            return;
+        }
+        setIsMigrationAlertOpen(true);
+    }
+
+    const handleConfirmMigration = async () => {
+        if (!migrationData) return;
+        
+        setIsMigrating(true);
+        try {
+            const result = await migrateData(migrationData);
+            console.log("Migration result:", result);
+            
+            toast({
+                title: "Migração Enviada!",
+                description: result.message || `O servidor recebeu ${result.clientsMigrated} clientes, ${result.plansMigrated} planos e mais.`,
+            });
+            
+            // Here you might want to clear localStorage after a successful migration,
+            // but that should be done carefully, maybe after user confirmation.
+            
+        } catch (error: any) {
+            console.error("Migration failed:", error);
+            toast({ title: "Falha na Migração", description: error.message, variant: "destructive" });
+        } finally {
+            setIsMigrating(false);
+            setIsMigrationAlertOpen(false);
+        }
     }
 
     return (
@@ -246,7 +297,7 @@ export default function SettingsPage() {
                 <Card>
                     <CardHeader>
                         <CardTitle>Conexão com Banco de Dados</CardTitle>
-                        <CardDescription>Configure e teste a conexão com seu banco de dados MySQL. Atualmente usando: <strong>{process.env.NEXT_PUBLIC_DATABASE_ENABLED === 'true' ? 'MySQL' : 'localStorage'}</strong>.</CardDescription>
+                        <CardDescription>Configure e teste a conexão com seu banco de dados MySQL. Atualmente usando: <strong>{isDbEnabled ? 'MySQL' : 'localStorage'}</strong>.</CardDescription>
                     </CardHeader>
                     <CardContent className="grid gap-6">
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -272,11 +323,33 @@ export default function SettingsPage() {
                                 <Input id="dbName" placeholder="sativar_db" disabled />
                         </div>
 
-                         <div>
+                        <div className="flex flex-wrap gap-2">
                             <Button onClick={handleTestConnection} disabled={isTesting}>
                                 <Server className="mr-2 h-4 w-4" />
                                 {isTesting ? 'Testando...' : 'Testar Conexão'}
                             </Button>
+
+                            {!isDbEnabled && (
+                                <Button onClick={handlePrepareMigration} disabled={isPreparingMigration}>
+                                {isPreparingMigration ? (
+                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                ) : (
+                                    <Send className="mr-2 h-4 w-4" />
+                                )}
+                                {isPreparingMigration ? 'Preparando...' : 'Preparar Migração'}
+                                </Button>
+                            )}
+
+                             {isDbEnabled && (
+                                <Button onClick={handleStartMigration} disabled={isMigrating}>
+                                {isMigrating ? (
+                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                ) : (
+                                    <Send className="mr-2 h-4 w-4" />
+                                )}
+                                {isMigrating ? 'Migrando...' : 'Iniciar Migração de Dados'}
+                                </Button>
+                            )}
                         </div>
                         
                         {dbLogs && (
@@ -285,6 +358,21 @@ export default function SettingsPage() {
                                 <pre className="mt-2 h-48 w-full whitespace-pre-wrap rounded-md bg-muted p-4 text-sm font-mono text-muted-foreground">
                                     {dbLogs}
                                 </pre>
+                            </div>
+                        )}
+
+                        {migrationData && (
+                            <div className="grid gap-2">
+                                <Label>Dados a Serem Migrados</Label>
+                                <div className="p-4 border rounded-lg bg-muted/50 text-sm">
+                                    <p><strong>Clientes:</strong> {migrationData.clients.length}</p>
+                                    <p><strong>Planos:</strong> {migrationData.plans.length}</p>
+                                    <p><strong>Faturas:</strong> {migrationData.invoices.length}</p>
+                                    <p><strong>Despesas:</strong> {migrationData.expenses.length}</p>
+                                    <p><strong>Categorias de Despesas:</strong> {migrationData.expenseCategories.length}</p>
+                                    <p><strong>Configurações da Empresa:</strong> {migrationData.settings ? '1' : '0'}</p>
+                                    <p className="text-muted-foreground mt-2 text-xs">Os dados acima foram lidos do localStorage e estão prontos para serem enviados para o banco de dados assim que a conexão for ativada.</p>
+                                </div>
                             </div>
                         )}
                     </CardContent>
@@ -297,14 +385,23 @@ export default function SettingsPage() {
                 </div>
                 </>
             )}
+             <AlertDialog open={isMigrationAlertOpen} onOpenChange={setIsMigrationAlertOpen}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Confirmar Migração de Dados</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Você está prestes a enviar todos os dados salvos localmente para o banco de dados MySQL. Esta ação irá inserir os dados nas tabelas correspondentes. Deseja continuar?
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel disabled={isMigrating}>Cancelar</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleConfirmMigration} disabled={isMigrating}>
+                             {isMigrating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                            {isMigrating ? 'Enviando...' : 'Sim, Iniciar Migração'}
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </div>
     );
 }
-
-    
-
-    
-
-    
-
-    
