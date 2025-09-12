@@ -162,24 +162,7 @@ export default function SettingsPage() {
                 settings: LocalStorageService.getItem('company-settings', 'single-settings') || undefined,
             };
 
-            const dataToMigrate = [
-                ...migrationData.clients,
-                ...migrationData.plans,
-                ...migrationData.invoices,
-                ...migrationData.expenses,
-                ...migrationData.expenseCategories
-            ];
-
-            if (dataToMigrate.length === 0) {
-                 toast({
-                    title: "Nenhum Dado para Migrar",
-                    description: "Não há dados no armazenamento local para serem migrados.",
-                });
-                return;
-            }
-
             const result = await migrateData(migrationData);
-            console.log("Migration result:", result);
             
             toast({
                 title: "Migração Concluída!",
@@ -294,34 +277,11 @@ export default function SettingsPage() {
                 <Card>
                     <CardHeader>
                         <CardTitle>Conexão com Banco de Dados</CardTitle>
-                        <CardDescription>Configure e teste a conexão com seu banco de dados MySQL. Atualmente usando: <strong>{isDbEnabled ? 'MySQL' : 'localStorage'}</strong>.</CardDescription>
+                        <CardDescription>Teste a conexão com seu banco de dados MySQL e migre os dados do armazenamento local. Modo atual: <strong>{isDbEnabled ? 'MySQL' : 'localStorage'}</strong>.</CardDescription>
                     </CardHeader>
                     <CardContent className="grid gap-6">
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                            <div className="grid gap-2">
-                                <Label htmlFor="dbHost">Host</Label>
-                                <Input id="dbHost" placeholder="localhost" disabled />
-                            </div>
-                            <div className="grid gap-2">
-                                <Label htmlFor="dbPort">Porta</Label>
-                                <Input id="dbPort" placeholder="3306" disabled />
-                            </div>
-                             <div className="grid gap-2">
-                                <Label htmlFor="dbUser">Usuário</Label>
-                                <Input id="dbUser" placeholder="admin" disabled />
-                            </div>
-                             <div className="grid gap-2">
-                                <Label htmlFor="dbPassword">Senha</Label>
-                                <Input id="dbPassword" type="password" placeholder="••••••••" disabled />
-                            </div>
-                        </div>
-                         <div className="grid gap-2">
-                                <Label htmlFor="dbName">Nome do Banco</Label>
-                                <Input id="dbName" placeholder="sativar_db" disabled />
-                        </div>
-
                         <div className="flex flex-wrap gap-2">
-                            <Button onClick={handleTestConnection} disabled={isTesting}>
+                            <Button onClick={handleTestConnection} disabled={isTesting || !isDbEnabled}>
                                 <Server className="mr-2 h-4 w-4" />
                                 {isTesting ? 'Testando...' : 'Testar Conexão'}
                             </Button>
@@ -360,7 +320,7 @@ export default function SettingsPage() {
                     <AlertDialogHeader>
                         <AlertDialogTitle>Confirmar Migração de Dados</AlertDialogTitle>
                         <AlertDialogDescription>
-                            Você está prestes a enviar todos os dados salvos localmente para o banco de dados MySQL. Esta ação irá inserir os dados nas tabelas correspondentes. Deseja continuar?
+                            Você está prestes a enviar todos os dados salvos localmente (se houver) para o banco de dados MySQL. Esta ação irá inserir os dados nas tabelas correspondentes. Deseja continuar?
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
@@ -375,5 +335,3 @@ export default function SettingsPage() {
         </div>
     );
 }
-
-    

@@ -113,10 +113,19 @@ const migrateDataFlow = ai.defineFlow(
 
         await connection.commit();
         console.log("Transaction committed successfully.");
+        
+        const message = (input.clients?.length || 0) === 0 &&
+                        (input.plans?.length || 0) === 0 &&
+                        (input.invoices?.length || 0) === 0 &&
+                        (input.expenses?.length || 0) === 0 &&
+                        (input.expenseCategories?.length || 0) === 0
+                        ? 'Nenhum dado local encontrado para migrar, mas a conexão com o banco de dados foi verificada.'
+                        : 'Migração de dados concluída com sucesso! Todos os dados foram salvos no banco de dados.';
+
 
         return {
             success: true,
-            message: 'Migração de dados concluída com sucesso! Todos os dados foram salvos no banco de dados.',
+            message: message,
             clientsMigrated: input.clients?.length || 0,
             plansMigrated: input.plans?.length || 0,
             invoicesMigrated: input.invoices?.length || 0,
