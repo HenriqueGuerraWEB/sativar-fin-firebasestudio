@@ -3,70 +3,80 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
-import { StorageService } from '@/lib/storage-service';
+import { useAuth } from './use-auth';
+import { addPlan as addPlanFlow, getPlans as getPlansFlow, updatePlan as updatePlanFlow, deletePlan as deletePlanFlow } from '@/ai/flows/plans-flow';
+import type { Plan, AddPlanInput } from '@/lib/types/plan-types';
 
+export type { Plan } from '@/lib/types/plan-types';
 
-export type Plan = {
-    id: string;
-    name: string;
-    description: string;
-    price: number;
-    type: 'recurring' | 'one-time';
-    recurrenceValue?: number;
-    recurrencePeriod?: 'dias' | 'meses' | 'anos';
-};
 
 export function usePlans() {
     const { toast } = useToast();
+    const { user, loading: authLoading } = useAuth();
     const [plans, setPlans] = useState<Plan[]>([]);
     const [isLoading, setIsLoading] = useState(true);
 
-    useEffect(() => {
-        const loadPlans = async () => {
-            setIsLoading(true);
-            const plansFromStorage = await StorageService.getCollection<Plan>('plans');
-            setPlans(plansFromStorage);
+    const loadPlans = useCallback(async () => {
+        if (!user) {
+            setPlans([]);
+            setIsLoading(false);
+            return;
+        }
+        setIsLoading(true);
+        try {
+            const plansFromApi = await getPlansFlow();
+            setPlans(plansFromApi.sort((a,b) => a.name.localeCompare(b.name)));
+        } catch (error) {
+            console.error("Failed to load plans:", error);
+            toast({
+                title: 'Erro ao Carregar Planos',
+                description: 'Não foi possível buscar os dados dos planos.',
+                variant: 'destructive',
+            });
+            setPlans([]);
+        } finally {
             setIsLoading(false);
         }
-        loadPlans();
-    }, []);
+    }, [user, toast]);
 
-    const addPlan = async (planData: Omit<Plan, 'id'>) => {
+    useEffect(() => {
+        if (!authLoading) {
+            loadPlans();
+        }
+    }, [user, authLoading, loadPlans]);
+
+    const addPlan = async (planData: AddPlanInput) => {
+        if (!user) throw new Error("User not authenticated");
         try {
-            const newPlan = await StorageService.addItem<Plan>('plans', planData);
-            setPlans(prev => [...prev, newPlan]);
+            await addPlanFlow(planData);
+            await loadPlans();
         } catch (error) {
             console.error("Error adding plan:", error);
-            toast({ title: "Erro", description: "Não foi possível adicionar o plano.", variant: "destructive"});
             throw new Error("Failed to add plan");
         }
     };
 
-    const updatePlan = async (planId: string, planData: Partial<Omit<Plan, 'id'>>) => {
+    const updatePlan = async (planId: string, updates: Partial<Omit<Plan, 'id'>>) => {
+        if (!user) throw new Error("User not authenticated");
         try {
-            const updatedPlan = await StorageService.updateItem<Plan>('plans', planId, planData);
-            if (updatedPlan) {
-                setPlans(prev => prev.map(p => p.id === planId ? updatedPlan : p));
-            }
+            await updatePlanFlow({ planId, updates });
+            await loadPlans();
         } catch (error) {
             console.error("Error updating plan:", error);
-            toast({ title: "Erro", description: "Não foi possível atualizar o plano.", variant: "destructive"});
             throw new Error("Failed to update plan");
         }
     };
 
     const deletePlan = async (planId: string) => {
+        if (!user) throw new Error("User not authenticated");
         try {
-            await StorageService.deleteItem('plans', planId);
-            setPlans(prev => prev.filter(p => p.id !== planId));
+            await deletePlanFlow(planId);
+            await loadPlans();
         } catch (error) {
             console.error("Error deleting plan:", error);
-            toast({ title: "Erro", description: "Não foi possível excluir o plano.", variant: "destructive"});
             throw new Error("Failed to delete plan");
         }
     };
 
-    return { plans, isLoading, addPlan, updatePlan, deletePlan };
+    return { plans, isLoading, addPlan, updatePlan, deletePlan, refreshPlans: loadPlans };
 }
-
-    

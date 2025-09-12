@@ -1,12 +1,11 @@
-
 "use client";
 
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Badge, badgeVariants } from "@/components/ui/badge";
+import { Badge } from "@/components/ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { MoreHorizontal, PlusCircle, Sparkles, TrendingUp, TrendingDown, ChevronsUpDown, Calendar as CalendarIcon } from "lucide-react";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger, SheetFooter } from "@/components/ui/sheet";
@@ -18,42 +17,18 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { format, startOfDay, endOfDay, startOfMonth, endOfMonth, startOfYear, endOfYear, eachDayOfInterval, eachMonthOfInterval, getMonth, getYear, subYears, subMonths } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import type { VariantProps } from 'class-variance-authority';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { cn } from '@/lib/utils';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
-import { StorageService } from '@/lib/storage-service';
+import { useExpenses, Expense } from '@/hooks/use-expenses';
+import { useInvoices, Invoice } from '@/hooks/use-invoices';
+import { useExpenseCategories, ExpenseCategory } from '@/hooks/use-expense-categories';
 
-
-type ExpenseCategory = {
-    id: string;
-    name: string;
-};
-
-type Expense = {
-    id: string;
-    description: string;
-    category: string;
-    amount: number;
-    dueDate: Date;
-    status: 'Paga' | 'Pendente';
-};
-
-type Invoice = {
-    id: string;
-    clientName: string;
-    clientId: string;
-    amount: number;
-    issueDate: Date;
-    dueDate: Date;
-    status: 'Paga' | 'Pendente' | 'Vencida';
-    planId: string;
-};
 
 const emptyExpense: Omit<Expense, 'id' | 'status'> = {
     description: "",
-    category: "",
+    categoryId: "",
     amount: 0,
     dueDate: new Date(),
 };
@@ -74,10 +49,10 @@ type Transaction = {
 
 export default function FinancePage() {
     const { toast } = useToast();
-    const [expenses, setExpenses] = useState<Expense[]>([]);
-    const [invoices, setInvoices] = useState<Invoice[]>([]);
-    const [categories, setCategories] = useState<ExpenseCategory[]>([]);
-    const [isLoading, setIsLoading] = useState(true);
+    const { expenses, isLoading: expensesLoading, addExpense, updateExpense, deleteExpense } = useExpenses();
+    const { invoices, isLoading: invoicesLoading } = useInvoices();
+    const { categories, isLoading: categoriesLoading, addExpenseCategory } = useExpenseCategories();
+
     const [isSheetOpen, setIsSheetOpen] = useState(false);
     const [currentExpense, setCurrentExpense] = useState<Omit<Expense, 'id' | 'status'>>(emptyExpense);
     const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -87,24 +62,8 @@ export default function FinancePage() {
     // State for cash flow date range
     const [currentDate, setCurrentDate] = useState(new Date());
     const [cashFlowView, setCashFlowView] = useState<'daily' | 'monthly' | 'yearly'>('monthly');
-    
-    useEffect(() => {
-        const loadData = async () => {
-            setIsLoading(true);
-            const [storedExpenses, storedInvoices, storedCategories] = await Promise.all([
-                StorageService.getCollection<Expense>('expenses'),
-                StorageService.getCollection<Invoice>('invoices'),
-                StorageService.getCollection<ExpenseCategory>('expenseCategories'),
-            ]);
-            
-            setExpenses(storedExpenses.sort((a: Expense, b: Expense) => new Date(b.dueDate).getTime() - new Date(a.dueDate).getTime()));
-            setInvoices(storedInvoices.sort((a: Invoice, b: Invoice) => new Date(b.dueDate).getTime() - new Date(a.dueDate).getTime()));
-            setCategories(storedCategories.sort((a: ExpenseCategory, b: ExpenseCategory) => a.name.localeCompare(b.name)));
-            
-            setIsLoading(false);
-        };
-        loadData();
-    }, []);
+
+    const isLoading = expensesLoading || invoicesLoading || categoriesLoading;
     
     const cashFlowReport = useMemo(() => {
         let start, end;
@@ -119,7 +78,7 @@ export default function FinancePage() {
             end = endOfYear(currentDate);
         }
 
-        const paidInvoices = invoices.filter(inv => inv.status === 'Paga' && new Date(inv.dueDate) >= start && new Date(inv.dueDate) <= end);
+        const paidInvoices = invoices.filter(inv => inv.status === 'Paga' && inv.paymentDate && new Date(inv.paymentDate) >= start && new Date(inv.paymentDate) <= end);
         const paidExpenses = expenses.filter(exp => exp.status === 'Paga' && new Date(exp.dueDate) >= start && new Date(exp.dueDate) <= end);
 
         const totalIncome = paidInvoices.reduce((sum, inv) => sum + inv.amount, 0);
@@ -127,7 +86,7 @@ export default function FinancePage() {
         const balance = totalIncome - totalExpenses;
 
         const transactions: Transaction[] = [
-            ...paidInvoices.map(inv => ({ id: inv.id, date: new Date(inv.dueDate), description: `Fatura: ${inv.clientName}`, amount: inv.amount, type: 'Entrada' as const })),
+            ...paidInvoices.map(inv => ({ id: inv.id, date: new Date(inv.paymentDate!), description: `Fatura: ${inv.clientName}`, amount: inv.amount, type: 'Entrada' as const })),
             ...paidExpenses.map(exp => ({ id: exp.id, date: new Date(exp.dueDate), description: exp.description, amount: exp.amount, type: 'Saída' as const })),
         ].sort((a, b) => b.date.getTime() - a.date.getTime());
         
@@ -149,7 +108,7 @@ export default function FinancePage() {
         }
 
         paidInvoices.forEach(inv => {
-            const invDate = new Date(inv.dueDate);
+            const invDate = new Date(inv.paymentDate!);
             if (cashFlowView === 'monthly') {
                 const dayIndex = invDate.getDate() - 1;
                 if (chartData[dayIndex]) chartData[dayIndex].Entradas += inv.amount;
@@ -198,40 +157,44 @@ export default function FinancePage() {
     };
     
     const handleSelectChange = (value: string) => {
-        setCurrentExpense(prev => ({...prev, category: value}));
+        setCurrentExpense(prev => ({...prev, categoryId: value}));
     }
 
     const handleSaveExpense = async () => {
-        if (!currentExpense.description || currentExpense.amount <= 0 || !currentExpense.category) {
+        if (!currentExpense.description || currentExpense.amount <= 0 || !currentExpense.categoryId) {
             toast({ title: "Erro", description: "Descrição, Categoria e Valor (maior que zero) são obrigatórios.", variant: "destructive" });
             return;
         }
-
-        const newExpenseData: Omit<Expense, 'id'> = {
-            ...currentExpense,
-            status: "Pendente",
-        };
-
-        const addedExpense = await StorageService.addItem<Expense>('expenses', newExpenseData);
-        setExpenses(prev => [...prev, addedExpense].sort((a,b) => new Date(b.dueDate).getTime() - new Date(a.dueDate).getTime()));
-
-        toast({ title: "Sucesso", description: "Despesa adicionada com sucesso." });
-        setIsSheetOpen(false);
-        setCurrentExpense(emptyExpense);
+        try {
+            await addExpense({
+                ...currentExpense,
+                status: "Pendente",
+            });
+            toast({ title: "Sucesso", description: "Despesa adicionada com sucesso." });
+            setIsSheetOpen(false);
+            setCurrentExpense(emptyExpense);
+        } catch (error) {
+            console.error("Error saving expense", error);
+            toast({ title: "Erro", description: "Não foi possível salvar a despesa.", variant: "destructive" });
+        }
     };
     
     const handleUpdateExpenseStatus = async (expenseId: string, status: Expense['status']) => {
-        const updatedExpense = await StorageService.updateItem<Expense>('expenses', expenseId, { status });
-        if (updatedExpense) {
-            setExpenses(prev => prev.map(exp => exp.id === expenseId ? updatedExpense : exp));
+        try {
+            await updateExpense(expenseId, { status });
             toast({ title: "Sucesso", description: `Despesa marcada como ${status}.`});
+        } catch (error) {
+            toast({ title: "Erro", description: "Não foi possível atualizar o status.", variant: "destructive" });
         }
     };
 
     const handleDeleteExpense = async (expenseId: string) => {
-        await StorageService.deleteItem('expenses', expenseId);
-        setExpenses(prev => prev.filter(exp => exp.id !== expenseId));
-        toast({ title: "Sucesso", description: "Despesa excluída com sucesso." });
+        try {
+            await deleteExpense(expenseId);
+            toast({ title: "Sucesso", description: "Despesa excluída com sucesso." });
+        } catch (error) {
+            toast({ title: "Erro", description: "Não foi possível excluir a despesa.", variant: "destructive" });
+        }
     };
 
     const handleSaveNewCategory = async () => {
@@ -239,24 +202,24 @@ export default function FinancePage() {
             toast({ title: "Erro", description: "O nome da categoria não pode estar vazio.", variant: "destructive" });
             return;
         }
-       
-        const newCategory = await StorageService.addItem<ExpenseCategory>('expenseCategories', { name: newCategoryName });
-        setCategories(prev => [...prev, newCategory].sort((a,b) => a.name.localeCompare(b.name)));
-
+       try {
+        const newCategory = await addExpenseCategory({ name: newCategoryName });
         toast({ title: "Sucesso!", description: `Categoria "${newCategoryName}" adicionada.` });
-        setCurrentExpense(prev => ({ ...prev, category: newCategory.id }));
+        setCurrentExpense(prev => ({ ...prev, categoryId: newCategory.id }));
         setNewCategoryName("");
         setIsCategoryDialogOpen(false);
+       } catch (error) {
+        toast({ title: "Erro", description: "Não foi possível adicionar a categoria.", variant: "destructive" });
+       }
     };
     
     const handleAnalyze = () => {
         setIsAnalyzing(true);
-        // Simulate AI analysis
         setTimeout(() => {
              const adobeCategory = categories.find(c => c.name.toLowerCase().includes('ferramentas'));
             setCurrentExpense({
                 description: "Assinatura Adobe Creative Cloud",
-                category: adobeCategory ? adobeCategory.id : "",
+                categoryId: adobeCategory ? adobeCategory.id : "",
                 amount: 280.00,
                 dueDate: new Date(),
             })
@@ -313,7 +276,7 @@ export default function FinancePage() {
                              <div className="grid grid-cols-4 items-center gap-4">
                                 <Label htmlFor="category" className="text-right">Categoria</Label>
                                 <div className="col-span-3 flex items-center gap-2">
-                                    <Select value={currentExpense.category} onValueChange={handleSelectChange}>
+                                    <Select value={currentExpense.categoryId ?? ''} onValueChange={handleSelectChange}>
                                         <SelectTrigger className="flex-grow">
                                             <SelectValue placeholder="Selecione uma categoria" />
                                         </SelectTrigger>
@@ -404,7 +367,7 @@ export default function FinancePage() {
                                         )) : expenses.map(expense => (
                                             <TableRow key={expense.id}>
                                                 <TableCell className="font-medium">{expense.description}</TableCell>
-                                                <TableCell><Badge variant="outline">{categories.find(c => c.id === expense.category)?.name || 'N/A'}</Badge></TableCell>
+                                                <TableCell><Badge variant="outline">{categories.find(c => c.id === expense.categoryId)?.name || 'N/A'}</Badge></TableCell>
                                                 <TableCell>{format(new Date(expense.dueDate), 'dd/MM/yyyy')}</TableCell>
                                                 <TableCell><Badge variant={expense.status === 'Paga' ? 'secondary' : 'destructive'}>{expense.status}</Badge></TableCell>
                                                 <TableCell className="text-right">{expense.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</TableCell>
@@ -482,7 +445,7 @@ export default function FinancePage() {
                                         )) : invoices.filter(invoice => invoice.status === 'Paga').map(invoice => (
                                             <TableRow key={invoice.id}>
                                                 <TableCell className="font-medium">{invoice.clientName}</TableCell>
-                                                <TableCell>{format(new Date(invoice.dueDate), 'dd/MM/yyyy')}</TableCell>
+                                                <TableCell>{invoice.paymentDate ? format(new Date(invoice.paymentDate), 'dd/MM/yyyy') : 'N/A'}</TableCell>
                                                 <TableCell className="text-right">{invoice.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</TableCell>
                                             </TableRow>
                                         ))}
@@ -656,5 +619,3 @@ export default function FinancePage() {
         </div>
     );
 }
-
-    

@@ -80,7 +80,7 @@ const migrateDataFlow = ai.defineFlow(
         // 3. Migrate Expenses
         if (input.expenses && input.expenses.length > 0) {
             const expenseValues = input.expenses.map(e => [
-                e.id, e.description, e.amount, formatDateForMySQL(e.dueDate), e.status, e.category
+                e.id, e.description, e.amount, formatDateForMySQL(e.dueDate), e.status, e.categoryId
             ]);
             await connection.query(
                 'INSERT INTO expenses (id, description, amount, due_date, status, category_id) VALUES ? ON DUPLICATE KEY UPDATE description=VALUES(description), amount=VALUES(amount), due_date=VALUES(due_date), status=VALUES(status), category_id=VALUES(category_id)',
@@ -161,5 +161,3 @@ const migrateDataFlow = ai.defineFlow(
     }
   }
 );
-
-    

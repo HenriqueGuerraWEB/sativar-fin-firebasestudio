@@ -1,65 +1,9 @@
-
 import { z } from 'zod';
-
-// Schemas for data structures from localStorage
-
-const ClientPlanSchema = z.object({
-  planId: z.string(),
-  planActivationDate: z.date(),
-});
-
-const ClientSchema = z.object({
-  id: z.string(),
-  name: z.string(),
-  taxId: z.string(),
-  contactName: z.string(),
-  email: z.string(),
-  phone: z.string(),
-  whatsapp: z.string(),
-  notes: z.string(),
-  status: z.enum(["Ativo", "Inativo"]),
-  plans: z.array(ClientPlanSchema),
-  createdAt: z.date(),
-});
-
-const PlanSchema = z.object({
-  id: z.string(),
-  name: z.string(),
-  description: z.string(),
-  price: z.number(),
-  type: z.enum(['recurring', 'one-time']),
-  recurrenceValue: z.number().optional().nullable(),
-  recurrencePeriod: z.enum(['dias', 'meses', 'anos']).optional().nullable(),
-});
-
-const InvoiceSchema = z.object({
-    id: z.string(),
-    clientName: z.string(),
-    clientId: z.string(),
-    amount: z.number(),
-    issueDate: z.date(),
-    dueDate: z.date(),
-    status: z.enum(['Paga', 'Pendente', 'Vencida']),
-    planId: z.string(),
-    planName: z.string().optional(),
-    paymentDate: z.date().optional(),
-    paymentMethod: z.enum(['Pix', 'Cartão de Crédito', 'Cartão de Débito']).optional(),
-    paymentNotes: z.string().optional(),
-});
-
-const ExpenseSchema = z.object({
-    id: z.string(),
-    description: z.string(),
-    category: z.string(),
-    amount: z.number(),
-    dueDate: z.date(),
-    status: z.enum(['Paga', 'Pendente']),
-});
-
-const ExpenseCategorySchema = z.object({
-    id: z.string(),
-    name: z.string(),
-});
+import { ClientSchema } from './client-types';
+import { PlanSchema } from './plan-types';
+import { InvoiceSchema } from './invoice-types';
+import { ExpenseSchema } from './expense-types';
+import { ExpenseCategorySchema } from './expense-category-types';
 
 const CompanySettingsSchema = z.object({
     id: z.string(),
@@ -78,7 +22,7 @@ export const DataMigrationInputSchema = z.object({
     clients: z.array(ClientSchema).optional(),
     plans: z.array(PlanSchema).optional(),
     invoices: z.array(InvoiceSchema).optional(),
-    expenses: z.array(ExpenseSchema).optional(),
+    expenses: z.array(ExpenseSchema.extend({ category: z.string() })).optional(), // Expense from local storage has category name
     expenseCategories: z.array(ExpenseCategorySchema).optional(),
     settings: CompanySettingsSchema.optional(),
 });
@@ -96,5 +40,3 @@ export const DataMigrationOutputSchema = z.object({
     categoriesMigrated: z.number(),
 });
 export type DataMigrationOutput = z.infer<typeof DataMigrationOutputSchema>;
-
-    

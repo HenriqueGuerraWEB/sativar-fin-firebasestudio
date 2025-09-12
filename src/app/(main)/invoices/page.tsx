@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
@@ -7,63 +6,26 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge, badgeVariants } from "@/components/ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
-import { MoreHorizontal, PlusCircle, Printer, Calendar as CalendarIcon, ChevronDown, Shapes, Trash2 } from "lucide-react";
+import { MoreHorizontal, PlusCircle, Printer, Calendar as CalendarIcon, Trash2 } from "lucide-react";
 import type { VariantProps } from 'class-variance-authority';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { format, addDays, addMonths, addYears, isBefore, startOfDay, subDays, subMonths, subYears, isEqual } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from '@/components/ui/label';
-import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
+import { useInvoices, Invoice, AddInvoiceInput } from '@/hooks/use-invoices';
+import { useClients, Client } from '@/hooks/use-clients';
+import { usePlans, Plan } from '@/hooks/use-plans';
 import { StorageService } from '@/lib/storage-service';
 
-
-type Plan = {
-    id: string;
-    name: string;
-    description: string;
-    price: number;
-    type: 'recurring' | 'one-time';
-    recurrenceValue?: number;
-    recurrencePeriod?: 'dias' | 'meses' | 'anos';
-}
-
-type ClientPlan = {
-    planId: string;
-    planActivationDate: Date;
-};
-
-type Client = {
-    id: string;
-    name: string;
-    email: string;
-    whatsapp: string;
-    plans: ClientPlan[];
-    status: 'Ativo' | 'Inativo';
-}
-
-type Invoice = {
-    id: string;
-    clientName: string;
-    clientId: string;
-    amount: number;
-    issueDate: Date;
-    dueDate: Date;
-    status: 'Paga' | 'Pendente' | 'Vencida';
-    planId: string;
-    planName?: string;
-    paymentDate?: Date;
-    paymentMethod?: 'Pix' | 'Cartão de Crédito' | 'Cartão de Débito';
-    paymentNotes?: string;
-};
 
 type CompanySettings = {
     name: string;
@@ -86,8 +48,10 @@ type GroupedInvoices = {
 
 export default function InvoicesPage() {
     const { toast } = useToast();
-    const [invoices, setInvoices] = useState<Invoice[]>([]);
-    const [isLoading, setIsLoading] = useState(true);
+    const { invoices, isLoading: invoicesLoading, addInvoices, updateInvoice, deleteInvoice, deleteInvoices, refreshInvoices } = useInvoices();
+    const { clients, isLoading: clientsLoading } = useClients();
+    const { plans, isLoading: plansLoading } = usePlans();
+    
     const [isGenerating, setIsGenerating] = useState(false);
     const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
     const [isReminderModalOpen, setIsReminderModalOpen] = useState(false);
@@ -104,40 +68,24 @@ export default function InvoicesPage() {
         paymentNotes: '',
     });
     
-    const processInvoices = useCallback((invoicesData: Invoice[]) => {
+    const isLoading = invoicesLoading || clientsLoading || plansLoading;
+
+    const processInvoices = useCallback(async () => {
         const today = startOfDay(new Date());
-        const updatePromises: Promise<any>[] = [];
-
-        const updatedInvoices = invoicesData.map(invoice => {
-             const dueDate = new Date(invoice.dueDate);
-            if (invoice.status === 'Pendente' && isBefore(dueDate, today)) {
-                updatePromises.push(StorageService.updateItem('invoices', invoice.id, { status: 'Vencida' as const }));
-                return {...invoice, status: 'Vencida' as const};
-            }
-            return invoice;
-        });
         
-        return updatedInvoices.sort((a,b) => new Date(b.issueDate).getTime() - new Date(a.issueDate).getTime());
-    }, []);
+        const invoicesToUpdate = invoices
+            .filter(invoice => invoice.status === 'Pendente' && isBefore(new Date(invoice.dueDate), today))
+            .map(invoice => updateInvoice(invoice.id, { status: 'Vencida' }));
 
-    const loadInvoices = useCallback(async () => {
-        setIsLoading(true);
-        const storedInvoices = await StorageService.getCollection<Invoice>('invoices');
-        const processed = processInvoices(storedInvoices);
-        setInvoices(processed);
-        setIsLoading(false);
-    }, [processInvoices]);
-    
-    useEffect(() => {
-        loadInvoices();
-
-        const handleStorageChange = () => {
-            loadInvoices();
+        if (invoicesToUpdate.length > 0) {
+            await Promise.all(invoicesToUpdate);
+            // The hook will refresh the data automatically
         }
-        window.addEventListener('storage', handleStorageChange);
-        return () => window.removeEventListener('storage', handleStorageChange);
+    }, [invoices, updateInvoice]);
 
-    }, [loadInvoices]);
+    useEffect(() => {
+        processInvoices();
+    }, [processInvoices]);
     
     const groupedInvoices = useMemo(() => {
         return invoices.reduce((acc, invoice) => {
@@ -157,8 +105,7 @@ export default function InvoicesPage() {
     const handleGenerateInvoices = async () => {
         setIsGenerating(true);
         try {
-            const allClients: Client[] = await StorageService.getCollection<Client>('clients');
-            const activeClients = allClients.filter(client => client.status === "Ativo" && client.plans && client.plans.length > 0);
+            const activeClients = clients.filter(client => client.status === "Ativo" && client.plans && client.plans.length > 0);
 
             if (activeClients.length === 0) {
                 toast({ title: "Nenhuma ação necessária", description: "Não há clientes ativos com planos para gerar faturas." });
@@ -166,14 +113,12 @@ export default function InvoicesPage() {
                 return;
             }
 
-            const allPlans: Plan[] = await StorageService.getCollection<Plan>('plans');
-            const plansMap = allPlans.reduce((acc, plan) => {
+            const plansMap = plans.reduce((acc, plan) => {
                 acc[plan.id] = plan;
                 return acc;
             }, {} as Record<string, Plan>);
 
-            const allInvoices: Invoice[] = await StorageService.getCollection<Invoice>('invoices');
-            let newInvoicesData: Omit<Invoice, 'id'>[] = [];
+            let newInvoicesData: AddInvoiceInput[] = [];
             const today = startOfDay(new Date());
 
             for (const client of activeClients) {
@@ -181,7 +126,7 @@ export default function InvoicesPage() {
                     const plan = plansMap[clientPlan.planId];
                     if (!plan) continue;
 
-                    const clientPlanInvoices = allInvoices.filter(inv => inv.clientId === client.id && inv.planId === clientPlan.planId);
+                    const clientPlanInvoices = invoices.filter(inv => inv.clientId === client.id && inv.planId === clientPlan.planId);
                     const activationDate = new Date(clientPlan.planActivationDate);
 
                     if (plan.type === 'one-time') {
@@ -253,9 +198,7 @@ export default function InvoicesPage() {
 
 
             if (newInvoicesData.length > 0) {
-                const addedInvoices = await StorageService.addItems('invoices', newInvoicesData);
-                const currentInvoices = await StorageService.getCollection<Invoice>('invoices');
-                setInvoices(processInvoices(currentInvoices));
+                await addInvoices(newInvoicesData);
                 toast({ title: "Sucesso!", description: `${newInvoicesData.length} nova(s) fatura(s) foram geradas.` });
             } else {
                 toast({ title: "Nenhuma ação necessária", description: "Todos os clientes estão com as faturas em dia." });
@@ -271,15 +214,16 @@ export default function InvoicesPage() {
 
 
     const handleUpdateStatus = async (invoiceId: string, status: 'Pendente' | 'Vencida') => {
-       const updatedInvoice = await StorageService.updateItem<Invoice>('invoices', invoiceId, {
+       try {
+        await updateInvoice(invoiceId, {
             status,
             paymentDate: undefined,
             paymentMethod: undefined,
             paymentNotes: undefined
-       });
-       if(updatedInvoice) {
-           setInvoices(prev => processInvoices(prev.map(inv => inv.id === invoiceId ? updatedInvoice : inv)));
-           toast({ title: "Sucesso", description: `Fatura marcada como ${status}.`});
+        });
+        toast({ title: "Sucesso", description: `Fatura marcada como ${status}.`});
+       } catch (error) {
+         toast({ title: "Erro", description: "Não foi possível atualizar o status da fatura.", variant: "destructive"});
        }
     };
     
@@ -298,27 +242,24 @@ export default function InvoicesPage() {
             toast({ title: "Erro", description: "Data e tipo de pagamento são obrigatórios.", variant: "destructive" });
             return;
         }
-
-        const updatedInvoice = await StorageService.updateItem<Invoice>('invoices', selectedInvoice.id, {
-            status: 'Paga',
-            paymentDate: paymentDetails.paymentDate!,
-            paymentMethod: paymentDetails.paymentMethod,
-            paymentNotes: paymentDetails.paymentNotes,
-        });
-
-        if (updatedInvoice) {
-            setInvoices(prev => processInvoices(prev.map(inv => inv.id === selectedInvoice.id ? updatedInvoice : inv)));
+        try {
+            await updateInvoice(selectedInvoice.id, {
+                status: 'Paga',
+                paymentDate: paymentDetails.paymentDate!,
+                paymentMethod: paymentDetails.paymentMethod,
+                paymentNotes: paymentDetails.paymentNotes,
+            });
             toast({ title: "Sucesso", description: `Fatura marcada como Paga.`});
+            setIsPaymentModalOpen(false);
+            setSelectedInvoice(null);
+        } catch (error) {
+             toast({ title: "Erro", description: "Não foi possível confirmar o pagamento.", variant: "destructive"});
         }
-
-        setIsPaymentModalOpen(false);
-        setSelectedInvoice(null);
     };
 
 
-    const handlePrepareReminder = async (invoice: Invoice) => {
-        const allClients: Client[] = await StorageService.getCollection<Client>('clients');
-        const client = allClients.find(c => c.id === invoice.clientId);
+    const handlePrepareReminder = (invoice: Invoice) => {
+        const client = clients.find(c => c.id === invoice.clientId);
 
         if (!client || !client.whatsapp) {
             toast({
@@ -329,8 +270,7 @@ export default function InvoicesPage() {
             return;
         }
 
-        const allPlans: Plan[] = await StorageService.getCollection<Plan>('plans');
-        const plan = allPlans.find(p => p.id === invoice.planId);
+        const plan = plans.find(p => p.id === invoice.planId);
         
         if (!plan) {
             toast({ title: 'Erro', description: 'Plano não encontrado para esta fatura.', variant: 'destructive'});
@@ -361,9 +301,12 @@ export default function InvoicesPage() {
     }
 
     const handleDeleteInvoice = async (invoiceId: string) => {
-        await StorageService.deleteItem('invoices', invoiceId);
-        setInvoices(prev => processInvoices(prev.filter(inv => inv.id !== invoiceId)));
-        toast({ title: "Sucesso", description: "Fatura excluída com sucesso." });
+        try {
+            await deleteInvoice(invoiceId);
+            toast({ title: "Sucesso", description: "Fatura excluída com sucesso." });
+        } catch (error) {
+            toast({ title: "Erro", description: "Não foi possível excluir a fatura.", variant: "destructive" });
+        }
     };
 
     const handleDeleteUnpaidInvoices = async (invoicesToDelete: Invoice[]) => {
@@ -375,10 +318,12 @@ export default function InvoicesPage() {
             toast({ title: "Nenhuma ação necessária", description: "Não há faturas pendentes ou vencidas para excluir." });
             return;
         }
-
-        await StorageService.deleteItems('invoices', unpaidInvoiceIds);
-        setInvoices(prev => processInvoices(prev.filter(inv => !unpaidInvoiceIds.includes(inv.id))));
-        toast({ title: "Sucesso!", description: `${unpaidInvoiceIds.length} fatura(s) foram excluídas.`});
+        try {
+            await deleteInvoices(unpaidInvoiceIds);
+            toast({ title: "Sucesso!", description: `${unpaidInvoiceIds.length} fatura(s) foram excluídas.`});
+        } catch (error) {
+            toast({ title: "Erro", description: "Não foi possível excluir as faturas.", variant: "destructive" });
+        }
     }
     
     const handlePrint = async (invoice: Invoice) => {
@@ -388,8 +333,8 @@ export default function InvoicesPage() {
                 return;
             }
             
-            const client = await StorageService.getItem<Client>('clients', invoice.clientId);
-            const plan = await StorageService.getItem<Plan>('plans', invoice.planId);
+            const client = clients.find(c => c.id === invoice.clientId);
+            const plan = plans.find(p => p.id === invoice.planId);
             const company: CompanySettings | null = await StorageService.getItem<CompanySettings>('company-settings', 'single-settings');
 
             if (!client || !plan) {
@@ -546,7 +491,7 @@ export default function InvoicesPage() {
                     <h1 className="text-3xl font-bold tracking-tight">Faturas</h1>
                     <p className="text-muted-foreground">Gerencie e visualize todas as faturas.</p>
                 </div>
-                 <Button size="sm" className="gap-1 w-full sm:w-auto" onClick={handleGenerateInvoices} disabled={isGenerating}>
+                 <Button size="sm" className="gap-1 w-full sm:w-auto" onClick={handleGenerateInvoices} disabled={isGenerating || isLoading}>
                     <PlusCircle className="h-4 w-4" />
                     {isGenerating ? 'Gerando...' : 'Gerar Faturas'}
                 </Button>
@@ -782,5 +727,3 @@ export default function InvoicesPage() {
         </div>
     );
 }
-
-    

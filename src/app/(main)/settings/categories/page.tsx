@@ -1,9 +1,8 @@
-
 "use client";
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState } from 'react';
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { MoreHorizontal, PlusCircle } from "lucide-react";
@@ -13,34 +12,19 @@ import { Label } from "@/components/ui/label";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
-import { StorageService } from '@/lib/storage-service';
+import { useExpenseCategories, ExpenseCategory } from '@/hooks/use-expense-categories';
 
 
-type Category = {
-    id: string;
-    name: string;
-};
-
-const emptyCategory: Omit<Category, 'id'> = {
+const emptyCategory: Omit<ExpenseCategory, 'id'> = {
     name: "",
 };
 
 export default function ExpenseCategoriesPage() {
     const { toast } = useToast();
-    const [categories, setCategories] = useState<Category[]>([]);
-    const [isLoading, setIsLoading] = useState(true);
-    const [isSheetOpen, setIsSheetOpen] = useState(false);
-    const [currentCategory, setCurrentCategory] = useState<Omit<Category, 'id'> | Category>(emptyCategory);
+    const { categories, isLoading, addExpenseCategory, updateExpenseCategory, deleteExpenseCategory } = useExpenseCategories();
 
-    useEffect(() => {
-        const loadCategories = async () => {
-            setIsLoading(true);
-            const storedCategories = await StorageService.getCollection<Category>('expenseCategories');
-            setCategories(storedCategories.sort((a, b) => a.name.localeCompare(b.name)));
-            setIsLoading(false);
-        };
-        loadCategories();
-    }, []);
+    const [isSheetOpen, setIsSheetOpen] = useState(false);
+    const [currentCategory, setCurrentCategory] = useState<Omit<ExpenseCategory, 'id'> | ExpenseCategory>(emptyCategory);
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const { id, value } = e.target;
@@ -57,21 +41,18 @@ export default function ExpenseCategoriesPage() {
             return;
         }
 
-        if ('id' in currentCategory) {
-            const updatedCategory = await StorageService.updateItem<Category>('expenseCategories', currentCategory.id, { name: currentCategory.name });
-            if (updatedCategory) {
-                setCategories(prev => 
-                    prev.map(cat => cat.id === currentCategory.id ? updatedCategory : cat).sort((a, b) => a.name.localeCompare(b.name))
-                );
+        try {
+            if ('id' in currentCategory) {
+                await updateExpenseCategory(currentCategory.id, { name: currentCategory.name });
+            } else {
+                await addExpenseCategory({ name: currentCategory.name });
             }
-        } else {
-            const newCategory = await StorageService.addItem<Category>('expenseCategories', { name: currentCategory.name });
-            setCategories(prev => [...prev, newCategory].sort((a, b) => a.name.localeCompare(b.name)));
+            toast({ title: "Sucesso", description: `Categoria ${'id' in currentCategory ? 'atualizada' : 'adicionada'} com sucesso.` });
+            setIsSheetOpen(false);
+            setCurrentCategory(emptyCategory);
+        } catch (error) {
+            toast({ title: "Erro", description: "Não foi possível salvar a categoria.", variant: "destructive" });
         }
-
-        toast({ title: "Sucesso", description: `Categoria ${'id' in currentCategory ? 'atualizada' : 'adicionada'} com sucesso.` });
-        setIsSheetOpen(false);
-        setCurrentCategory(emptyCategory);
     };
 
     const handleAddNew = () => {
@@ -79,15 +60,18 @@ export default function ExpenseCategoriesPage() {
         setIsSheetOpen(true);
     };
 
-    const handleEdit = (category: Category) => {
+    const handleEdit = (category: ExpenseCategory) => {
         setCurrentCategory(category);
         setIsSheetOpen(true);
     };
 
     const handleDelete = async (categoryId: string) => {
-        await StorageService.deleteItem('expenseCategories', categoryId);
-        setCategories(prev => prev.filter(cat => cat.id !== categoryId));
-        toast({ title: "Sucesso", description: "Categoria excluída com sucesso." });
+       try {
+         await deleteExpenseCategory(categoryId);
+         toast({ title: "Sucesso", description: "Categoria excluída com sucesso." });
+       } catch (error) {
+         toast({ title: "Erro", description: "Não foi possível excluir a categoria.", variant: "destructive" });
+       }
     };
 
     return (
@@ -193,5 +177,3 @@ export default function ExpenseCategoriesPage() {
         </div>
     );
 }
-
-    
