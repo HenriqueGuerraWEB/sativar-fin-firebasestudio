@@ -34,8 +34,21 @@ export const getInvoices = ai.defineFlow(
   },
   async () => {
     console.log('[INVOICES_FLOW] Fetching all invoices from database...');
-    const results = await executeQuery('SELECT * FROM invoices ORDER BY issue_date DESC');
-    return results as Invoice[];
+    const results: any[] = await executeQuery('SELECT * FROM invoices ORDER BY issue_date DESC');
+    return results.map(inv => ({
+        id: inv.id,
+        clientId: inv.client_id,
+        planId: inv.plan_id,
+        clientName: inv.client_name,
+        planName: inv.plan_name,
+        amount: inv.amount,
+        issueDate: inv.issue_date,
+        dueDate: inv.due_date,
+        status: inv.status,
+        paymentDate: inv.payment_date,
+        paymentMethod: inv.payment_method,
+        paymentNotes: inv.payment_notes,
+    })) as Invoice[];
   }
 );
 
@@ -105,18 +118,60 @@ export const updateInvoice = ai.defineFlow(
     console.log(`[INVOICES_FLOW] Updating invoice ${invoiceId} in database...`);
     
     if (Object.keys(updates).length === 0) {
-        const result = await executeQuery('SELECT * FROM invoices WHERE id = ?', [invoiceId]);
-        return result.length > 0 ? (result as Invoice[])[0] : null;
+        const result: any[] = await executeQuery('SELECT * FROM invoices WHERE id = ?', [invoiceId]);
+        if (result.length > 0) {
+            const inv = result[0];
+            return {
+                id: inv.id,
+                clientId: inv.client_id,
+                planId: inv.plan_id,
+                clientName: inv.client_name,
+                planName: inv.plan_name,
+                amount: inv.amount,
+                issueDate: inv.issue_date,
+                dueDate: inv.due_date,
+                status: inv.status,
+                paymentDate: inv.payment_date,
+                paymentMethod: inv.payment_method,
+                paymentNotes: inv.payment_notes,
+            } as Invoice;
+        }
+        return null;
     }
 
-    const fields = Object.keys(updates);
-    const values = Object.values(updates);
+    const dbUpdates: { [key: string]: any } = {};
+    for (const key in updates) {
+        if (Object.prototype.hasOwnProperty.call(updates, key)) {
+            const dbKey = key.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
+            (dbUpdates as any)[dbKey] = (updates as any)[key];
+        }
+    }
+
+    const fields = Object.keys(dbUpdates);
+    const values = Object.values(dbUpdates);
     const setClause = fields.map(field => `\`${field.replace(/`/g, '``')}\` = ?`).join(', ');
 
     await executeQuery(`UPDATE invoices SET ${setClause} WHERE id = ?`, [...values, invoiceId]);
     
-    const result = await executeQuery('SELECT * FROM invoices WHERE id = ?', [invoiceId]);
-    return result.length > 0 ? (result as Invoice[])[0] : null;
+    const result: any[] = await executeQuery('SELECT * FROM invoices WHERE id = ?', [invoiceId]);
+    if (result.length > 0) {
+            const inv = result[0];
+            return {
+                id: inv.id,
+                clientId: inv.client_id,
+                planId: inv.plan_id,
+                clientName: inv.client_name,
+                planName: inv.plan_name,
+                amount: inv.amount,
+                issueDate: inv.issue_date,
+                dueDate: inv.due_date,
+                status: inv.status,
+                paymentDate: inv.payment_date,
+                paymentMethod: inv.payment_method,
+                paymentNotes: inv.payment_notes,
+            } as Invoice;
+        }
+    return null;
   }
 );
 
@@ -158,3 +213,5 @@ export const deleteInvoices = ai.defineFlow(
     }
   }
 );
+
+    

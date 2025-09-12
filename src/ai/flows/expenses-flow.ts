@@ -29,8 +29,15 @@ export const getExpenses = ai.defineFlow(
   },
   async () => {
     console.log('[EXPENSES_FLOW] Fetching all expenses from database...');
-    const results = await executeQuery('SELECT * FROM expenses ORDER BY due_date DESC');
-    return results as Expense[];
+    const results: any[] = await executeQuery('SELECT * FROM expenses ORDER BY due_date DESC');
+    return results.map(exp => ({
+        id: exp.id,
+        description: exp.description,
+        amount: exp.amount,
+        dueDate: exp.due_date,
+        status: exp.status,
+        categoryId: exp.category_id,
+    })) as Expense[];
   }
 );
 
@@ -68,18 +75,48 @@ export const updateExpense = ai.defineFlow(
     console.log(`[EXPENSES_FLOW] Updating expense ${expenseId} in database...`);
     
     if (Object.keys(updates).length === 0) {
-        const result = await executeQuery('SELECT * FROM expenses WHERE id = ?', [expenseId]);
-        return result.length > 0 ? (result as Expense[])[0] : null;
+        const result: any[] = await executeQuery('SELECT * FROM expenses WHERE id = ?', [expenseId]);
+        if (result.length > 0) {
+            const exp = result[0];
+            return {
+                id: exp.id,
+                description: exp.description,
+                amount: exp.amount,
+                dueDate: exp.due_date,
+                status: exp.status,
+                categoryId: exp.category_id,
+            } as Expense;
+        }
+        return null;
     }
 
-    const fields = Object.keys(updates);
-    const values = Object.values(updates);
+    const dbUpdates: { [key: string]: any } = {};
+    for (const key in updates) {
+        if (Object.prototype.hasOwnProperty.call(updates, key)) {
+            const dbKey = key.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
+            (dbUpdates as any)[dbKey] = (updates as any)[key];
+        }
+    }
+
+    const fields = Object.keys(dbUpdates);
+    const values = Object.values(dbUpdates);
     const setClause = fields.map(field => `\`${field.replace(/`/g, '``')}\` = ?`).join(', ');
 
     await executeQuery(`UPDATE expenses SET ${setClause} WHERE id = ?`, [...values, expenseId]);
     
-    const result = await executeQuery('SELECT * FROM expenses WHERE id = ?', [expenseId]);
-    return result.length > 0 ? (result as Expense[])[0] : null;
+    const result: any[] = await executeQuery('SELECT * FROM expenses WHERE id = ?', [expenseId]);
+    if (result.length > 0) {
+        const exp = result[0];
+        return {
+            id: exp.id,
+            description: exp.description,
+            amount: exp.amount,
+            dueDate: exp.due_date,
+            status: exp.status,
+            categoryId: exp.category_id,
+        } as Expense;
+    }
+    return null;
   }
 );
 
@@ -96,3 +133,5 @@ export const deleteExpense = ai.defineFlow(
     console.log(`Expense ${expenseId} deleted.`);
   }
 );
+
+    

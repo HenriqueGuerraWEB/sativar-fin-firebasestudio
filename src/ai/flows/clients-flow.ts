@@ -31,11 +31,19 @@ export const getClients = ai.defineFlow(
   async () => {
     console.log('[CLIENTS_FLOW] Fetching all clients from database...');
     const results: any[] = await executeQuery('SELECT * FROM clients ORDER BY created_at DESC');
-    // The mysql2 driver automatically parses JSON columns.
-    // We just need to handle the case where the column might be null.
+    // Map database snake_case to application camelCase
     return results.map(client => ({
-        ...client,
-        plans: client.plans || [] // If client.plans is null, default to an empty array.
+        id: client.id,
+        name: client.name,
+        taxId: client.tax_id,
+        contactName: client.contact_name,
+        email: client.email,
+        phone: client.phone,
+        whatsapp: client.whatsapp,
+        notes: client.notes,
+        status: client.status,
+        createdAt: client.created_at,
+        plans: client.plans || [] // mysql2 driver handles JSON parsing
     })) as Client[];
   }
 );
@@ -96,18 +104,39 @@ export const updateClient = ai.defineFlow(
         const result: any[] = await executeQuery('SELECT * FROM clients WHERE id = ?', [clientId]);
         if (result.length > 0) {
             const client = result[0];
-            return { ...client, plans: client.plans || [] } as Client;
+            return {
+                id: client.id,
+                name: client.name,
+                taxId: client.tax_id,
+                contactName: client.contact_name,
+                email: client.email,
+                phone: client.phone,
+                whatsapp: client.whatsapp,
+                notes: client.notes,
+                status: client.status,
+                createdAt: client.created_at,
+                plans: client.plans || []
+            } as Client;
         }
         return null;
     }
     
+    // Convert camelCase keys from the input to snake_case for the database query
+    const dbUpdates: { [key: string]: any } = {};
+    for (const key in updates) {
+        if (Object.prototype.hasOwnProperty.call(updates, key)) {
+            const dbKey = key.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
+            (dbUpdates as any)[dbKey] = (updates as any)[key];
+        }
+    }
+    
     // If plans are being updated, they need to be stringified.
-    if (updates.plans) {
-        (updates as any).plans = JSON.stringify(updates.plans);
+    if (dbUpdates.plans) {
+       dbUpdates.plans = JSON.stringify(dbUpdates.plans);
     }
 
-    const fields = Object.keys(updates);
-    const values = Object.values(updates);
+    const fields = Object.keys(dbUpdates);
+    const values = Object.values(dbUpdates);
     const setClause = fields.map(field => `\`${field.replace(/`/g, '``')}\` = ?`).join(', ');
 
     await executeQuery(`UPDATE clients SET ${setClause} WHERE id = ?`, [...values, clientId]);
@@ -115,7 +144,19 @@ export const updateClient = ai.defineFlow(
     const result: any[] = await executeQuery('SELECT * FROM clients WHERE id = ?', [clientId]);
      if (result.length > 0) {
         const client = result[0];
-        return { ...client, plans: client.plans || [] } as Client;
+        return { 
+            id: client.id,
+            name: client.name,
+            taxId: client.tax_id,
+            contactName: client.contact_name,
+            email: client.email,
+            phone: client.phone,
+            whatsapp: client.whatsapp,
+            notes: client.notes,
+            status: client.status,
+            createdAt: client.created_at,
+            plans: client.plans || []
+        } as Client;
     }
     return null;
   }
@@ -135,3 +176,5 @@ export const deleteClient = ai.defineFlow(
     console.log(`Client ${clientId} deleted.`);
   }
 );
+
+    
