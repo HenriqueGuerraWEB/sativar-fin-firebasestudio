@@ -20,7 +20,6 @@ import React, {
   useCallback,
 } from "react";
 import { auth, googleProvider } from "@/lib/firebase";
-import { useRouter, usePathname } from "next/navigation";
 import { StorageService } from "@/lib/storage-service";
 
 interface AuthContextType {
@@ -42,28 +41,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const checkAdminStatus = () => {
-      const adminFlag = StorageService.getItem('sativar-config', 'admin_exists');
-      setAdminExists(!!adminFlag);
+      // Direct check from localStorage.
+      const adminFlag = localStorage.getItem('sativar-admin_exists');
+      setAdminExists(adminFlag === 'true');
     };
     checkAdminStatus();
 
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       setUser(user);
-      if (user) {
-         const adminFlag = StorageService.getItem('sativar-config', 'admin_exists');
-         if (!adminFlag) {
-            StorageService.addItem('sativar-config', { id: 'admin_exists', value: true });
-            setAdminExists(true);
-         }
-      }
       setLoading(false);
     });
-
-    window.addEventListener('storage', checkAdminStatus);
+    
+    // Listen for storage changes to keep adminExists in sync across tabs.
+    const handleStorageChange = (event: StorageEvent) => {
+        if (event.key === 'sativar-admin_exists') {
+            checkAdminStatus();
+        }
+    };
+    
+    window.addEventListener('storage', handleStorageChange);
 
     return () => {
       unsubscribe();
-      window.removeEventListener('storage', checkAdminStatus);
+      window.removeEventListener('storage', handleStorageChange);
     };
   }, []);
 
@@ -76,15 +76,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   const signup = async (email: string, pass: string, name?: string) => {
+    if (adminExists) {
+      throw new Error("Um administrador já existe.");
+    }
     const userCredential = await createUserWithEmailAndPassword(auth, email, pass);
     if (userCredential.user) {
       if (name) {
         await updateProfile(userCredential.user, { displayName: name });
       }
       // Set admin flag
-      StorageService.addItem('sativar-config', { id: 'admin_exists', value: true });
+      localStorage.setItem('sativar-admin_exists', 'true');
       setAdminExists(true);
-      setUser(auth.currentUser);
+      setUser(auth.currentUser); // Update user state immediately after profile update
     }
     return userCredential;
   };

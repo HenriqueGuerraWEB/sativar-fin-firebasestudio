@@ -29,7 +29,7 @@ export default function SignupPage() {
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
-    if (authLoading) return; // Wait until auth state is determined
+    if (authLoading || adminExists === null) return; // Wait until auth state is determined
     
     if (user) {
       router.push("/dashboard");
@@ -37,6 +37,7 @@ export default function SignupPage() {
       toast({
         title: "Acesso Negado",
         description: "Já existe um administrador para este sistema. Por favor, faça o login.",
+        variant: "destructive",
       });
       router.push("/login");
     }
@@ -82,6 +83,8 @@ export default function SignupPage() {
             description = "Este e-mail já está em uso.";
         } else if (error.code === 'auth/weak-password') {
             description = "A senha deve ter pelo menos 6 caracteres.";
+        } else if (error.message) {
+            description = error.message;
         }
       toast({
         title: "Erro de Cadastro",
@@ -100,6 +103,15 @@ export default function SignupPage() {
             </div>
       )
     }
+    
+    // Don't render form if admin already exists and we are about to redirect
+    if (adminExists) {
+        return (
+            <div className="flex h-screen w-full items-center justify-center">
+                <div className="h-16 w-16 animate-spin rounded-full border-4 border-solid border-primary border-t-transparent"></div>
+            </div>
+        )
+    }
 
   return (
     <div className="flex h-screen w-full items-center justify-center bg-background px-4">
@@ -110,7 +122,7 @@ export default function SignupPage() {
             </div>
           <CardTitle className="text-2xl">Cadastro</CardTitle>
           <CardDescription>
-            Crie sua conta para começar a gerenciar seu negócio.
+            Crie sua conta de administrador para começar.
           </CardDescription>
         </CardHeader>
         <CardContent>
