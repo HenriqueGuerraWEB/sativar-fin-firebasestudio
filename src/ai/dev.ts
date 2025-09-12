@@ -2,3 +2,4 @@
 import './flows/data-migration-flow';
 import './flows/plans-flow';
 import './flows/test-db-connection-flow';
+import './flows/clients-flow';

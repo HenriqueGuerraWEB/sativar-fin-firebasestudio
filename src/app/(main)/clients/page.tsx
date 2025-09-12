@@ -21,7 +21,8 @@ import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { usePlans, Plan } from '@/hooks/use-plans';
+import { usePlans } from '@/hooks/use-plans';
+import type { Plan } from '@/hooks/use-plans';
 import { useClients, Client, ClientPlan } from '@/hooks/use-clients';
 
 
@@ -120,7 +121,7 @@ export default function ClientsPage() {
 
         try {
             if ('id' in currentClient) {
-                const { id, ...clientData } = currentClient;
+                const { id, createdAt, ...clientData } = currentClient;
                 await updateClient(id, clientData);
                 toast({ title: "Sucesso", description: "Cliente atualizado com sucesso." });
             } else {
@@ -148,7 +149,10 @@ export default function ClientsPage() {
     };
 
     const handleEdit = (client: Client) => {
-        setCurrentClient({ ...client, plans: client.plans || [] });
+        // Ensure plans is an array, parsing if necessary from old data formats
+        const clientPlans = client.plans || [];
+        const parsedPlans = clientPlans.map(p => ({...p, planActivationDate: new Date(p.planActivationDate)}));
+        setCurrentClient({ ...client, plans: parsedPlans });
         setIsSheetOpen(true);
     };
 
@@ -198,7 +202,7 @@ export default function ClientsPage() {
                                 </div>
                                 <div className="space-y-2">
                                     <Label htmlFor="taxId">CPF/CNPJ</Label>
-                                    <Input id="taxId" value={currentClient.taxId} onChange={handleInputChange} />
+                                    <Input id="taxId" value={currentClient.taxId ?? ''} onChange={handleInputChange} />
                                 </div>
                             </div>
                             
@@ -238,7 +242,7 @@ export default function ClientsPage() {
                                                     <PopoverContent className="w-auto p-0">
                                                     <Calendar
                                                         mode="single"
-                                                        selected={clientPlan.planActivationDate}
+                                                        selected={new Date(clientPlan.planActivationDate)}
                                                         onSelect={(date) => handleDateChange(index, date)}
                                                         initialFocus
                                                     />
@@ -262,25 +266,25 @@ export default function ClientsPage() {
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                <div className="space-y-2">
                                     <Label htmlFor="contactName">Nome do Contato</Label>
-                                    <Input id="contactName" value={currentClient.contactName} onChange={handleInputChange} />
+                                    <Input id="contactName" value={currentClient.contactName ?? ''} onChange={handleInputChange} />
                                 </div>
                                 <div className="space-y-2">
                                     <Label htmlFor="email">Email</Label>
-                                    <Input id="email" type="email" value={currentClient.email} onChange={handleInputChange} />
+                                    <Input id="email" type="email" value={currentClient.email ?? ''} onChange={handleInputChange} />
                                 </div>
                                 <div className="space-y-2">
                                     <Label htmlFor="phone">Telefone</Label>
-                                    <Input id="phone" value={currentClient.phone} onChange={handleInputChange} />
+                                    <Input id="phone" value={currentClient.phone ?? ''} onChange={handleInputChange} />
                                 </div>
                                 <div className="space-y-2">
                                     <Label htmlFor="whatsapp">Whatsapp</Label>
-                                    <Input id="whatsapp" value={currentClient.whatsapp} onChange={handleInputChange} />
+                                    <Input id="whatsapp" value={currentClient.whatsapp ?? ''} onChange={handleInputChange} />
                                 </div>
                             </div>
 
                             <div className="space-y-2">
                                 <Label htmlFor="notes">Observações</Label>
-                                <Textarea id="notes" value={currentClient.notes} onChange={handleInputChange} />
+                                <Textarea id="notes" value={currentClient.notes ?? ''} onChange={handleInputChange} />
                             </div>
 
                         </div>

@@ -18,9 +18,9 @@ npm install
 
 ## 2. Configuração do Ambiente
 
-Crie um arquivo chamado `.env.local` na raiz do projeto, copiando o conteúdo do arquivo `.env` (que está vazio). Este arquivo armazenará suas variáveis de ambiente locais.
+Crie um arquivo chamado `.env.local` na raiz do projeto. Este arquivo armazenará suas variáveis de ambiente locais.
 
-Adicione as seguintes variáveis ao `.env.local`:
+Adicione as seguintes variáveis ao `.env.local` e preencha com suas credenciais:
 
 ```env
 # Configuração do Banco de Dados MySQL
@@ -39,9 +39,11 @@ NEXT_PUBLIC_DATABASE_ENABLED=false
 *   Substitua `sua_senha_aqui` pela senha do seu usuário `root` do MySQL ou por um usuário que você tenha criado.
 *   O `DB_NAME` deve ser o nome do banco de dados que você criará na próxima etapa.
 
-## 3. Configuração do Banco de Dados MySQL
+## 3. Configuração do Banco de Dados MySQL (Passo Obrigatório)
 
-Conecte-se à sua instância do MySQL e execute os seguintes comandos SQL para criar o banco de dados e as tabelas necessárias para a aplicação.
+**Importante:** A aplicação **não** cria as tabelas do banco de dados automaticamente. Você deve criá-las manualmente antes de executar a aplicação no modo MySQL.
+
+Conecte-se à sua instância do MySQL e execute os seguintes comandos SQL.
 
 ### 3.1. Criar o Banco de Dados
 
@@ -52,7 +54,7 @@ USE sativar_db;
 
 ### 3.2. Criar as Tabelas
 
-Execute os scripts abaixo para criar as tabelas `plans`, `expense_categories`, `expenses`, `clients`, e `invoices`.
+Execute os scripts abaixo para criar todas as tabelas necessárias para a aplicação.
 
 ```sql
 -- Tabela de Planos
@@ -69,7 +71,7 @@ CREATE TABLE IF NOT EXISTS `plans` (
 -- Tabela de Categorias de Despesas
 CREATE TABLE IF NOT EXISTS `expense_categories` (
   `id` VARCHAR(255) PRIMARY KEY,
-  `name` VARCHAR(255) NOT NULL
+  `name` VARCHAR(255) NOT NULL UNIQUE
 );
 
 -- Tabela de Despesas
@@ -133,15 +135,16 @@ Para rodar o servidor de desenvolvimento do Genkit (necessário para os fluxos d
 npm run genkit:dev
 ```
 
-## 5. Fluxo de Uso
+## 5. Fluxo de Uso e Migração
 
-1.  **Modo `localStorage`**: Com `NEXT_PUBLIC_DATABASE_ENABLED=false`, a aplicação usará o armazenamento local do navegador. Você pode adicionar clientes, planos, etc., e tudo funcionará normalmente.
+1.  **Modo `localStorage`**: Com `NEXT_PUBLIC_DATABASE_ENABLED=false`, a aplicação usará o armazenamento local do navegador. Você pode adicionar clientes, planos, etc., e tudo funcionará normalmente. Os dados ficam salvos no seu navegador.
 2.  **Migração para MySQL**:
-    *   Quando estiver pronto para usar o banco de dados, preencha as credenciais do MySQL no arquivo `.env.local`.
+    *   Quando estiver pronto para usar o banco de dados, certifique-se de que você já executou os scripts da **Etapa 3** no seu MySQL.
+    *   Preencha as credenciais corretas do MySQL no arquivo `.env.local`.
     *   Mude a variável `NEXT_PUBLIC_DATABASE_ENABLED` para `true`.
-    *   Reinicie a aplicação.
-    *   Vá para a página **Configurações**.
-    *   Clique no botão **"Testar Conexão"** para verificar se o backend consegue se comunicar com o banco.
+    *   Reinicie os servidores da aplicação (`dev` e `genkit:dev`).
+    *   Acesse a aplicação e vá para a página **Configurações**.
+    *   Clique no botão **"Testar Conexão"** para verificar se o backend consegue se comunicar com o banco de dados.
     *   Se o teste for bem-sucedido, o botão **"Iniciar Migração de Dados"** será habilitado.
-    *   Clique nele para enviar todos os dados que estavam no `localStorage` para o seu banco de dados MySQL.
+    *   Clique nele para **transferir** todos os dados que estavam no `localStorage` para o seu banco de dados MySQL. Se não houver dados, o processo apenas verificará a conexão.
     *   A partir deste ponto, a aplicação usará o MySQL como sua fonte de dados principal.

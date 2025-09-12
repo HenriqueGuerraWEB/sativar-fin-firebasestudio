@@ -9,8 +9,16 @@ import {
     updatePlan,
     deletePlan,
 } from '@/ai/flows/plans-flow';
+import {
+    getClients,
+    addClient,
+    updateClient,
+    deleteClient,
+} from '@/ai/flows/clients-flow';
 import { migrateData } from '@/ai/flows/data-migration-flow';
 import type { Plan, AddPlanInput, UpdatePlanInput } from '@/lib/types/plan-types';
+import type { Client, AddClientInput, UpdateClientInput } from '@/lib/types/client-types';
+
 
 /**
  * ApiService
@@ -23,9 +31,8 @@ export const ApiService = {
         switch (collectionKey) {
             case 'plans':
                 return await getPlans() as T[];
-            // Add cases for other collections here as flows are created
-            // case 'clients':
-            //     return await getClients() as T[];
+            case 'clients':
+                 return await getClients() as T[];
             default:
                 console.warn(`ApiService: No getCollection handler for ${collectionKey}`);
                 return Promise.resolve([]);
@@ -53,6 +60,8 @@ export const ApiService = {
         switch (collectionKey) {
             case 'plans':
                 return await addPlan(itemData as AddPlanInput) as T;
+             case 'clients':
+                return await addClient(itemData as AddClientInput) as T;
             default:
                 console.warn(`ApiService: No addItem handler for ${collectionKey}`);
                 // Returning a mock object for now to avoid breaking hooks' expectations.
@@ -71,8 +80,11 @@ export const ApiService = {
         console.log(`ApiService: Updating item ${itemId} in ${collectionKey}...`);
         switch (collectionKey) {
             case 'plans':
-                const input: UpdatePlanInput = { planId: itemId, updates: updates as Partial<Plan> };
-                return await updatePlan(input) as T | null;
+                const planInput: UpdatePlanInput = { planId: itemId, updates: updates as Partial<Plan> };
+                return await updatePlan(planInput) as T | null;
+            case 'clients':
+                 const clientInput: UpdateClientInput = { clientId: itemId, updates: updates as Partial<Client> };
+                 return await updateClient(clientInput) as T | null;
             default:
                  console.warn(`ApiService: No updateItem handler for ${collectionKey}`);
                  return Promise.resolve(null);
@@ -84,6 +96,8 @@ export const ApiService = {
         switch (collectionKey) {
             case 'plans':
                 return await deletePlan(itemId);
+             case 'clients':
+                return await deleteClient(itemId);
             default:
                 console.warn(`ApiService: No deleteItem handler for ${collectionKey}`);
                 return Promise.resolve();
