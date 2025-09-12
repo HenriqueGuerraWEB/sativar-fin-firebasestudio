@@ -50,9 +50,7 @@ export default function SettingsPage() {
     const [isSaving, setIsSaving] = useState(false);
     const [isTesting, setIsTesting] = useState(false);
     const [dbLogs, setDbLogs] = useState('');
-    const [isPreparingMigration, setIsPreparingMigration] = useState(false);
     const [isMigrating, setIsMigrating] = useState(false);
-    const [migrationData, setMigrationData] = useState<DataMigrationInput | null>(null);
     const [isMigrationAlertOpen, setIsMigrationAlertOpen] = useState(false);
 
 
@@ -144,10 +142,15 @@ export default function SettingsPage() {
         }, 1500);
     }
     
-    const handlePrepareMigration = () => {
-        setIsPreparingMigration(true);
+    const handleStartMigration = () => {
+        setIsMigrationAlertOpen(true);
+    }
+
+    const handleConfirmMigration = async () => {
+        setIsMigrationAlertOpen(false);
+        setIsMigrating(true);
         try {
-            const data: DataMigrationInput = {
+            const migrationData: DataMigrationInput = {
                 clients: LocalStorageService.getCollection('clients'),
                 plans: LocalStorageService.getCollection('plans'),
                 invoices: LocalStorageService.getCollection('invoices'),
@@ -155,45 +158,34 @@ export default function SettingsPage() {
                 expenseCategories: LocalStorageService.getCollection('expenseCategories'),
                 settings: LocalStorageService.getItem('company-settings', 'single-settings') || undefined,
             };
-            setMigrationData(data);
-            toast({ title: "Dados Prontos!", description: "Os dados do localStorage foram preparados para a migração." });
-        } catch (error: any) {
-             toast({ title: "Erro ao Preparar", description: error.message, variant: "destructive" });
-        } finally {
-            setIsPreparingMigration(false);
-        }
-    }
-    
-    const handleStartMigration = async () => {
-        if (!migrationData) {
-            toast({ title: "Erro", description: "Nenhum dado preparado para migração. Clique em 'Preparar Migração' primeiro.", variant: "destructive" });
-            return;
-        }
-        setIsMigrationAlertOpen(true);
-    }
 
-    const handleConfirmMigration = async () => {
-        if (!migrationData) return;
-        
-        setIsMigrating(true);
-        try {
+            if (
+                migrationData.clients.length === 0 &&
+                migrationData.plans.length === 0 &&
+                migrationData.invoices.length === 0 &&
+                migrationData.expenses.length === 0 &&
+                migrationData.expenseCategories.length === 0
+            ) {
+                 toast({
+                    title: "Nenhum Dado para Migrar",
+                    description: "Não há dados no armazenamento local para serem migrados.",
+                });
+                return;
+            }
+
             const result = await migrateData(migrationData);
             console.log("Migration result:", result);
             
             toast({
-                title: "Migração Enviada!",
-                description: result.message || `O servidor recebeu ${result.clientsMigrated} clientes, ${result.plansMigrated} planos e mais.`,
+                title: "Migração Concluída!",
+                description: result.message,
             });
-            
-            // Here you might want to clear localStorage after a successful migration,
-            // but that should be done carefully, maybe after user confirmation.
             
         } catch (error: any) {
             console.error("Migration failed:", error);
             toast({ title: "Falha na Migração", description: error.message, variant: "destructive" });
         } finally {
             setIsMigrating(false);
-            setIsMigrationAlertOpen(false);
         }
     }
 
@@ -303,24 +295,24 @@ export default function SettingsPage() {
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                             <div className="grid gap-2">
                                 <Label htmlFor="dbHost">Host</Label>
-                                <Input id="dbHost" placeholder="localhost" disabled />
+                                <Input id="dbHost" placeholder="localhost" />
                             </div>
                             <div className="grid gap-2">
                                 <Label htmlFor="dbPort">Porta</Label>
-                                <Input id="dbPort" placeholder="3306" disabled />
+                                <Input id="dbPort" placeholder="3306" />
                             </div>
                              <div className="grid gap-2">
                                 <Label htmlFor="dbUser">Usuário</Label>
-                                <Input id="dbUser" placeholder="admin" disabled />
+                                <Input id="dbUser" placeholder="admin" />
                             </div>
                              <div className="grid gap-2">
                                 <Label htmlFor="dbPassword">Senha</Label>
-                                <Input id="dbPassword" type="password" placeholder="••••••••" disabled />
+                                <Input id="dbPassword" type="password" placeholder="••••••••" />
                             </div>
                         </div>
                          <div className="grid gap-2">
                                 <Label htmlFor="dbName">Nome do Banco</Label>
-                                <Input id="dbName" placeholder="sativar_db" disabled />
+                                <Input id="dbName" placeholder="sativar_db" />
                         </div>
 
                         <div className="flex flex-wrap gap-2">
@@ -329,27 +321,14 @@ export default function SettingsPage() {
                                 {isTesting ? 'Testando...' : 'Testar Conexão'}
                             </Button>
 
-                            {!isDbEnabled && (
-                                <Button onClick={handlePrepareMigration} disabled={isPreparingMigration}>
-                                {isPreparingMigration ? (
-                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                ) : (
-                                    <Send className="mr-2 h-4 w-4" />
-                                )}
-                                {isPreparingMigration ? 'Preparando...' : 'Preparar Migração'}
-                                </Button>
-                            )}
-
-                             {isDbEnabled && (
-                                <Button onClick={handleStartMigration} disabled={isMigrating}>
+                            <Button onClick={handleStartMigration} disabled={!isDbEnabled || isMigrating}>
                                 {isMigrating ? (
                                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                                 ) : (
                                     <Send className="mr-2 h-4 w-4" />
                                 )}
                                 {isMigrating ? 'Migrando...' : 'Iniciar Migração de Dados'}
-                                </Button>
-                            )}
+                            </Button>
                         </div>
                         
                         {dbLogs && (
@@ -361,20 +340,6 @@ export default function SettingsPage() {
                             </div>
                         )}
 
-                        {migrationData && (
-                            <div className="grid gap-2">
-                                <Label>Dados a Serem Migrados</Label>
-                                <div className="p-4 border rounded-lg bg-muted/50 text-sm">
-                                    <p><strong>Clientes:</strong> {migrationData.clients.length}</p>
-                                    <p><strong>Planos:</strong> {migrationData.plans.length}</p>
-                                    <p><strong>Faturas:</strong> {migrationData.invoices.length}</p>
-                                    <p><strong>Despesas:</strong> {migrationData.expenses.length}</p>
-                                    <p><strong>Categorias de Despesas:</strong> {migrationData.expenseCategories.length}</p>
-                                    <p><strong>Configurações da Empresa:</strong> {migrationData.settings ? '1' : '0'}</p>
-                                    <p className="text-muted-foreground mt-2 text-xs">Os dados acima foram lidos do localStorage e estão prontos para serem enviados para o banco de dados assim que a conexão for ativada.</p>
-                                </div>
-                            </div>
-                        )}
                     </CardContent>
                 </Card>
 
@@ -405,3 +370,5 @@ export default function SettingsPage() {
         </div>
     );
 }
+
+    
