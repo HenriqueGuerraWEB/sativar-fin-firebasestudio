@@ -6,11 +6,89 @@ Este guia descreve os passos necessários para configurar e executar a aplicaç�
 
 1.  **Node.js**: Certifique-se de que você tem o Node.js instalado (versão 18 ou superior).
 2.  **npm** (ou **yarn**): Gerenciador de pacotes do Node.js.
-3.  **Banco de Dados MySQL**: Uma instância do MySQL rodando localmente ou em um servidor acessível.
+3.  **Ambiente de Banco de Dados**: Você precisará de uma instância do MySQL. Escolha uma das opções abaixo.
 
-## 1. Instalação das Dependências
+---
 
-Clone o repositório do projeto e instale as dependências necessárias executando o seguinte comando no terminal, na raiz do projeto:
+## Opção 1: Configuração do Banco de Dados com Docker (Recomendado)
+
+Esta é a abordagem mais simples e recomendada, pois isola o ambiente e gerencia o MySQL e uma interface gráfica (phpMyAdmin) automaticamente.
+
+### 1. Pré-requisitos do Docker
+
+*   **Docker** e **Docker Compose**: Certifique-se de que ambos estejam instalados em sua máquina.
+
+### 2. Crie o arquivo `docker-compose.yml`
+
+Na raiz do seu projeto, crie um arquivo chamado `docker-compose.yml` e cole o seguinte conteúdo:
+
+```yaml
+version: '3.8'
+
+services:
+  mysql-db:
+    image: mysql:8.0
+    container_name: sativar-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: root_password
+      MYSQL_DATABASE: sativar_db
+      MYSQL_USER: sativar_user
+      MYSQL_PASSWORD: sativar_password
+    ports:
+      - "3306:3306"
+    volumes:
+      - sativar_db_data:/var/lib/mysql
+
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin
+    container_name: sativar-phpmyadmin
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    environment:
+      PMA_HOST: mysql-db
+      PMA_PORT: 3306
+      MYSQL_ROOT_PASSWORD: root_password
+    depends_on:
+      - mysql-db
+
+volumes:
+  sativar_db_data:
+```
+
+### 3. Inicie os Contêineres
+
+Abra um terminal na raiz do projeto (onde você criou o `docker-compose.yml`) e execute:
+
+```bash
+docker-compose up -d
+```
+
+Este comando fará o download das imagens e iniciará os contêineres do MySQL e do phpMyAdmin em segundo plano.
+
+### 4. Conecte-se ao Banco de Dados
+
+*   **phpMyAdmin**: Para gerenciar o banco de dados visualmente, acesse `http://localhost:8080` no seu navegador. Use as seguintes credenciais:
+    *   **Servidor**: `mysql-db`
+    *   **Usuário**: `root`
+    *   **Senha**: `root_password`
+*   **Credenciais para a Aplicação**: Use os dados do `docker-compose.yml` para configurar seu arquivo `.env.local`.
+
+---
+
+## Opção 2: Configuração Manual do Banco de Dados MySQL
+
+Use esta opção se você prefere instalar e gerenciar o MySQL diretamente em sua máquina.
+
+1.  **Instalação do MySQL**: Instale o MySQL Server em seu sistema operacional.
+2.  **Crie o Banco de Dados e as Tabelas**: Conecte-se à sua instância do MySQL e execute os scripts SQL fornecidos na seção "Configuração do Banco de Dados".
+
+---
+
+## 1. Instalação das Dependências da Aplicação
+
+Independentemente da sua escolha de banco de dados, instale as dependências do projeto:
 
 ```bash
 npm install
@@ -18,15 +96,14 @@ npm install
 
 ## 2. Configuração do Ambiente
 
-Crie um arquivo chamado `.env.local` na raiz do projeto. Este arquivo armazenará suas variáveis de ambiente locais.
+Crie um arquivo chamado `.env.local` na raiz do projeto. Adicione as seguintes variáveis e preencha com as credenciais correspondentes ao seu ambiente (Docker ou Manual).
 
-Adicione as seguintes variáveis ao `.env.local` e preencha com suas credenciais:
-
+**Se estiver usando a configuração do Docker Compose acima, use estes valores:**
 ```env
 # Configuração do Banco de Dados MySQL
 DB_HOST=localhost
-DB_USER=root
-DB_PASSWORD=sua_senha_aqui
+DB_USER=sativar_user
+DB_PASSWORD=sativar_password
 DB_NAME=sativar_db
 DB_PORT=3306
 
@@ -35,22 +112,22 @@ DB_PORT=3306
 NEXT_PUBLIC_DATABASE_ENABLED=false
 ```
 
-**Observações:**
-*   Substitua `sua_senha_aqui` pela senha do seu usuário `root` do MySQL ou por um usuário que você tenha criado.
-*   O `DB_NAME` deve ser o nome do banco de dados que você criará na próxima etapa.
+**Observação:** Se estiver usando uma instalação manual, substitua os valores pelas suas próprias credenciais.
 
-## 3. Configuração do Banco de Dados MySQL (Passo Obrigatório)
+## 3. Configuração da Estrutura do Banco de Dados (Passo Obrigatório)
 
 **Importante:** A aplicação **não** cria as tabelas do banco de dados automaticamente. Você deve criá-las manualmente antes de executar a aplicação no modo MySQL.
 
-Conecte-se à sua instância do MySQL e execute os seguintes comandos SQL.
+Conecte-se à sua instância do MySQL (seja via phpMyAdmin em `http://localhost:8080` ou outra ferramenta) e execute os seguintes comandos SQL.
 
 ### 3.1. Criar o Banco de Dados
 
+Se você não usou o Docker, crie o banco de dados primeiro:
 ```sql
 CREATE DATABASE IF NOT EXISTS sativar_db;
 USE sativar_db;
 ```
+*(Se usou Docker, o banco `sativar_db` já foi criado).*
 
 ### 3.2. Criar as Tabelas
 
@@ -139,12 +216,11 @@ npm run genkit:dev
 
 1.  **Modo `localStorage`**: Com `NEXT_PUBLIC_DATABASE_ENABLED=false`, a aplicação usará o armazenamento local do navegador. Você pode adicionar clientes, planos, etc., e tudo funcionará normalmente. Os dados ficam salvos no seu navegador.
 2.  **Migração para MySQL**:
-    *   Quando estiver pronto para usar o banco de dados, certifique-se de que você já executou os scripts da **Etapa 3** no seu MySQL.
-    *   Preencha as credenciais corretas do MySQL no arquivo `.env.local`.
+    *   Quando estiver pronto para usar o banco de dados, certifique-se de que você já executou os scripts SQL da **Etapa 3**.
+    *   Configure corretamente o arquivo `.env.local` com as credenciais do seu banco.
     *   Mude a variável `NEXT_PUBLIC_DATABASE_ENABLED` para `true`.
     *   Reinicie os servidores da aplicação (`dev` e `genkit:dev`).
     *   Acesse a aplicação e vá para a página **Configurações**.
     *   Clique no botão **"Testar Conexão"** para verificar se o backend consegue se comunicar com o banco de dados.
-    *   Se o teste for bem-sucedido, o botão **"Iniciar Migração de Dados"** será habilitado.
-    *   Clique nele para **transferir** todos os dados que estavam no `localStorage` para o seu banco de dados MySQL. Se não houver dados, o processo apenas verificará a conexão.
+    *   Se o teste for bem-sucedido, o botão **"Iniciar Migração de Dados"** será habilitado. Clique nele para **transferir** os dados do `localStorage` para o MySQL. Se não houver dados, o processo apenas verificará a conexão e as tabelas.
     *   A partir deste ponto, a aplicação usará o MySQL como sua fonte de dados principal.
