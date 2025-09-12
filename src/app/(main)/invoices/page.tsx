@@ -10,7 +10,6 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
 import { MoreHorizontal, PlusCircle, Printer, Calendar as CalendarIcon, ChevronDown, Shapes, Trash2 } from "lucide-react";
 import type { VariantProps } from 'class-variance-authority';
 import { useToast } from '@/hooks/use-toast';
-import { Timestamp } from "firebase/firestore";
 import { Skeleton } from '@/components/ui/skeleton';
 import { format, addDays, addMonths, addYears, isBefore, startOfDay, subDays, subMonths, subYears, isEqual } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -39,7 +38,7 @@ type Plan = {
 
 type ClientPlan = {
     planId: string;
-    planActivationDate: Timestamp;
+    planActivationDate: Date;
 };
 
 type Client = {
@@ -56,12 +55,12 @@ type Invoice = {
     clientName: string;
     clientId: string;
     amount: number;
-    issueDate: Timestamp;
-    dueDate: Timestamp;
+    issueDate: Date;
+    dueDate: Date;
     status: 'Paga' | 'Pendente' | 'Vencida';
     planId: string;
     planName?: string;
-    paymentDate?: Timestamp;
+    paymentDate?: Date;
     paymentMethod?: 'Pix' | 'Cartão de Crédito' | 'Cartão de Débito';
     paymentNotes?: string;
 };
@@ -111,7 +110,7 @@ export default function InvoicesPage() {
 
         const updatedInvoices = invoicesData.map(invoice => {
             if (!invoice.dueDate) return invoice;
-            const dueDate = invoice.dueDate.toDate();
+            const dueDate = invoice.dueDate;
             if (invoice.status === 'Pendente' && isBefore(dueDate, today)) {
                 hasUpdates = true;
                 return {...invoice, status: 'Vencida' as const};
@@ -123,7 +122,7 @@ export default function InvoicesPage() {
            StorageService.setCollection('invoices', updatedInvoices);
         }
 
-        return updatedInvoices.sort((a,b) => b.issueDate.toMillis() - a.issueDate.toMillis());
+        return updatedInvoices.sort((a,b) => b.issueDate.getTime() - a.issueDate.getTime());
     }, []);
     
     useEffect(() => {
@@ -153,7 +152,7 @@ export default function InvoicesPage() {
                 };
             }
             acc[clientId].invoices.push(invoice);
-            acc[clientId].invoices.sort((a,b) => b.dueDate.toMillis() - a.dueDate.toMillis());
+            acc[clientId].invoices.sort((a,b) => b.dueDate.getTime() - a.dueDate.getTime());
             return acc;
         }, {} as GroupedInvoices);
     }, [invoices]);
@@ -193,7 +192,7 @@ export default function InvoicesPage() {
                                 clientId: client.id,
                                 clientName: client.name,
                                 amount: plan.price,
-                                issueDate: Timestamp.now(),
+                                issueDate: new Date(),
                                 dueDate: clientPlan.planActivationDate,
                                 status: 'Pendente' as const,
                                 planId: clientPlan.planId,
@@ -206,17 +205,17 @@ export default function InvoicesPage() {
                     if (plan.type === 'recurring' && plan.recurrencePeriod && plan.recurrenceValue) {
                         
                         let lastBilledDueDate = clientPlanInvoices.length > 0
-                            ? clientPlanInvoices.sort((a, b) => b.dueDate.toMillis() - a.dueDate.toMillis())[0].dueDate.toDate()
-                            : subDays(clientPlan.planActivationDate.toDate(), 1);
+                            ? clientPlanInvoices.sort((a, b) => b.dueDate.getTime() - a.dueDate.getTime())[0].dueDate
+                            : subDays(clientPlan.planActivationDate, 1);
 
-                        const activationDate = clientPlan.planActivationDate.toDate();
+                        const activationDate = clientPlan.planActivationDate;
                         if ((isBefore(activationDate, today) || isEqual(startOfDay(activationDate), today)) && clientPlanInvoices.length === 0) {
                            newInvoices.push({
                                 clientId: client.id,
                                 clientName: client.name,
                                 amount: plan.price,
-                                issueDate: Timestamp.now(),
-                                dueDate: Timestamp.fromDate(activationDate),
+                                issueDate: new Date(),
+                                dueDate: activationDate,
                                 status: 'Pendente' as const,
                                 planId: clientPlan.planId,
                                 planName: plan.name,
@@ -241,8 +240,8 @@ export default function InvoicesPage() {
                                 clientId: client.id,
                                 clientName: client.name,
                                 amount: plan.price,
-                                issueDate: Timestamp.now(),
-                                dueDate: Timestamp.fromDate(nextDueDate),
+                                issueDate: new Date(),
+                                dueDate: nextDueDate,
                                 status: 'Pendente' as const,
                                 planId: clientPlan.planId,
                                 planName: plan.name,
@@ -302,7 +301,7 @@ export default function InvoicesPage() {
 
         const updatedInvoice = StorageService.updateItem<Invoice>('invoices', selectedInvoice.id, {
             status: 'Paga',
-            paymentDate: Timestamp.fromDate(paymentDetails.paymentDate!),
+            paymentDate: paymentDetails.paymentDate!,
             paymentMethod: paymentDetails.paymentMethod,
             paymentNotes: paymentDetails.paymentNotes,
         });
@@ -341,7 +340,7 @@ export default function InvoicesPage() {
         setClientForReminder(client);
         setSelectedInvoice(invoice);
 
-        const dueDate = format(invoice.dueDate.toDate(), 'dd/MM/yyyy', { locale: ptBR });
+        const dueDate = format(invoice.dueDate, 'dd/MM/yyyy', { locale: ptBR });
         const amount = invoice.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
         const serviceTypeText = plan.type === 'recurring' ? 'do seu plano' : 'do serviço';
@@ -398,7 +397,7 @@ export default function InvoicesPage() {
                 return;
             }
 
-            const dueDate = invoice.dueDate.toDate();
+            const dueDate = invoice.dueDate;
             let billingPeriod = format(dueDate, 'dd/MM/yyyy');
             if (plan.type === 'recurring' && plan.recurrencePeriod && plan.recurrenceValue) {
                 let startDate: Date;
@@ -465,8 +464,8 @@ export default function InvoicesPage() {
                                     </div>
                                     <div class="text-left sm:text-right">
                                         <h3 class="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-2">Detalhes da Fatura</h3>
-                                        <p class="text-gray-600"><span class="font-medium">Data de Emissão:</span> ${format(invoice.issueDate.toDate(), 'dd/MM/yyyy')}</p>
-                                        <p class="text-gray-600"><span class="font-medium">Data de Vencimento:</span> ${format(invoice.dueDate.toDate(), 'dd/MM/yyyy')}</p>
+                                        <p class="text-gray-600"><span class="font-medium">Data de Emissão:</span> ${format(invoice.issueDate, 'dd/MM/yyyy')}</p>
+                                        <p class="text-gray-600"><span class="font-medium">Data de Vencimento:</span> ${format(invoice.dueDate, 'dd/MM/yyyy')}</p>
                                         <div class="mt-2">
                                             <span class="px-3 py-1 text-sm font-semibold rounded-full status-${invoice.status}">${invoice.status}</span>
                                         </div>
@@ -636,8 +635,8 @@ export default function InvoicesPage() {
                                                     <TableRow key={invoice.id}>
                                                         <TableCell className="font-medium">#{invoice.id.substring(0, 7).toUpperCase()}</TableCell>
                                                         <TableCell>{invoice.planName || 'N/A'}</TableCell>
-                                                        <TableCell className="hidden md:table-cell">{invoice.paymentDate ? format(invoice.paymentDate.toDate(), 'dd/MM/yyyy') : 'N/A'}</TableCell>
-                                                        <TableCell>{invoice.dueDate ? format(invoice.dueDate.toDate(), 'dd/MM/yyyy') : 'N/A'}</TableCell>
+                                                        <TableCell className="hidden md:table-cell">{invoice.paymentDate ? format(invoice.paymentDate, 'dd/MM/yyyy') : 'N/A'}</TableCell>
+                                                        <TableCell>{invoice.dueDate ? format(invoice.dueDate, 'dd/MM/yyyy') : 'N/A'}</TableCell>
                                                         <TableCell>
                                                             <Badge variant={getStatusVariant(invoice.status)} className={cn("whitespace-nowrap", getStatusClass(invoice.status))}>
                                                                 {invoice.status}

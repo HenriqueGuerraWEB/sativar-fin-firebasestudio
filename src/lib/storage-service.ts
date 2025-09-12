@@ -13,10 +13,6 @@ const replacer = (key: any, value: any) => {
     if (value instanceof Date) {
         return { __type: 'Date', value: value.toISOString() };
     }
-    // If the value looks like a Firebase Timestamp, convert it to a Date and then to our format
-    if (isTimestampLike(value) && !(value instanceof Date)) {
-        return { __type: 'Date', value: new Date(value.seconds * 1000 + value.nanoseconds / 1000000).toISOString() };
-    }
     return value;
 };
 
@@ -28,7 +24,13 @@ const reviver = (key: any, value: any) => {
     }
     // Backward compatibility for old Timestamp format
     if (value && value.__type === 'Timestamp' && value.value) {
-        return new Date(value.value.seconds * 1000 + value.value.nanoseconds / 1000000);
+         if(isTimestampLike(value.value)) {
+            return new Date(value.value.seconds * 1000 + value.value.nanoseconds / 1000000);
+         }
+    }
+    // For backward compatibility for items stored directly as Timestamp-like objects
+    if(isTimestampLike(value)){
+        return new Date(value.seconds * 1000 + value.nanoseconds / 1000000);
     }
     return value;
 };

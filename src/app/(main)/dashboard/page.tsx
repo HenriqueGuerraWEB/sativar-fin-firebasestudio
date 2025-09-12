@@ -13,14 +13,13 @@ import { format, subMonths, getMonth, getYear, startOfMonth, endOfMonth, isWithi
 import { ptBR } from 'date-fns/locale';
 import { useAuth } from '@/hooks/use-auth';
 import { useClients } from '@/hooks/use-clients';
-import { Timestamp } from "firebase/firestore";
 
 
 // Mocks since data is now in localStorage. This can be built out later.
 type Invoice = {
     id: string;
     clientName: string;
-    dueDate: Timestamp;
+    dueDate: Date;
     amount: number;
     status: 'Paga' | 'Pendente' | 'Vencida';
 };
@@ -28,7 +27,7 @@ type Invoice = {
 type Expense = {
     id: string;
     amount: number;
-    dueDate: Timestamp;
+    dueDate: Date;
     status: 'Paga' | 'Pendente';
 };
 
@@ -60,7 +59,7 @@ export default function DashboardPage() {
        const end = endOfMonth(now);
        return clients.filter(c => {
          if (!c.createdAt) return false;
-         const createdAtDate = c.createdAt.toDate();
+         const createdAtDate = c.createdAt;
          return isWithinInterval(createdAtDate, { start, end });
        }).length;
     }, [clients]);

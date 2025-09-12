@@ -4,12 +4,11 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/use-auth';
-import { Timestamp } from "firebase/firestore";
 import { StorageService } from '@/lib/storage-service';
 
 export type ClientPlan = {
     planId: string;
-    planActivationDate: Timestamp;
+    planActivationDate: Date;
 };
 
 export type Client = {
@@ -23,7 +22,7 @@ export type Client = {
     notes: string;
     status: "Ativo" | "Inativo";
     plans: ClientPlan[];
-    createdAt: Timestamp;
+    createdAt: Date;
 };
 
 export function useClients() {
@@ -47,7 +46,7 @@ export function useClients() {
             return;
         }
         
-        setClients(getClientsFromStorage().sort((a,b) => b.createdAt.toMillis() - a.createdAt.toMillis()));
+        setClients(getClientsFromStorage().sort((a,b) => b.createdAt.getTime() - a.createdAt.getTime()));
         setIsLoading(false);
 
     }, [user, authLoading, getClientsFromStorage]);
@@ -58,10 +57,10 @@ export function useClients() {
         try {
             const newClientData = {
                 ...clientData,
-                createdAt: Timestamp.now()
+                createdAt: new Date()
             };
             const newClient = StorageService.addItem<Client>('clients', newClientData);
-            setClients(prev => [...prev, newClient].sort((a,b) => b.createdAt.toMillis() - a.createdAt.toMillis()));
+            setClients(prev => [...prev, newClient].sort((a,b) => b.createdAt.getTime() - a.createdAt.getTime()));
 
         } catch (error) {
             console.error("Error adding client to localStorage:", error);
@@ -74,7 +73,7 @@ export function useClients() {
         try {
             const updatedClient = StorageService.updateItem<Client>('clients', clientId, clientData);
             if (updatedClient) {
-                 setClients(prev => prev.map(client => client.id === clientId ? updatedClient : client).sort((a,b) => b.createdAt.toMillis() - a.createdAt.toMillis()));
+                 setClients(prev => prev.map(client => client.id === clientId ? updatedClient : client).sort((a,b) => b.createdAt.getTime() - a.createdAt.getTime()));
             }
         } catch (error)
         {
@@ -87,7 +86,7 @@ export function useClients() {
         if (!user) throw new Error("User not authenticated");
         try {
             StorageService.deleteItem('clients', clientId);
-            setClients(prev => prev.filter(client => client.id !== clientId).sort((a,b) => b.createdAt.toMillis() - a.createdAt.toMillis()));
+            setClients(prev => prev.filter(client => client.id !== clientId).sort((a,b) => b.createdAt.getTime() - a.createdAt.getTime()));
         } catch (error) {
             console.error("Error deleting client from localStorage:", error);
             throw new Error("Failed to delete client");

@@ -13,7 +13,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { useToast } from '@/hooks/use-toast';
-import { Timestamp } from "firebase/firestore";
 import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -84,13 +83,13 @@ export default function ClientsPage() {
     const handleDateChange = (index: number, date: Date | undefined) => {
         if (date) {
             const newPlans = [...(currentClient.plans || [])];
-            newPlans[index].planActivationDate = Timestamp.fromDate(date);
+            newPlans[index].planActivationDate = date;
             setCurrentClient(prev => ({ ...prev, plans: newPlans }));
         }
     }
     
     const addPlanToClient = () => {
-        const newPlan: ClientPlan = { planId: '', planActivationDate: Timestamp.now() };
+        const newPlan: ClientPlan = { planId: '', planActivationDate: new Date() };
         setCurrentClient(prev => ({...prev, plans: [...(prev.plans || []), newPlan]}));
     }
     
@@ -233,13 +232,13 @@ export default function ClientsPage() {
                                                         )}
                                                     >
                                                         <CalendarIcon className="mr-2 h-4 w-4" />
-                                                        {clientPlan.planActivationDate ? format(clientPlan.planActivationDate.toDate(), "PPP", { locale: ptBR }) : <span>Escolha uma data</span>}
+                                                        {clientPlan.planActivationDate ? format(clientPlan.planActivationDate, "PPP", { locale: ptBR }) : <span>Escolha uma data</span>}
                                                     </Button>
                                                     </PopoverTrigger>
                                                     <PopoverContent className="w-auto p-0">
                                                     <Calendar
                                                         mode="single"
-                                                        selected={clientPlan.planActivationDate?.toDate()}
+                                                        selected={clientPlan.planActivationDate}
                                                         onSelect={(date) => handleDateChange(index, date)}
                                                         initialFocus
                                                     />
