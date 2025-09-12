@@ -29,7 +29,7 @@ const GoogleIcon = (props: React.SVGProps<SVGSVGElement>) => (
 
 
 export default function LoginPage() {
-  const { user, login, loginWithGoogle } = useAuth();
+  const { user, login } = useAuth();
   const router = useRouter();
   const { toast } = useToast();
   const [email, setEmail] = useState("");
@@ -51,10 +51,7 @@ export default function LoginPage() {
     } catch (error: any) {
       toast({
         title: "Erro de Login",
-        description:
-          error.code === "auth/invalid-credential"
-            ? "Credenciais inválidas. Verifique seu e-mail e senha."
-            : "Ocorreu um erro ao tentar fazer login.",
+        description: error.message || "Ocorreu um erro ao tentar fazer login.",
         variant: "destructive",
       });
     } finally {
@@ -62,21 +59,6 @@ export default function LoginPage() {
     }
   };
 
-  const handleGoogleLogin = async () => {
-      setIsLoading(true);
-      try {
-          await loginWithGoogle();
-          router.push('/dashboard');
-      } catch (error) {
-          toast({
-              title: 'Erro de Login com Google',
-              description: 'Não foi possível fazer login com o Google.',
-              variant: 'destructive',
-          });
-      } finally {
-        setIsLoading(false);
-      }
-  }
 
   return (
     <div className="flex h-screen w-full items-center justify-center bg-background px-4">
@@ -92,17 +74,13 @@ export default function LoginPage() {
         </CardHeader>
         <CardContent>
           <div className="grid gap-4">
-            <Button variant="outline" className="w-full" onClick={handleGoogleLogin} disabled={isLoading}>
-                <GoogleIcon className="mr-2 h-4 w-4" />
-                Login com Google
-            </Button>
             <div className="relative">
                 <div className="absolute inset-0 flex items-center">
                     <span className="w-full border-t" />
                 </div>
                 <div className="relative flex justify-center text-xs uppercase">
                     <span className="bg-background px-2 text-muted-foreground">
-                        Ou continue com
+                        Acesse com seu e-mail
                     </span>
                 </div>
             </div>

@@ -29,11 +29,17 @@ export default function SignupPage() {
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
-    if (authLoading || adminExists === null) return; // Wait until auth state is determined
+    // Wait for the hook to determine auth state
+    if (authLoading || adminExists === null) return;
     
+    // If a user session already exists, go to dashboard
     if (user) {
       router.push("/dashboard");
-    } else if (adminExists) {
+      return;
+    }
+
+    // If an admin account exists and there's no user session, redirect to login
+    if (adminExists) {
       toast({
         title: "Acesso Negado",
         description: "Já existe um administrador para este sistema. Por favor, faça o login.",
@@ -55,15 +61,23 @@ export default function SignupPage() {
     }
     if (!name) {
        toast({
-        title: "Erro",
+        title: "Erro de Validação",
         description: "O campo nome é obrigatório.",
         variant: "destructive",
       });
       return;
     }
+    if (password.length < 6) {
+        toast({
+            title: "Erro de Validação",
+            description: "A senha deve ter pelo menos 6 caracteres.",
+            variant: "destructive",
+        });
+        return;
+    }
     if (password !== confirmPassword) {
       toast({
-        title: "Erro",
+        title: "Erro de Validação",
         description: "As senhas não coincidem.",
         variant: "destructive",
       });
@@ -74,21 +88,13 @@ export default function SignupPage() {
       await signup(email, password, name);
       toast({
         title: "Sucesso!",
-        description: "Sua conta foi criada. Você será redirecionado.",
+        description: "Sua conta de administrador foi criada. Você será redirecionado.",
       });
       router.push("/dashboard");
     } catch (error: any) {
-        let description = "Ocorreu um erro ao criar a conta.";
-        if (error.code === 'auth/email-already-in-use') {
-            description = "Este e-mail já está em uso.";
-        } else if (error.code === 'auth/weak-password') {
-            description = "A senha deve ter pelo menos 6 caracteres.";
-        } else if (error.message) {
-            description = error.message;
-        }
       toast({
         title: "Erro de Cadastro",
-        description: description,
+        description: error.message || "Ocorreu um erro ao criar a conta.",
         variant: "destructive",
       });
     } finally {
@@ -96,6 +102,7 @@ export default function SignupPage() {
     }
   };
   
+    // Show a loading spinner while determining auth state
     if (authLoading || adminExists === null) {
       return (
             <div className="flex h-screen w-full items-center justify-center">
@@ -105,10 +112,10 @@ export default function SignupPage() {
     }
     
     // Don't render form if admin already exists and we are about to redirect
-    if (adminExists) {
+    if (adminExists && !user) {
         return (
             <div className="flex h-screen w-full items-center justify-center">
-                <div className="h-16 w-16 animate-spin rounded-full border-4 border-solid border-primary border-t-transparent"></div>
+                 <div className="h-16 w-16 animate-spin rounded-full border-4 border-solid border-primary border-t-transparent"></div>
             </div>
         )
     }
@@ -120,9 +127,9 @@ export default function SignupPage() {
             <div className="mb-4 flex justify-center">
                  <SativarLogo />
             </div>
-          <CardTitle className="text-2xl">Cadastro</CardTitle>
+          <CardTitle className="text-2xl">Cadastro de Administrador</CardTitle>
           <CardDescription>
-            Crie sua conta de administrador para começar.
+            Crie a conta principal para gerenciar o sistema.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -174,7 +181,7 @@ export default function SignupPage() {
               />
             </div>
             <Button onClick={handleSignup} disabled={isLoading} className="w-full">
-              {isLoading ? "Criando conta..." : "Criar conta"}
+              {isLoading ? "Criando conta..." : "Criar Conta de Administrador"}
             </Button>
           </div>
           <div className="mt-4 text-center text-sm">

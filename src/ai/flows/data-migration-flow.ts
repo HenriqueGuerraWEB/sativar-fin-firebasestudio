@@ -1,3 +1,4 @@
+
 'use server';
 /**
  * @fileOverview A flow for migrating user data from localStorage to the database.
@@ -9,13 +10,13 @@
 
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
-import { Timestamp } from 'firebase/firestore';
+
 
 // Schemas for data structures from localStorage
 
 const ClientPlanSchema = z.object({
   planId: z.string(),
-  planActivationDate: z.custom<Timestamp>(),
+  planActivationDate: z.date(),
 });
 
 const ClientSchema = z.object({
@@ -29,7 +30,7 @@ const ClientSchema = z.object({
   notes: z.string(),
   status: z.enum(["Ativo", "Inativo"]),
   plans: z.array(ClientPlanSchema),
-  createdAt: z.custom<Timestamp>(),
+  createdAt: z.date(),
 });
 
 const PlanSchema = z.object({
@@ -47,12 +48,12 @@ const InvoiceSchema = z.object({
     clientName: z.string(),
     clientId: z.string(),
     amount: z.number(),
-    issueDate: z.custom<Timestamp>(),
-    dueDate: z.custom<Timestamp>(),
+    issueDate: z.date(),
+    dueDate: z.date(),
     status: z.enum(['Paga', 'Pendente', 'Vencida']),
     planId: z.string(),
     planName: z.string().optional(),
-    paymentDate: z.custom<Timestamp>().optional(),
+    paymentDate: z.date().optional(),
     paymentMethod: z.enum(['Pix', 'Cartão de Crédito', 'Cartão de Débito']).optional(),
     paymentNotes: z.string().optional(),
 });
@@ -62,7 +63,7 @@ const ExpenseSchema = z.object({
     description: z.string(),
     category: z.string(),
     amount: z.number(),
-    dueDate: z.custom<Timestamp>(),
+    dueDate: z.date(),
     status: z.enum(['Paga', 'Pendente']),
 });
 
@@ -133,7 +134,7 @@ const migrateDataFlow = ai.defineFlow(
     console.log(`Received ${input.expenseCategories.length} categories to migrate.`);
 
     // In a real scenario, this is where you would:
-    // 1. Connect to the PostgreSQL database.
+    // 1. Connect to the MySQL database.
     // 2. Begin a transaction.
     // 3. Insert/update clients, plans, invoices, etc.
     // 4. Handle potential conflicts (e.g., if a record already exists).

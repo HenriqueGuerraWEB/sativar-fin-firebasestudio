@@ -1,22 +1,41 @@
 
 "use client"
-import { Timestamp } from "firebase/firestore";
 
-type Storable = { id: string; [key: string]: any };
+// A custom type guard to check if a value is a Timestamp-like object
+const isTimestampLike = (value: any): value is { seconds: number; nanoseconds: number } => {
+    return value && typeof value.seconds === 'number' && typeof value.nanoseconds === 'number';
+};
 
+
+// Custom Replacer to handle Date objects, converting them to a serializable format
 const replacer = (key: any, value: any) => {
-    if (value instanceof Timestamp) {
-        return { __type: 'Timestamp', value: { seconds: value.seconds, nanoseconds: value.nanoseconds } };
+    // If the value is a Date object, convert it to our custom format
+    if (value instanceof Date) {
+        return { __type: 'Date', value: value.toISOString() };
+    }
+    // If the value looks like a Firebase Timestamp, convert it to a Date and then to our format
+    if (isTimestampLike(value) && !(value instanceof Date)) {
+        return { __type: 'Date', value: new Date(value.seconds * 1000 + value.nanoseconds / 1000000).toISOString() };
     }
     return value;
 };
 
+
+// Custom Reviver to convert our custom format back to Date objects
 const reviver = (key: any, value: any) => {
-    if (value && value.__type === 'Timestamp') {
-        return new Timestamp(value.value.seconds, value.value.nanoseconds);
+    if (value && value.__type === 'Date' && typeof value.value === 'string') {
+        return new Date(value.value);
+    }
+    // Backward compatibility for old Timestamp format
+    if (value && value.__type === 'Timestamp' && value.value) {
+        return new Date(value.value.seconds * 1000 + value.value.nanoseconds / 1000000);
     }
     return value;
 };
+
+
+// Define a generic type for storable items, must have an id.
+type Storable = { id: string; [key: string]: any };
 
 const getFullKey = (collectionKey: string) => `sativar-${collectionKey}`;
 

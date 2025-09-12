@@ -272,7 +272,7 @@ export default function InvoicesPage() {
 
 
     const handleUpdateStatus = async (invoiceId: string, status: 'Pendente' | 'Vencida') => {
-       const updatedInvoice = StorageService.updateItem<Invoice>(invoiceId, {
+       const updatedInvoice = StorageService.updateItem<Invoice>('invoices', invoiceId, {
             status,
             paymentDate: undefined,
             paymentMethod: undefined,
@@ -300,7 +300,7 @@ export default function InvoicesPage() {
             return;
         }
 
-        const updatedInvoice = StorageService.updateItem<Invoice>(selectedInvoice.id, {
+        const updatedInvoice = StorageService.updateItem<Invoice>('invoices', selectedInvoice.id, {
             status: 'Paga',
             paymentDate: Timestamp.fromDate(paymentDetails.paymentDate!),
             paymentMethod: paymentDetails.paymentMethod,
@@ -391,7 +391,7 @@ export default function InvoicesPage() {
             
             const client = StorageService.getItem<Client>('clients', invoice.clientId);
             const plan = StorageService.getItem<Plan>('plans', invoice.planId);
-            const company: CompanySettings | null = StorageService.getCollection<CompanySettings>('settings');
+            const company: CompanySettings | null = StorageService.getItem<CompanySettings>('company-settings', 'single-settings');
 
             if (!client || !plan) {
                 toast({ title: 'Erro', description: 'Não foi possível encontrar os dados do cliente ou do plano.', variant: 'destructive' });

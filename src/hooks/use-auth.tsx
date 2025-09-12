@@ -1,16 +1,5 @@
-
 "use client";
 
-import {
-  Auth,
-  User,
-  onAuthStateChanged,
-  signInWithEmailAndPassword,
-  createUserWithEmailAndPassword,
-  signOut,
-  signInWithPopup,
-  updateProfile,
-} from "firebase/auth";
 import React, {
   createContext,
   useContext,
@@ -19,20 +8,29 @@ import React, {
   useMemo,
   useCallback,
 } from "react";
-import { auth, googleProvider } from "@/lib/firebase";
 import { StorageService } from "@/lib/storage-service";
+
+// Define a simple user object type for our custom auth
+type User = {
+  name: string;
+  email: string;
+};
 
 interface AuthContextType {
   user: User | null;
   loading: boolean;
   adminExists: boolean | null;
-  login: (email: string, pass: string) => Promise<any>;
-  loginWithGoogle: () => Promise<any>;
-  signup: (email: string, pass: string, name?: string) => Promise<any>;
-  logout: () => Promise<any>;
+  login: (email: string, pass: string) => Promise<void>;
+  signup: (email: string, pass: string, name: string) => Promise<void>;
+  logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+// The key for storing the currently logged-in user session
+const SESSION_STORAGE_KEY = 'sativar-session';
+// The key for storing the list of all users (in this case, just the admin)
+const USERS_STORAGE_KEY = 'sativar-users';
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
@@ -40,61 +38,82 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [adminExists, setAdminExists] = useState<boolean | null>(null);
 
   useEffect(() => {
-    const checkAdminStatus = () => {
-      // Direct check from localStorage.
-      const adminFlag = localStorage.getItem('sativar-admin_exists');
-      setAdminExists(adminFlag === 'true');
-    };
-    checkAdminStatus();
+    try {
+      // Check if an admin account exists
+      const users = StorageService.getCollection(USERS_STORAGE_KEY);
+      setAdminExists(users.length > 0);
 
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      setUser(user);
-      setLoading(false);
-    });
-    
-    // Listen for storage changes to keep adminExists in sync across tabs.
+      // Check for an active session
+      const sessionUserJson = localStorage.getItem(SESSION_STORAGE_KEY);
+      if (sessionUserJson) {
+        setUser(JSON.parse(sessionUserJson));
+      }
+    } catch (e) {
+        console.error("Failed to initialize auth state from localStorage", e);
+    } finally {
+        setLoading(false);
+    }
+
     const handleStorageChange = (event: StorageEvent) => {
-        if (event.key === 'sativar-admin_exists') {
-            checkAdminStatus();
+        if (event.key === USERS_STORAGE_KEY) {
+            const users = StorageService.getCollection(USERS_STORAGE_KEY);
+            setAdminExists(users.length > 0);
+        }
+        if (event.key === SESSION_STORAGE_KEY) {
+            const sessionUserJson = event.newValue;
+            if (sessionUserJson) {
+                setUser(JSON.parse(sessionUserJson));
+            } else {
+                setUser(null);
+            }
         }
     };
     
     window.addEventListener('storage', handleStorageChange);
 
     return () => {
-      unsubscribe();
       window.removeEventListener('storage', handleStorageChange);
     };
   }, []);
 
-  const login = (email: string, pass: string) => {
-    return signInWithEmailAndPassword(auth, email, pass);
-  };
-  
-  const loginWithGoogle = () => {
-    return signInWithPopup(auth, googleProvider);
-  }
+  const login = useCallback(async (email: string, pass: string): Promise<void> => {
+    const users = StorageService.getCollection(USERS_STORAGE_KEY);
+    const userToLogin = users.find(
+      (u) => u.email === email && u.password === pass // Plain text comparison
+    );
 
-  const signup = async (email: string, pass: string, name?: string) => {
-    if (adminExists) {
-      throw new Error("Um administrador já existe.");
+    if (userToLogin) {
+      const userData: User = { name: userToLogin.name, email: userToLogin.email };
+      localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(userData));
+      setUser(userData);
+    } else {
+      throw new Error("Credenciais inválidas. Verifique seu e-mail e senha.");
     }
-    const userCredential = await createUserWithEmailAndPassword(auth, email, pass);
-    if (userCredential.user) {
-      if (name) {
-        await updateProfile(userCredential.user, { displayName: name });
-      }
-      // Set admin flag
-      localStorage.setItem('sativar-admin_exists', 'true');
-      setAdminExists(true);
-      setUser(auth.currentUser); // Update user state immediately after profile update
-    }
-    return userCredential;
-  };
+  }, []);
 
-  const logout = () => {
-    return signOut(auth);
-  };
+  const signup = useCallback(async (email: string, pass: string, name: string): Promise<void> => {
+    const users = StorageService.getCollection(USERS_STORAGE_KEY);
+    if (users.length > 0) {
+      throw new Error("Um administrador já existe. Não é possível criar outra conta.");
+    }
+
+    if (!name || !email || !pass) {
+        throw new Error("Nome, email e senha são obrigatórios.");
+    }
+
+    const newUser = { name, email, password: pass }; // Storing password in plain text
+    StorageService.addItem(USERS_STORAGE_KEY, newUser);
+
+    const userData: User = { name, email };
+    localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(userData));
+    setUser(userData);
+    setAdminExists(true);
+  }, []);
+
+  const logout = useCallback(async (): Promise<void> => {
+    localStorage.removeItem(SESSION_STORAGE_KEY);
+    setUser(null);
+  }, []);
 
   const value = useMemo(
     () => ({
@@ -102,11 +121,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       loading,
       adminExists,
       login,
-      loginWithGoogle,
       signup,
       logout,
     }),
-    [user, loading, adminExists]
+    [user, loading, adminExists, login, signup, logout]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

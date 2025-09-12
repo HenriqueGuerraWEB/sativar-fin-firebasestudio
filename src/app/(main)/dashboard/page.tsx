@@ -13,7 +13,7 @@ import { format, subMonths, getMonth, getYear, startOfMonth, endOfMonth, isWithi
 import { ptBR } from 'date-fns/locale';
 import { useAuth } from '@/hooks/use-auth';
 import { useClients } from '@/hooks/use-clients';
-import { Timestamp } from 'firebase/firestore';
+import { Timestamp } from "firebase/firestore";
 
 
 // Mocks since data is now in localStorage. This can be built out later.

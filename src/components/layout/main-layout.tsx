@@ -55,8 +55,8 @@ function HeaderContent() {
                 <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                         <Avatar className="h-9 w-9 cursor-pointer">
-                            <AvatarImage src={user?.photoURL ?? ''} alt={user?.displayName ?? 'User'} data-ai-hint="person portrait" />
-                            <AvatarFallback>{getInitials(user?.displayName)}</AvatarFallback>
+                            <AvatarImage src="" alt={user?.name ?? 'User'} data-ai-hint="person portrait" />
+                            <AvatarFallback>{getInitials(user?.name)}</AvatarFallback>
                         </Avatar>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
