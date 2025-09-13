@@ -64,6 +64,9 @@ export const addInvoice = ai.defineFlow(
     const newInvoice: Invoice = {
       ...invoiceData,
       id: randomUUID(),
+      paymentDate: null,
+      paymentMethod: null,
+      paymentNotes: null,
     };
     
     await executeQuery(
@@ -91,15 +94,21 @@ export const addInvoices = ai.defineFlow(
     console.log(`[INVOICES_FLOW] Adding ${invoicesData.length} new invoices to database...`);
     if (invoicesData.length === 0) return [];
     
-    const newInvoices: Invoice[] = invoicesData.map(inv => ({ ...inv, id: randomUUID() }));
+    const newInvoices: Invoice[] = invoicesData.map(inv => ({
+      ...inv,
+      id: randomUUID(),
+      paymentDate: null,
+      paymentMethod: null,
+      paymentNotes: null,
+    }));
 
     const values = newInvoices.map(inv => [
         inv.id, inv.clientId, inv.planId, inv.clientName, inv.planName, inv.amount, 
-        inv.issueDate, inv.dueDate, inv.status
+        inv.issueDate, inv.dueDate, inv.status, inv.paymentDate, inv.paymentMethod, inv.paymentNotes
     ]);
     
     await executeQuery(
-        `INSERT INTO invoices (id, client_id, plan_id, client_name, plan_name, amount, issue_date, due_date, status) VALUES ?`,
+        `INSERT INTO invoices (id, client_id, plan_id, client_name, plan_name, amount, issue_date, due_date, status, payment_date, payment_method, payment_notes) VALUES ?`,
         [values]
     );
 
@@ -213,5 +222,3 @@ export const deleteInvoices = ai.defineFlow(
     }
   }
 );
-
-    
