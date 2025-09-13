@@ -1,18 +1,22 @@
 
 import { cn } from "@/lib/utils";
-import { Package2 } from "lucide-react";
+import { Rocket } from "lucide-react";
 
 export const SativarLogo = ({ className }: { className?: string }) => (
-    <div className="flex items-center gap-2 group-data-[collapsible=icon]:hidden">
-        <Package2 className="h-6 w-6 text-brand" />
-        <h1 className={cn("text-lg font-semibold text-foreground", className)}>
+    <div className="flex items-center gap-2">
+        <div className="bg-primary p-1.5 rounded-lg">
+            <Rocket className="h-5 w-5 text-primary-foreground" />
+        </div>
+        <h1 className={cn("text-lg font-bold text-foreground", className)}>
             Sativar
         </h1>
     </div>
 );
 
 export const SativarLogoIcon = ({ className }: { className?: string }) => (
-    <div className="flex items-center gap-2 group-data-[collapsible=icon]:flex">
-        <Package2 className={cn("h-6 w-6 text-brand", className)} />
+     <div className="flex items-center gap-2">
+        <div className="bg-primary p-1.5 rounded-lg">
+            <Rocket className={cn("h-5 w-5 text-primary-foreground", className)} />
+        </div>
     </div>
 );

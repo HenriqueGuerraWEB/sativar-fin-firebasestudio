@@ -17,8 +17,7 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { LayoutDashboard, Users, Package, Banknote, FileText, Settings, LogOut, Shapes, PanelLeft } from 'lucide-react';
 import React from 'react';
-import { SativarLogoIcon } from '@/components/sativar-logo';
-import { ModeToggle } from '@/components/mode-toggle';
+import { SativarLogo } from '@/components/sativar-logo';
 import { useAuth } from '@/hooks/use-auth';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '../ui/dropdown-menu';
 import { Button } from '../ui/button';
@@ -51,7 +50,6 @@ function HeaderContent() {
                 </Button>
             )}
             <div className="ml-auto flex items-center gap-4">
-                <ModeToggle />
                 <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                         <Avatar className="h-9 w-9 cursor-pointer">
@@ -121,7 +119,7 @@ function MainLayoutContent({ children }: { children: React.ReactNode }) {
             <Sidebar>
                 <SidebarHeader>
                     <Link href="/dashboard" onClick={handleLinkClick}>
-                       <SativarLogoIcon />
+                       <SativarLogo />
                     </Link>
                 </SidebarHeader>
                 <SidebarContent>
