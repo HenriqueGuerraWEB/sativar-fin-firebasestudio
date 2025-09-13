@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
@@ -330,6 +331,7 @@ export default function InvoicesPage() {
     }
     
     const handlePrint = async (invoice: Invoice) => {
+        toast({ title: "Preparando fatura...", description: "Aguarde enquanto geramos o documento para impressão." });
         try {
              if (!invoice.clientId || !invoice.planId) {
                 toast({ title: 'Erro', description: 'Dados da fatura incompletos para impressão.', variant: 'destructive' });
@@ -385,11 +387,11 @@ export default function InvoicesPage() {
                                 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
                                 body { font-family: 'Inter', sans-serif; color: #111827; }
                                 @media print {
-                                    body { -webkit-print-color-adjust: exact; }
+                                    body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
                                 }
-                                .status-Paga { background-color: #dcfce7; color: #166534; }
-                                .status-Pendente { background-color: #fef9c3; color: #854d0e; }
-                                .status-Vencida { background-color: #fee2e2; color: #991b1b; }
+                                .status-Paga { background-color: #dcfce7 !important; color: #166534 !important; }
+                                .status-Pendente { background-color: #fef9c3 !important; color: #854d0e !important; }
+                                .status-Vencida { background-color: #fee2e2 !important; color: #991b1b !important; }
                             </style>
                         </head>
                         <body class="bg-gray-100 p-4 sm:p-8">
@@ -443,7 +445,7 @@ export default function InvoicesPage() {
                                 <div class="grid grid-cols-1 sm:grid-cols-2 mt-10 gap-4">
                                     <div>
                                         <h4 class="font-semibold text-gray-800">Obrigado por sua preferência!</h4>
-                                        ${company ? `<p class="text-sm text-gray-500">${company.name}</p>` : ''}
+                                        ${invoice.paymentNotes ? `<p class="text-sm text-gray-500 mt-2"><strong>Observações do Pagamento:</strong><br>${invoice.paymentNotes.replace(/\n/g, '<br>')}</p>` : ''}
                                     </div>
                                     <div class="text-left sm:text-right">
                                         <p class="text-sm text-gray-500 mb-1">Total</p>
@@ -457,10 +459,10 @@ export default function InvoicesPage() {
                 printWindow.document.close();
                 printWindow.focus();
                 
-                setTimeout(() => { // Timeout to ensure styles are loaded
+                setTimeout(() => { // Timeout to ensure styles and images are loaded
                     printWindow.print();
                     printWindow.close();
-                }, 500);
+                }, 1000);
             }
         } catch (error) {
             console.error("Error preparing print data:", error);
