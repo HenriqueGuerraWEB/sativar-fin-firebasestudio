@@ -52,7 +52,7 @@ USE sativar_db;
 
 ### 3.2. Criar as Tabelas
 
-Execute os scripts abaixo para criar as tabelas `plans`, `expense_categories`, `expenses`, `clients`, e `invoices`.
+Execute os scripts abaixo para criar as tabelas `plans`, `expense_categories`, `expenses`, `clients`, `invoices` e `company_settings`.
 
 ```sql
 -- Tabela de Planos
@@ -114,6 +114,19 @@ CREATE TABLE IF NOT EXISTS `invoices` (
   `payment_notes` TEXT,
   FOREIGN KEY (`client_id`) REFERENCES `clients`(`id`) ON DELETE CASCADE,
   FOREIGN KEY (`plan_id`) REFERENCES `plans`(`id`) ON DELETE SET NULL
+);
+
+-- Tabela de Configurações da Empresa
+CREATE TABLE IF NOT EXISTS `company_settings` (
+  `id` VARCHAR(255) PRIMARY KEY,
+  `name` VARCHAR(255),
+  `cpf` VARCHAR(50),
+  `cnpj` VARCHAR(50),
+  `address` TEXT,
+  `phone` VARCHAR(50),
+  `email` VARCHAR(255),
+  `website` VARCHAR(255),
+  `logo` LONGTEXT
 );
 ```
 
