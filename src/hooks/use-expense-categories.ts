@@ -5,7 +5,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from './use-auth';
 import { getExpenseCategories as getExpenseCategoriesFlow, addExpenseCategory as addExpenseCategoryFlow, updateExpenseCategory as updateExpenseCategoryFlow, deleteExpenseCategory as deleteExpenseCategoryFlow } from '@/ai/flows/expense-categories-flow';
-import type { ExpenseCategory, AddExpenseCategoryInput } from '@/lib/types/expense-category-types';
+import type { ExpenseCategory, AddExpenseCategoryInput, UpdateExpenseCategoryInput } from '@/lib/types/expense-category-types';
 
 export type { ExpenseCategory, AddExpenseCategoryInput } from '@/lib/types/expense-category-types';
 
@@ -48,38 +48,22 @@ export function useExpenseCategories() {
 
     const addExpenseCategory = async (categoryData: AddExpenseCategoryInput): Promise<ExpenseCategory> => {
         if (!user) throw new Error("User not authenticated");
-        try {
-            const newCategory = await addExpenseCategoryFlow(categoryData);
-            await loadCategories();
-            return newCategory;
-        } catch (error) {
-            console.error("Error adding expense category:", error);
-            throw new Error("Failed to add expense category");
-        }
+        const newCategory = await addExpenseCategoryFlow(categoryData);
+        await loadCategories();
+        return newCategory;
     };
 
     const updateExpenseCategory = async (categoryId: string, updates: Partial<Omit<ExpenseCategory, 'id'>>) => {
         if (!user) throw new Error("User not authenticated");
-        try {
-            await updateExpenseCategoryFlow({ categoryId, updates });
-            await loadCategories();
-        }
-        catch (error)
-        {
-            console.error("Error updating expense category:", error);
-            throw new Error("Failed to update expense category");
-        }
+        const input: UpdateExpenseCategoryInput = { categoryId, updates };
+        await updateExpenseCategoryFlow(input);
+        await loadCategories();
     };
 
     const deleteExpenseCategory = async (categoryId: string) => {
         if (!user) throw new Error("User not authenticated");
-        try {
-            await deleteExpenseCategoryFlow(categoryId);
-            await loadCategories();
-        } catch (error) {
-            console.error("Error deleting expense category:", error);
-            throw new Error("Failed to delete expense category");
-        }
+        await deleteExpenseCategoryFlow(categoryId);
+        await loadCategories();
     };
 
     return { categories, isLoading, addExpenseCategory, updateExpenseCategory, deleteExpenseCategory, refreshCategories: loadCategories };

@@ -52,6 +52,7 @@ export default function ExpenseCategoriesPage() {
             setIsSheetOpen(false);
             setCurrentCategory(emptyCategory);
         } catch (error) {
+            console.error("Error saving category:", error);
             toast({ title: "Erro", description: "Não foi possível salvar a categoria.", variant: "destructive" });
         }
     };
@@ -71,6 +72,7 @@ export default function ExpenseCategoriesPage() {
          await deleteExpenseCategory(categoryId);
          toast({ title: "Sucesso", description: "Categoria excluída com sucesso." });
        } catch (error) {
+         console.error("Error deleting category:", error);
          toast({ title: "Erro", description: "Não foi possível excluir a categoria.", variant: "destructive" });
        }
     };
@@ -155,7 +157,7 @@ export default function ExpenseCategoriesPage() {
                                                                 <AlertDialogHeader>
                                                                     <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
                                                                     <AlertDialogDescription>
-                                                                        Essa ação não pode ser desfeita. Isso excluirá permanentemente a categoria.
+                                                                        Essa ação não pode ser desfeita. Isso excluirá permanentemente a categoria. As despesas associadas não serão excluídas, mas ficarão sem categoria.
                                                                     </AlertDialogDescription>
                                                                 </AlertDialogHeader>
                                                                 <AlertDialogFooter>
