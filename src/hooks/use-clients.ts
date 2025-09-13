@@ -5,7 +5,8 @@ import { useState, useEffect, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/use-auth';
 import type { AddClientInput, Client } from '@/lib/types/client-types';
-import { getClients, addClient as addClientService, updateClient as updateClientService, deleteClient as deleteClientService } from '@/lib/data-service';
+import { getClients as getClientsFlow, addClient as addClientFlow, updateClient as updateClientFlow, deleteClient as deleteClientFlow } from '@/ai/flows/clients-flow';
+
 
 export type { Client, ClientPlan } from '@/lib/types/client-types';
 
@@ -23,7 +24,7 @@ export function useClients() {
         }
         setIsLoading(true);
         try {
-            const clientsFromService = await getClients();
+            const clientsFromService = await getClientsFlow();
             setClients(clientsFromService);
         } catch (error) {
             console.error("Failed to load clients:", error);
@@ -47,7 +48,7 @@ export function useClients() {
     const addClient = async (clientData: AddClientInput) => {
         if (!user) throw new Error("User not authenticated");
         try {
-            const newClient = await addClientService(clientData);
+            const newClient = await addClientFlow(clientData);
             await loadClients();
             return newClient;
         } catch (error) {
@@ -59,7 +60,7 @@ export function useClients() {
     const updateClient = async (clientId: string, clientData: Partial<Omit<Client, 'id' | 'createdAt'>>) => {
         if (!user) throw new Error("User not authenticated");
         try {
-            const updatedClient = await updateClientService(clientId, clientData);
+            const updatedClient = await updateClientFlow(clientId, clientData);
             await loadClients();
             return updatedClient;
         } catch (error) {
@@ -71,7 +72,7 @@ export function useClients() {
     const deleteClient = async (clientId: string) => {
         if (!user) throw new Error("User not authenticated");
         try {
-            await deleteClientService(clientId);
+            await deleteClientFlow(clientId);
             await loadClients();
         } catch (error) {
             console.error("Error deleting client:", error);
