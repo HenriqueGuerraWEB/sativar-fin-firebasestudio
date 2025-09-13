@@ -29,8 +29,17 @@ export const getPlans = ai.defineFlow(
   },
   async () => {
     console.log('[PLANS_FLOW] Fetching all plans from database...');
-    const results = await executeQuery('SELECT * FROM plans');
-    return results as Plan[];
+    const results = await executeQuery('SELECT * FROM plans') as any[];
+    // Map database results to the application's camelCase and correct types
+    return results.map(plan => ({
+        id: plan.id,
+        name: plan.name,
+        description: plan.description,
+        price: typeof plan.price === 'string' ? parseFloat(plan.price) : plan.price,
+        type: plan.type,
+        recurrenceValue: plan.recurrenceValue,
+        recurrencePeriod: plan.recurrencePeriod,
+    })) as Plan[];
   }
 );
 
@@ -71,8 +80,20 @@ export const updatePlan = ai.defineFlow(
     console.log(`[PLANS_FLOW] Updating plan ${planId} in database...`);
     
     if (Object.keys(updates).length === 0) {
-        const result = await executeQuery('SELECT * FROM plans WHERE id = ?', [planId]);
-        return result.length > 0 ? (result as Plan[])[0] : null;
+        const result: any[] = await executeQuery('SELECT * FROM plans WHERE id = ?', [planId]);
+        if (result.length > 0) {
+            const plan = result[0];
+            return {
+                id: plan.id,
+                name: plan.name,
+                description: plan.description,
+                price: typeof plan.price === 'string' ? parseFloat(plan.price) : plan.price,
+                type: plan.type,
+                recurrenceValue: plan.recurrenceValue,
+                recurrencePeriod: plan.recurrencePeriod,
+            } as Plan;
+        }
+        return null;
     }
 
     // Ensure recurrence fields are null if type is 'one-time'
@@ -87,8 +108,20 @@ export const updatePlan = ai.defineFlow(
 
     await executeQuery(`UPDATE plans SET ${setClause} WHERE id = ?`, [...values, planId]);
     
-    const result = await executeQuery('SELECT * FROM plans WHERE id = ?', [planId]);
-    return result.length > 0 ? (result as Plan[])[0] : null;
+    const result: any[] = await executeQuery('SELECT * FROM plans WHERE id = ?', [planId]);
+    if (result.length > 0) {
+        const plan = result[0];
+        return {
+            id: plan.id,
+            name: plan.name,
+            description: plan.description,
+            price: typeof plan.price === 'string' ? parseFloat(plan.price) : plan.price,
+            type: plan.type,
+            recurrenceValue: plan.recurrenceValue,
+            recurrencePeriod: plan.recurrencePeriod,
+        } as Plan;
+    }
+    return null;
   }
 );
 
