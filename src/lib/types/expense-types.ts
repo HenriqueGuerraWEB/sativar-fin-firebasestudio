@@ -6,8 +6,8 @@ export const ExpenseSchema = z.object({
   id: z.string(),
   description: z.string(),
   amount: z.number(),
-  // Dates from the database may be strings or Date objects.
-  dueDate: z.union([z.string(), z.date()]),
+  // Dates will be handled as ISO strings
+  dueDate: z.string(),
   status: z.enum(['Paga', 'Pendente']),
   categoryId: z.string().nullable().optional(),
 });

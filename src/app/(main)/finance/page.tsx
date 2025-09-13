@@ -27,7 +27,7 @@ import { useInvoices, Invoice } from '@/hooks/use-invoices';
 import { useExpenseCategories } from '@/hooks/use-expense-categories';
 
 
-const emptyExpense: Omit<Expense, 'id' | 'status'> = {
+const emptyExpense: Omit<Expense, 'id' | 'status' | 'dueDate'> & { dueDate: Date } = {
     description: "",
     categoryId: "",
     amount: 0,
@@ -55,7 +55,7 @@ export default function FinancePage() {
     const { categories, isLoading: categoriesLoading, addExpenseCategory } = useExpenseCategories();
 
     const [isSheetOpen, setIsSheetOpen] = useState(false);
-    const [currentExpense, setCurrentExpense] = useState<Omit<Expense, 'id' | 'status'>>(emptyExpense);
+    const [currentExpense, setCurrentExpense] = useState(emptyExpense);
     const [isAnalyzing, setIsAnalyzing] = useState(false);
     const [isCategoryDialogOpen, setIsCategoryDialogOpen] = useState(false);
     const [newCategoryName, setNewCategoryName] = useState("");
@@ -169,6 +169,7 @@ export default function FinancePage() {
         try {
             await addExpense({
                 ...currentExpense,
+                dueDate: currentExpense.dueDate.toISOString(),
                 status: "Pendente",
             });
             toast({ title: "Sucesso", description: "Despesa adicionada com sucesso." });

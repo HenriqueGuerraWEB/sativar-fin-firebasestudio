@@ -61,7 +61,7 @@ export default function InvoicesPage() {
     const [clientForReminder, setClientForReminder] = useState<Client | null>(null);
     const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
     const [paymentDetails, setPaymentDetails] = useState<{
-        paymentDate: Date | undefined;
+        paymentDate: Date;
         paymentMethod: 'Pix' | 'Cartão de Crédito' | 'Cartão de Débito' | undefined;
         paymentNotes: string;
     }>({
@@ -137,8 +137,8 @@ export default function InvoicesPage() {
                                 clientId: client.id,
                                 clientName: client.name,
                                 amount: plan.price,
-                                issueDate: new Date(),
-                                dueDate: activationDate,
+                                issueDate: new Date().toISOString(),
+                                dueDate: activationDate.toISOString(),
                                 status: 'Pendente' as const,
                                 planId: clientPlan.planId,
                                 planName: plan.name,
@@ -151,8 +151,9 @@ export default function InvoicesPage() {
                         
                         let lastBilledDueDate = clientPlanInvoices.length > 0
                             ? clientPlanInvoices.sort((a, b) => new Date(b.dueDate).getTime() - new Date(a.dueDate).getTime())[0].dueDate
-                            : subDays(activationDate, 1);
-                        lastBilledDueDate = new Date(lastBilledDueDate);
+                            : subDays(activationDate, 1).toISOString();
+                        
+                        let lastBilledDueDateObj = new Date(lastBilledDueDate);
 
 
                         if ((isBefore(activationDate, today) || isEqual(startOfDay(activationDate), today)) && clientPlanInvoices.length === 0) {
@@ -160,21 +161,21 @@ export default function InvoicesPage() {
                                 clientId: client.id,
                                 clientName: client.name,
                                 amount: plan.price,
-                                issueDate: new Date(),
-                                dueDate: activationDate,
+                                issueDate: new Date().toISOString(),
+                                dueDate: activationDate.toISOString(),
                                 status: 'Pendente' as const,
                                 planId: clientPlan.planId,
                                 planName: plan.name,
                             });
-                            lastBilledDueDate = activationDate;
+                            lastBilledDueDateObj = activationDate;
                         }
 
                         while (true) {
                             let nextDueDate: Date;
                             switch (plan.recurrencePeriod) {
-                                case 'dias': nextDueDate = addDays(lastBilledDueDate, plan.recurrenceValue); break;
-                                case 'meses': nextDueDate = addMonths(lastBilledDueDate, plan.recurrenceValue); break;
-                                case 'anos': nextDueDate = addYears(lastBilledDueDate, plan.recurrenceValue); break;
+                                case 'dias': nextDueDate = addDays(lastBilledDueDateObj, plan.recurrenceValue); break;
+                                case 'meses': nextDueDate = addMonths(lastBilledDueDateObj, plan.recurrenceValue); break;
+                                case 'anos': nextDueDate = addYears(lastBilledDueDateObj, plan.recurrenceValue); break;
                                 default: console.error("Invalid recurrence period for plan:", plan.id); continue;
                             }
 
@@ -186,13 +187,13 @@ export default function InvoicesPage() {
                                 clientId: client.id,
                                 clientName: client.name,
                                 amount: plan.price,
-                                issueDate: new Date(),
-                                dueDate: nextDueDate,
+                                issueDate: new Date().toISOString(),
+                                dueDate: nextDueDate.toISOString(),
                                 status: 'Pendente' as const,
                                 planId: clientPlan.planId,
                                 planName: plan.name,
                             });
-                            lastBilledDueDate = nextDueDate;
+                            lastBilledDueDateObj = nextDueDate;
                         }
                     }
                 }
@@ -219,9 +220,9 @@ export default function InvoicesPage() {
        try {
         await updateInvoice(invoiceId, {
             status,
-            paymentDate: undefined,
-            paymentMethod: undefined,
-            paymentNotes: undefined
+            paymentDate: null,
+            paymentMethod: null,
+            paymentNotes: null
         });
         toast({ title: "Sucesso", description: `Fatura marcada como ${status}.`});
        } catch (error) {
@@ -247,7 +248,7 @@ export default function InvoicesPage() {
         try {
             await updateInvoice(selectedInvoice.id, {
                 status: 'Paga',
-                paymentDate: paymentDetails.paymentDate!,
+                paymentDate: paymentDetails.paymentDate!.toISOString(),
                 paymentMethod: paymentDetails.paymentMethod,
                 paymentNotes: paymentDetails.paymentNotes,
             });
@@ -658,7 +659,7 @@ export default function InvoicesPage() {
                                                                                     <Calendar
                                                                                         mode="single"
                                                                                         selected={paymentDetails.paymentDate}
-                                                                                        onSelect={(date) => setPaymentDetails(prev => ({...prev, paymentDate: date}))}
+                                                                                        onSelect={(date) => setPaymentDetails(prev => ({...prev, paymentDate: date ?? new Date()}))}
                                                                                         initialFocus
                                                                                     />
                                                                                     </PopoverContent>

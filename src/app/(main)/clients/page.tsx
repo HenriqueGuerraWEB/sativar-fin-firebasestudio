@@ -37,13 +37,23 @@ const emptyClient: Omit<Client, 'id' | 'status' | 'createdAt'> = {
     plans: [],
 };
 
+type EditableClientPlan = {
+    planId: string;
+    planActivationDate: Date;
+}
+
+type EditableClient = Omit<Client, 'plans' | 'createdAt'> & {
+    plans: EditableClientPlan[];
+    createdAt?: string;
+}
+
 export default function ClientsPage() {
     const { toast } = useToast();
     const { clients, isLoading: clientsLoading, addClient, updateClient, deleteClient } = useClients();
     const { plans, isLoading: plansLoading } = usePlans();
     
     const [isSheetOpen, setIsSheetOpen] = useState(false);
-    const [currentClient, setCurrentClient] = useState<Omit<Client, 'id' | 'status' | 'createdAt'> | Client>(emptyClient);
+    const [currentClient, setCurrentClient] = useState<Omit<Client, 'id' | 'status' | 'createdAt'> | EditableClient>(emptyClient);
 
     const isLoading = clientsLoading || plansLoading;
 
@@ -78,19 +88,19 @@ export default function ClientsPage() {
     const handlePlanChange = (index: number, planId: string) => {
         const newPlans = [...(currentClient.plans || [])];
         newPlans[index].planId = planId;
-        setCurrentClient(prev => ({...prev, plans: newPlans}));
+        setCurrentClient(prev => ({...prev, plans: newPlans as EditableClientPlan[]}));
     }
     
     const handleDateChange = (index: number, date: Date | undefined) => {
         if (date) {
             const newPlans = [...(currentClient.plans || [])];
             newPlans[index].planActivationDate = date;
-            setCurrentClient(prev => ({ ...prev, plans: newPlans }));
+            setCurrentClient(prev => ({ ...prev, plans: newPlans as EditableClientPlan[] }));
         }
     }
     
     const addPlanToClient = () => {
-        const newPlan: ClientPlan = { planId: '', planActivationDate: new Date() };
+        const newPlan: EditableClientPlan = { planId: '', planActivationDate: new Date() };
         setCurrentClient(prev => ({...prev, plans: [...(prev.plans || []), newPlan]}));
     }
     
@@ -119,14 +129,19 @@ export default function ClientsPage() {
             return;
         }
 
+        const clientDataToSave = {
+            ...currentClient,
+            plans: currentClient.plans.map(p => ({...p, planActivationDate: (p.planActivationDate as Date).toISOString()}))
+        };
+
         try {
-            if ('id' in currentClient) {
-                const { id, createdAt, ...clientData } = currentClient;
+            if ('id' in clientDataToSave) {
+                const { id, createdAt, ...clientData } = clientDataToSave as Client;
                 await updateClient(id, clientData);
                 toast({ title: "Sucesso", description: "Cliente atualizado com sucesso." });
             } else {
                 await addClient({
-                    ...currentClient,
+                    ...(clientDataToSave as Omit<Client, 'id' | 'createdAt'>),
                     status: "Ativo",
                 });
                 toast({ title: "Sucesso", description: "Cliente adicionado com sucesso." });
@@ -149,10 +164,14 @@ export default function ClientsPage() {
     };
 
     const handleEdit = (client: Client) => {
-        // Ensure plans is an array, parsing if necessary from old data formats
-        const clientPlans = client.plans || [];
-        const parsedPlans = clientPlans.map(p => ({...p, planActivationDate: new Date(p.planActivationDate)}));
-        setCurrentClient({ ...client, plans: parsedPlans });
+        const editableClient: EditableClient = {
+            ...client,
+            plans: (client.plans || []).map(p => ({
+                ...p,
+                planActivationDate: new Date(p.planActivationDate),
+            })),
+        };
+        setCurrentClient(editableClient);
         setIsSheetOpen(true);
     };
 
@@ -209,7 +228,7 @@ export default function ClientsPage() {
                             <div className="space-y-4">
                                 <Label>Planos</Label>
                                 <div className="space-y-3">
-                                    {currentClient.plans?.map((clientPlan, index) => (
+                                    {'plans' in currentClient && currentClient.plans?.map((clientPlan, index) => (
                                         <div key={index} className="grid grid-cols-1 sm:grid-cols-6 gap-2 items-center p-3 border rounded-lg">
                                             <div className="sm:col-span-3">
                                                 <Label className="text-xs text-muted-foreground">Plano</Label>
@@ -242,7 +261,7 @@ export default function ClientsPage() {
                                                     <PopoverContent className="w-auto p-0">
                                                     <Calendar
                                                         mode="single"
-                                                        selected={new Date(clientPlan.planActivationDate)}
+                                                        selected={clientPlan.planActivationDate}
                                                         onSelect={(date) => handleDateChange(index, date)}
                                                         initialFocus
                                                     />

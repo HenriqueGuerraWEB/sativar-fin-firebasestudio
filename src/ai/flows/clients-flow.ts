@@ -21,6 +21,7 @@ import {
     UpdateClientInputSchema 
 } from '../../lib/types/client-types';
 import { RowDataPacket } from 'mysql2';
+import { format } from 'date-fns';
 
 
 // Function to get all clients
@@ -38,7 +39,7 @@ export async function getClients() {
       whatsapp: client.whatsapp,
       notes: client.notes,
       status: client.status,
-      createdAt: client.created_at,
+      createdAt: new Date(client.created_at).toISOString(),
       plans: client.plans || [] // mysql2 driver handles JSON parsing
   })) as Client[];
 }
@@ -67,7 +68,7 @@ export const addClientFlow = ai.defineFlow(
         clientData.whatsapp, 
         clientData.notes, 
         clientData.status, 
-        createdAt, 
+        format(createdAt, 'yyyy-MM-dd HH:mm:ss'), 
         JSON.stringify(clientData.plans || []) // Store plans array as a JSON string
       ]
     );
@@ -75,7 +76,7 @@ export const addClientFlow = ai.defineFlow(
     const newClient: Client = {
       ...clientData,
       id: newClientId,
-      createdAt: createdAt,
+      createdAt: createdAt.toISOString(),
     };
 
     return newClient;
@@ -105,7 +106,7 @@ export async function updateClient(clientId: string, updates: Partial<Omit<Clien
               whatsapp: client.whatsapp,
               notes: client.notes,
               status: client.status,
-              createdAt: client.created_at,
+              createdAt: new Date(client.created_at).toISOString(),
               plans: client.plans || []
           } as Client;
       }
@@ -145,7 +146,7 @@ export async function updateClient(clientId: string, updates: Partial<Omit<Clien
           whatsapp: client.whatsapp,
           notes: client.notes,
           status: client.status,
-          createdAt: client.created_at,
+          createdAt: new Date(client.created_at).toISOString(),
           plans: client.plans || []
       } as Client;
   }
