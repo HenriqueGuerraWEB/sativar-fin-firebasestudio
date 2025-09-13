@@ -4,7 +4,7 @@ import {
   addClient,
   updateClient,
   deleteClient
-} from '../../ai/flows/clients-flow';
+} from '../../../ai/flows/clients-flow';
 
 console.log('[API] clients.ts loaded');
 
