@@ -4,8 +4,8 @@ import { z } from 'zod';
 // Zod schema for ClientPlan, used for validation within the Client schema
 export const ClientPlanSchema = z.object({
   planId: z.string(),
-  // Dates from the database may be strings, so we coerce them.
-  planActivationDate: z.coerce.date(),
+  // Dates from the database may be strings or Date objects.
+  planActivationDate: z.union([z.string(), z.date()]),
 });
 export type ClientPlan = z.infer<typeof ClientPlanSchema>;
 
@@ -21,8 +21,8 @@ export const ClientSchema = z.object({
   notes: z.string().nullable().optional(),
   status: z.enum(["Ativo", "Inativo"]),
   plans: z.array(ClientPlanSchema).nullable().optional(),
-  // Dates from the database may be strings, so we coerce them.
-  createdAt: z.coerce.date(),
+  // Dates from the database may be strings or Date objects.
+  createdAt: z.union([z.string(), z.date()]),
 });
 export type Client = z.infer<typeof ClientSchema>;
 

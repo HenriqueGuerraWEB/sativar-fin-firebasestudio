@@ -9,11 +9,11 @@ export const InvoiceSchema = z.object({
   clientName: z.string(),
   planName: z.string().nullable().optional(),
   amount: z.number(),
-  // Dates from the database may be strings, so we coerce them.
-  issueDate: z.coerce.date(),
-  dueDate: z.coerce.date(),
+  // Dates from the database may be strings or Date objects.
+  issueDate: z.union([z.string(), z.date()]),
+  dueDate: z.union([z.string(), z.date()]),
   status: z.enum(['Paga', 'Pendente', 'Vencida']),
-  paymentDate: z.coerce.date().nullable().optional(),
+  paymentDate: z.union([z.string(), z.date()]).nullable().optional(),
   paymentMethod: z.enum(['Pix', 'Cartão de Crédito', 'Cartão de Débito']).nullable().optional(),
   paymentNotes: z.string().nullable().optional(),
 });

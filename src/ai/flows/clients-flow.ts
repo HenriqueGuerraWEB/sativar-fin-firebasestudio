@@ -1,3 +1,4 @@
+
 'use server';
 /**
  * @fileOverview Genkit flows for managing clients.
@@ -52,28 +53,30 @@ export const addClientFlow = ai.defineFlow(
   async (clientData) => {
     console.log('[CLIENTS_FLOW] Adding new client to database...');
     const newClientId = randomUUID();
-    const newClient: Client = {
-      ...clientData,
-      id: newClientId,
-      createdAt: new Date(),
-    };
+    const createdAt = new Date();
     
     await executeQuery(
       'INSERT INTO clients (id, name, tax_id, contact_name, email, phone, whatsapp, notes, status, created_at, plans) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
       [
-        newClient.id, 
-        newClient.name, 
-        newClient.taxId, 
-        newClient.contactName, 
-        newClient.email, 
-        newClient.phone, 
-        newClient.whatsapp, 
-        newClient.notes, 
-        newClient.status, 
-        newClient.createdAt, 
-        JSON.stringify(newClient.plans || []) // Store plans array as a JSON string
+        newClientId, 
+        clientData.name, 
+        clientData.taxId, 
+        clientData.contactName, 
+        clientData.email, 
+        clientData.phone, 
+        clientData.whatsapp, 
+        clientData.notes, 
+        clientData.status, 
+        createdAt, 
+        JSON.stringify(clientData.plans || []) // Store plans array as a JSON string
       ]
     );
+
+    const newClient: Client = {
+      ...clientData,
+      id: newClientId,
+      createdAt: createdAt,
+    };
 
     return newClient;
   }
