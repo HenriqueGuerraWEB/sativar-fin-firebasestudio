@@ -21,6 +21,7 @@ import { SativarLogo } from '@/components/sativar-logo';
 import { useAuth } from '@/hooks/use-auth';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '../ui/dropdown-menu';
 import { Button } from '../ui/button';
+import { ModeToggle } from '../mode-toggle';
 
 function HeaderContent() {
     const { user, logout } = useAuth();
@@ -50,6 +51,7 @@ function HeaderContent() {
                 </Button>
             )}
             <div className="ml-auto flex items-center gap-4">
+                <ModeToggle />
                 <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                         <Avatar className="h-9 w-9 cursor-pointer">
