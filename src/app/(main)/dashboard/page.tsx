@@ -1,7 +1,7 @@
 
 "use client"
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -9,27 +9,13 @@ import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts";
 import { DollarSign, Users, CreditCard, Activity } from "lucide-react";
 import { Skeleton } from '@/components/ui/skeleton';
-import { format, subMonths, getMonth, getYear, startOfMonth, endOfMonth, isWithinInterval } from 'date-fns';
+import { format, subMonths, getMonth, getYear, startOfMonth, endOfMonth, isWithinInterval, isToday, isPast, differenceInDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useAuth } from '@/hooks/use-auth';
 import { useClients } from '@/hooks/use-clients';
+import { useInvoices } from '@/hooks/use-invoices';
+import { useExpenses } from '@/hooks/use-expenses';
 
-
-// Mocks since data is now in localStorage. This can be built out later.
-type Invoice = {
-    id: string;
-    clientName: string;
-    dueDate: Date;
-    amount: number;
-    status: 'Paga' | 'Pendente' | 'Vencida';
-};
-
-type Expense = {
-    id: string;
-    amount: number;
-    dueDate: Date;
-    status: 'Paga' | 'Pendente';
-};
 
 const chartConfig = {
   revenue: { label: "Receita", color: "hsl(var(--chart-1))" },
@@ -39,17 +25,10 @@ const chartConfig = {
 export default function DashboardPage() {
     const { user, loading: authLoading } = useAuth();
     const { clients, isLoading: clientsLoading } = useClients();
-    const [invoices, setInvoices] = useState<Invoice[]>([]);
-    const [expenses, setExpenses] = useState<Expense[]>([]);
+    const { invoices, isLoading: invoicesLoading } = useInvoices();
+    const { expenses, isLoading: expensesLoading } = useExpenses();
     
-    const isLoading = authLoading || clientsLoading;
-
-    useEffect(() => {
-        // In a real scenario, you'd fetch this from localStorage or a new backend
-        // For now, we'll use mock data.
-        setInvoices([]);
-        setExpenses([]);
-    }, []);
+    const isLoading = authLoading || clientsLoading || invoicesLoading || expensesLoading;
 
     const activeClientsCount = useMemo(() => clients.filter(c => c.status === 'Ativo').length, [clients]);
     
@@ -59,22 +38,60 @@ export default function DashboardPage() {
        const end = endOfMonth(now);
        return clients.filter(c => {
          if (!c.createdAt) return false;
-         const createdAtDate = c.createdAt;
+         const createdAtDate = new Date(c.createdAt); // Convert string to Date
          return isWithinInterval(createdAtDate, { start, end });
        }).length;
     }, [clients]);
 
     const { monthlyRevenue, revenueChange, monthlyExpenses, expenseChange, expectedProfit, accountBalance } = useMemo(() => {
-        // This is now mock data
-        return {
-            monthlyRevenue: 0,
-            revenueChange: 0,
-            monthlyExpenses: 0,
-            expenseChange: 0,
-            expectedProfit: 0,
-            accountBalance: 0
+        const now = new Date();
+        const currentMonthStart = startOfMonth(now);
+        const currentMonthEnd = endOfMonth(now);
+        const prevMonthStart = startOfMonth(subMonths(now, 1));
+        const prevMonthEnd = endOfMonth(subMonths(now, 1));
+
+        // Current Month Calculations
+        const currentMonthPaidInvoices = invoices.filter(inv => 
+            inv.status === 'Paga' && inv.paymentDate && isWithinInterval(new Date(inv.paymentDate), { start: currentMonthStart, end: currentMonthEnd })
+        );
+        const currentMonthRevenue = currentMonthPaidInvoices.reduce((sum, inv) => sum + inv.amount, 0);
+
+        const currentMonthPaidExpenses = expenses.filter(exp => 
+            exp.status === 'Paga' && isWithinInterval(new Date(exp.dueDate), { start: currentMonthStart, end: currentMonthEnd })
+        );
+        const currentMonthExpenses = currentMonthPaidExpenses.reduce((sum, exp) => sum + exp.amount, 0);
+        
+        // Previous Month Calculations
+        const prevMonthPaidInvoices = invoices.filter(inv => 
+            inv.status === 'Paga' && inv.paymentDate && isWithinInterval(new Date(inv.paymentDate), { start: prevMonthStart, end: prevMonthEnd })
+        );
+        const prevMonthRevenue = prevMonthPaidInvoices.reduce((sum, inv) => sum + inv.amount, 0);
+
+        const prevMonthPaidExpenses = expenses.filter(exp => 
+            exp.status === 'Paga' && isWithinInterval(new Date(exp.dueDate), { start: prevMonthStart, end: prevMonthEnd })
+        );
+        const prevMonthExpenses = prevMonthPaidExpenses.reduce((sum, exp) => sum + exp.amount, 0);
+
+        // Calculate percentage change
+        const calcChange = (current: number, previous: number) => {
+            if (previous === 0) return current > 0 ? 100 : 0;
+            return ((current - previous) / previous) * 100;
         };
-    }, []);
+
+        const revenueChange = calcChange(currentMonthRevenue, prevMonthRevenue);
+        const expenseChange = calcChange(currentMonthExpenses, prevMonthExpenses);
+
+        const profit = currentMonthRevenue - currentMonthExpenses;
+
+        return {
+            monthlyRevenue: currentMonthRevenue,
+            revenueChange,
+            monthlyExpenses: currentMonthExpenses,
+            expenseChange,
+            expectedProfit: profit,
+            accountBalance: profit, // Simplified: account balance is this month's profit
+        };
+    }, [invoices, expenses]);
 
     const chartData = useMemo(() => {
         const data = Array.from({ length: 6 }).map((_, i) => {
@@ -86,12 +103,48 @@ export default function DashboardPage() {
                 expenses: 0,
             };
         });
+
+        invoices.forEach(inv => {
+            if (inv.status === 'Paga' && inv.paymentDate) {
+                const paymentDate = new Date(inv.paymentDate);
+                const monthIndex = data.findIndex(d => d.month === format(paymentDate, 'MMM', { locale: ptBR }) && d.year === getYear(paymentDate));
+                if (monthIndex !== -1) {
+                    data[monthIndex].revenue += inv.amount;
+                }
+            }
+        });
+
+        expenses.forEach(exp => {
+            if (exp.status === 'Paga') {
+                const dueDate = new Date(exp.dueDate);
+                const monthIndex = data.findIndex(d => d.month === format(dueDate, 'MMM', { locale: ptBR }) && d.year === getYear(dueDate));
+                if (monthIndex !== -1) {
+                    data[monthIndex].expenses += exp.amount;
+                }
+            }
+        });
         return data;
-    }, []);
+    }, [invoices, expenses]);
 
     const importantNotices = useMemo(() => {
-       return [];
-    }, []);
+        const today = new Date();
+        return invoices
+            .filter(inv => inv.status === 'Vencida' || (inv.status === 'Pendente' && isToday(new Date(inv.dueDate))))
+            .map(inv => {
+                const dueDate = new Date(inv.dueDate);
+                let friendlyDueDate: string;
+                if (isToday(dueDate)) {
+                    friendlyDueDate = "Vence Hoje";
+                } else if (isPast(dueDate)) {
+                    const daysOverdue = differenceInDays(today, dueDate);
+                    friendlyDueDate = `Vencida há ${daysOverdue} dia(s)`;
+                } else {
+                    friendlyDueDate = format(dueDate, 'dd/MM/yyyy');
+                }
+                return { ...inv, friendlyDueDate };
+            })
+            .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
+    }, [invoices]);
 
 
   return (
@@ -175,7 +228,7 @@ export default function DashboardPage() {
                     <TableHeader>
                         <TableRow>
                             <TableHead>Cliente</TableHead>
-                            <TableHead>Vencimento</TableHead>
+                            <TableHead>Aviso</TableHead>
                             <TableHead className="text-right">Valor</TableHead>
                         </TableRow>
                     </TableHeader>
@@ -208,3 +261,5 @@ export default function DashboardPage() {
     </div>
   );
 }
+
+  
