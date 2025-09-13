@@ -4,14 +4,10 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/use-auth';
-import { StorageService } from '@/lib/storage-service';
 import type { AddClientInput, Client } from '@/lib/types/client-types';
-import { addClient as addClientFlow, getClients as getClientsFlow } from '@/ai/flows/clients-flow';
-
-const isDatabaseEnabled = process.env.NEXT_PUBLIC_DATABASE_ENABLED === 'true';
+import { getClients, addClient as addClientService, updateClient as updateClientService, deleteClient as deleteClientService } from '@/lib/data-service';
 
 export type { Client, ClientPlan } from '@/lib/types/client-types';
-
 
 export function useClients() {
     const { toast } = useToast();
@@ -27,11 +23,8 @@ export function useClients() {
         }
         setIsLoading(true);
         try {
-            const clientsFromStorage = isDatabaseEnabled 
-                ? await getClientsFlow()
-                : await StorageService.getCollection<Client>('clients');
-
-            setClients(clientsFromStorage);
+            const clientsFromService = await getClients();
+            setClients(clientsFromService);
         } catch (error) {
             console.error("Failed to load clients:", error);
             toast({
@@ -51,17 +44,11 @@ export function useClients() {
         }
     }, [user, authLoading, loadClients]);
 
-
     const addClient = async (clientData: AddClientInput) => {
         if (!user) throw new Error("User not authenticated");
         try {
-            let newClient;
-            if (isDatabaseEnabled) {
-                newClient = await addClientFlow(clientData);
-            } else {
-                newClient = await StorageService.addItem<Client>('clients', clientData);
-            }
-            await loadClients(); // Reload to reflect sorted list
+            const newClient = await addClientService(clientData);
+            await loadClients();
             return newClient;
         } catch (error) {
             console.error("Error adding client:", error);
@@ -72,14 +59,10 @@ export function useClients() {
     const updateClient = async (clientId: string, clientData: Partial<Omit<Client, 'id' | 'createdAt'>>) => {
         if (!user) throw new Error("User not authenticated");
         try {
-            const updatedClient = await StorageService.updateItem<Client>('clients', clientId, clientData);
-            if (updatedClient) {
-                 setClients(prev => prev.map(client => client.id === clientId ? updatedClient : client));
-            }
+            const updatedClient = await updateClientService(clientId, clientData);
+            await loadClients();
             return updatedClient;
-        }
-        catch (error)
-        {
+        } catch (error) {
             console.error("Error updating client:", error);
             throw new Error("Failed to update client");
         }
@@ -88,8 +71,8 @@ export function useClients() {
     const deleteClient = async (clientId: string) => {
         if (!user) throw new Error("User not authenticated");
         try {
-            await StorageService.deleteItem('clients', clientId);
-            setClients(prev => prev.filter(client => client.id !== clientId));
+            await deleteClientService(clientId);
+            await loadClients();
         } catch (error) {
             console.error("Error deleting client:", error);
             throw new Error("Failed to delete client");
