@@ -22,9 +22,11 @@ export const getCompanySettings = ai.defineFlow(
   async () => {
     console.log('[SETTINGS_FLOW] Fetching company settings from database...');
     const results = await executeQuery('SELECT * FROM company_settings WHERE id = ?', ['single-settings']) as RowDataPacket[];
+    
     if (results.length === 0) {
         return null;
     }
+    
     const settings = results[0];
     // Map database snake_case to application camelCase
     return {
@@ -36,7 +38,7 @@ export const getCompanySettings = ai.defineFlow(
         phone: settings.phone,
         email: settings.email,
         website: settings.website,
-        logoDataUrl: settings.logo,
+        logoDataUrl: settings.logo, // Correctly map from 'logo' column
     };
   }
 );
@@ -94,5 +96,3 @@ export const updateCompanySettings = ai.defineFlow(
     return sanitizedSettings;
   }
 );
-
-    
