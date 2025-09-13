@@ -109,7 +109,7 @@ export const addInvoices = ai.defineFlow(
     
     await executeQuery(
         `INSERT INTO invoices (id, client_id, plan_id, client_name, plan_name, amount, issue_date, due_date, status, payment_date, payment_method, payment_notes) VALUES ?`,
-        [values]
+        values
     );
 
     return newInvoices;
