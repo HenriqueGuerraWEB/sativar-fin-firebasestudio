@@ -17,20 +17,11 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { migrateData } from '@/ai/flows/data-migration-flow';
 import { testDbConnection } from '@/ai/flows/test-db-connection-flow';
 import { DataMigrationInput } from '@/lib/types/migration-types';
+import type { CompanySettings } from '@/lib/types/company-settings-types';
 
-
-type CompanySettings = {
-    name: string;
-    address: string;
-    phone: string;
-    email: string;
-    website: string;
-    logoDataUrl: string;
-    cpf: string;
-    cnpj: string;
-};
 
 const emptySettings: CompanySettings = {
+    id: 'single-settings',
     name: '',
     address: '',
     phone: '',
@@ -60,19 +51,31 @@ export default function SettingsPage() {
         const loadSettings = async () => {
             if(user) {
                 setIsLoading(true);
-                const storedSettings = await StorageService.getItem<CompanySettings & {id: string}>('company-settings', 'single-settings');
-                if (storedSettings) {
-                    setSettings(storedSettings);
-                } else {
-                    const initialSettings = { ...emptySettings, id: 'single-settings' };
-                    await StorageService.addItem('company-settings', initialSettings);
-                    setSettings(initialSettings);
+                try {
+                    const storedSettings = await StorageService.getItem<CompanySettings>('company-settings', 'single-settings');
+                    if (storedSettings) {
+                        setSettings(storedSettings);
+                    } else if (!isDbEnabled) {
+                        // Only create initial if in local storage mode and it doesn't exist.
+                        // In DB mode, it should come as null if the table is empty.
+                        await StorageService.addItem('company-settings', emptySettings);
+                        setSettings(emptySettings);
+                    } else {
+                        setSettings(emptySettings);
+                    }
+                } catch (error) {
+                    console.error("Error loading settings: ", error);
+                    toast({
+                        title: "Erro ao Carregar",
+                        description: "Não foi possível carregar as configurações.",
+                        variant: "destructive"
+                    });
                 }
                 setIsLoading(false);
             }
         };
         loadSettings();
-    }, [user]);
+    }, [user, toast]);
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
         const { id, value } = e.target;
@@ -104,9 +107,16 @@ export default function SettingsPage() {
             return;
         }
         setIsSaving(true);
-        await StorageService.updateItem('company-settings', 'single-settings', settings);
-        setIsSaving(false);
-        toast({ title: "Sucesso!", description: "Configurações salvas com sucesso." });
+        try {
+            // updateItem will handle both creation (via INSERT ON DUPLICATE KEY) and update
+            await StorageService.updateItem('company-settings', 'single-settings', settings);
+            toast({ title: "Sucesso!", description: "Configurações salvas com sucesso." });
+        } catch (error) {
+             console.error("Error saving settings: ", error);
+             toast({ title: "Erro ao Salvar", description: "Não foi possível salvar as configurações.", variant: "destructive" });
+        } finally {
+            setIsSaving(false);
+        }
     };
 
     const handleTestConnection = async () => {
@@ -152,13 +162,21 @@ export default function SettingsPage() {
         setIsMigrationAlertOpen(false);
         setIsMigrating(true);
         try {
+            // Explicitly fetch all data from localStorage to be migrated
+            const clients = LocalStorageService.getCollection('clients');
+            const plans = LocalStorageService.getCollection('plans');
+            const invoices = LocalStorageService.getCollection('invoices');
+            const expenses = LocalStorageService.getCollection('expenses');
+            const expenseCategories = LocalStorageService.getCollection('expenseCategories');
+            const settingsData = LocalStorageService.getItem<CompanySettings>('company-settings', 'single-settings');
+
             const migrationData: DataMigrationInput = {
-                clients: LocalStorageService.getCollection('clients'),
-                plans: LocalStorageService.getCollection('plans'),
-                invoices: LocalStorageService.getCollection('invoices'),
-                expenses: LocalStorageService.getCollection('expenses'),
-                expenseCategories: LocalStorageService.getCollection('expenseCategories'),
-                settings: LocalStorageService.getItem('company-settings', 'single-settings') || undefined,
+                clients: clients.length > 0 ? clients : undefined,
+                plans: plans.length > 0 ? plans : undefined,
+                invoices: invoices.length > 0 ? invoices : undefined,
+                expenses: expenses.length > 0 ? expenses : undefined,
+                expenseCategories: expenseCategories.length > 0 ? expenseCategories : undefined,
+                settings: settingsData || undefined,
             };
 
             const result = await migrateData(migrationData);
@@ -334,6 +352,3 @@ export default function SettingsPage() {
         </div>
     );
 }
-
-
-    

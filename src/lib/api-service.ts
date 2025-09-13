@@ -34,13 +34,16 @@ import {
     updateExpenseCategory,
     deleteExpenseCategory,
 } from '@/ai/flows/expense-categories-flow';
+import { getCompanySettings, updateCompanySettings } from '@/ai/flows/company-settings-flow';
 import { migrateData } from '@/ai/flows/data-migration-flow';
 
-import type { Plan, AddPlanInput, UpdatePlanInput } from '@/lib/types/plan-types';
-import type { Client, AddClientInput, UpdateClientInput } from '@/lib/types/client-types';
+import type { Plan, UpdatePlanInput } from '@/lib/types/plan-types';
+import type { AddPlanInput } from '@/lib/types/plan-types';
+import type { Client, AddClientInput } from '@/lib/types/client-types';
 import type { Invoice, AddInvoiceInput, UpdateInvoiceInput } from '@/lib/types/invoice-types';
 import type { Expense, AddExpenseInput, UpdateExpenseInput } from '@/lib/types/expense-types';
 import type { ExpenseCategory, AddExpenseCategoryInput, UpdateExpenseCategoryInput } from '@/lib/types/expense-category-types';
+import type { CompanySettings } from '@/lib/types/company-settings-types';
 
 
 /**
@@ -79,9 +82,14 @@ export const ApiService = {
 
     getItem: async <T extends Storable>(collectionKey: string, itemId: string): Promise<T | null> => {
         console.log(`ApiService: Fetching item ${itemId} from ${collectionKey}...`);
-        // This is inefficient. It's better to create specific `getItem` flows.
-        const collection = await ApiService.getCollection<T>(collectionKey);
-        return Promise.resolve(collection.find(item => item.id === itemId) || null);
+        switch (collectionKey) {
+            case 'company-settings':
+                return await getCompanySettings() as T | null;
+            // This is inefficient for other types. It's better to create specific `getItem` flows if needed.
+            default:
+                const collection = await ApiService.getCollection<T>(collectionKey);
+                return Promise.resolve(collection.find(item => item.id === itemId) || null);
+        }
     },
 
     addItem: async <T extends Storable>(collectionKey: string, itemData: Omit<T, 'id'>): Promise<T> => {
@@ -99,6 +107,9 @@ export const ApiService = {
                 return await addExpense(itemData as AddExpenseInput) as T;
             case 'expenseCategories':
                 return await addExpenseCategory(itemData as AddExpenseCategoryInput) as T;
+            case 'company-settings':
+                 // Since there's only one settings object, 'addItem' is the same as 'update'
+                 return await updateCompanySettings(itemData as CompanySettings) as T;
             default:
                 console.warn(`ApiService: No addItem handler for ${collectionKey}`);
                 return Promise.resolve({ ...itemData, id: 'temp-api-id' } as T);
@@ -123,8 +134,7 @@ export const ApiService = {
                 const planInput: UpdatePlanInput = { planId: itemId, updates: updates as Partial<Plan> };
                 return await updatePlan(planInput) as T | null;
             case 'clients':
-                 const clientInput: UpdateClientInput = { clientId: itemId, updates: updates as Partial<Client> };
-                 return await updateClient(clientInput) as T | null;
+                 return await updateClient(itemId, updates as Partial<Client>) as T | null;
             case 'invoices':
                  const invoiceInput: UpdateInvoiceInput = { invoiceId: itemId, updates: updates as Partial<Invoice> };
                  return await updateInvoice(invoiceInput) as T | null;
@@ -134,6 +144,9 @@ export const ApiService = {
             case 'expenseCategories':
                 const categoryInput: UpdateExpenseCategoryInput = { categoryId: itemId, updates: updates as Partial<ExpenseCategory> };
                 return await updateExpenseCategory(categoryInput) as T | null;
+            case 'company-settings':
+                 // The backend takes the full object for simplicity of the INSERT...ON DUPLICATE KEY query
+                 return await updateCompanySettings(updates as CompanySettings) as T | null;
             default:
                  console.warn(`ApiService: No updateItem handler for ${collectionKey}`);
                  return Promise.resolve(null);
