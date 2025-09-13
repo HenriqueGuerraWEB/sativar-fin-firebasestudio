@@ -16,17 +16,43 @@ import {
 } from '@/components/ui/sidebar';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { LayoutDashboard, Users, Package, Banknote, FileText, Settings, LogOut, Shapes, PanelLeft } from 'lucide-react';
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { SativarLogo } from '@/components/sativar-logo';
 import { useAuth } from '@/hooks/use-auth';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '../ui/dropdown-menu';
 import { Button } from '../ui/button';
 import { ModeToggle } from '../mode-toggle';
+import { StorageService } from '@/lib/storage-service';
+import type { CompanySettings } from '@/lib/types/company-settings-types';
+import { Skeleton } from '../ui/skeleton';
 
 function HeaderContent() {
     const { user, logout } = useAuth();
     const router = useRouter();
     const { isMobile, setOpenMobile } = useSidebar();
+    const [companyName, setCompanyName] = useState<string | null>(null);
+    const [loadingName, setLoadingName] = useState(true);
+
+    useEffect(() => {
+        const fetchCompanyName = async () => {
+            setLoadingName(true);
+            try {
+                const settings = await StorageService.getItem<CompanySettings>('company-settings', 'single-settings');
+                if (settings?.name) {
+                    setCompanyName(settings.name);
+                } else {
+                    setCompanyName('Sativar');
+                }
+            } catch (error) {
+                console.error("Failed to fetch company name", error);
+                setCompanyName('Sativar');
+            } finally {
+                setLoadingName(false);
+            }
+        };
+
+        fetchCompanyName();
+    }, []);
 
     const handleLogout = async () => {
         await logout();
@@ -43,14 +69,21 @@ function HeaderContent() {
     }
 
     return (
-        <div className="flex w-full items-center gap-4">
-             {isMobile && (
-                <Button variant="ghost" size="icon" onClick={() => setOpenMobile(true)}>
-                    <PanelLeft />
-                    <span className="sr-only">Toggle Menu</span>
-                </Button>
-            )}
-            <div className="ml-auto flex items-center gap-4">
+        <div className="flex w-full items-center justify-between gap-4">
+            <div className="flex items-center gap-4">
+                {isMobile && (
+                    <Button variant="ghost" size="icon" onClick={() => setOpenMobile(true)}>
+                        <PanelLeft />
+                        <span className="sr-only">Toggle Menu</span>
+                    </Button>
+                )}
+                {loadingName ? (
+                     <Skeleton className="h-6 w-32" />
+                ) : (
+                    <h1 className="text-lg font-bold text-foreground hidden sm:block">{companyName}</h1>
+                )}
+            </div>
+            <div className="flex items-center gap-4">
                 <ModeToggle />
                 <DropdownMenu>
                     <DropdownMenuTrigger asChild>
