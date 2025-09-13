@@ -33,7 +33,7 @@ export const getExpenses = ai.defineFlow(
     return results.map(exp => ({
         id: exp.id,
         description: exp.description,
-        amount: exp.amount,
+        amount: typeof exp.amount === 'string' ? parseFloat(exp.amount) : exp.amount,
         dueDate: exp.due_date,
         status: exp.status,
         categoryId: exp.category_id,
@@ -81,7 +81,7 @@ export const updateExpense = ai.defineFlow(
             return {
                 id: exp.id,
                 description: exp.description,
-                amount: exp.amount,
+                amount: typeof exp.amount === 'string' ? parseFloat(exp.amount) : exp.amount,
                 dueDate: exp.due_date,
                 status: exp.status,
                 categoryId: exp.category_id,
@@ -110,7 +110,7 @@ export const updateExpense = ai.defineFlow(
         return {
             id: exp.id,
             description: exp.description,
-            amount: exp.amount,
+            amount: typeof exp.amount === 'string' ? parseFloat(exp.amount) : exp.amount,
             dueDate: exp.due_date,
             status: exp.status,
             categoryId: exp.category_id,
