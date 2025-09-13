@@ -19,6 +19,18 @@ import {
     AddExpenseInputSchema,
     UpdateExpenseInputSchema
 } from '@/lib/types/expense-types';
+import { format } from 'date-fns';
+
+// Helper function to format dates for MySQL
+const formatDateForMySQL = (date: string | Date | null | undefined): string | null => {
+    if (!date) return null;
+    try {
+        const dateObj = typeof date === 'string' ? new Date(date) : date;
+        return format(dateObj, 'yyyy-MM-dd HH:mm:ss');
+    } catch {
+        return null;
+    }
+};
 
 
 // Flow to get all expenses
@@ -57,7 +69,7 @@ export const addExpense = ai.defineFlow(
     
     await executeQuery(
       'INSERT INTO expenses (id, description, amount, due_date, status, category_id) VALUES (?, ?, ?, ?, ?, ?)',
-      [newExpense.id, newExpense.description, newExpense.amount, newExpense.dueDate, newExpense.status, newExpense.categoryId]
+      [newExpense.id, newExpense.description, newExpense.amount, formatDateForMySQL(newExpense.dueDate), newExpense.status, newExpense.categoryId]
     );
 
     return newExpense;
@@ -94,7 +106,11 @@ export const updateExpense = ai.defineFlow(
     for (const key in updates) {
         if (Object.prototype.hasOwnProperty.call(updates, key)) {
             const dbKey = key.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
-            (dbUpdates as any)[dbKey] = (updates as any)[key];
+            if (key === 'dueDate') {
+                (dbUpdates as any)[dbKey] = formatDateForMySQL((updates as any)[key]);
+            } else {
+                (dbUpdates as any)[dbKey] = (updates as any)[key];
+            }
         }
     }
 
