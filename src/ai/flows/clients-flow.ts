@@ -39,7 +39,7 @@ export async function getClients() {
       whatsapp: client.whatsapp,
       notes: client.notes,
       status: client.status,
-      createdAt: new Date(client.created_at).toISOString(),
+      createdAt: client.created_at ? new Date(client.created_at).toISOString() : '',
       plans: client.plans || [] // mysql2 driver handles JSON parsing
   })) as Client[];
 }
@@ -106,7 +106,7 @@ export async function updateClient(clientId: string, updates: Partial<Omit<Clien
               whatsapp: client.whatsapp,
               notes: client.notes,
               status: client.status,
-              createdAt: new Date(client.created_at).toISOString(),
+              createdAt: client.created_at ? new Date(client.created_at).toISOString() : '',
               plans: client.plans || []
           } as Client;
       }
@@ -146,7 +146,7 @@ export async function updateClient(clientId: string, updates: Partial<Omit<Clien
           whatsapp: client.whatsapp,
           notes: client.notes,
           status: client.status,
-          createdAt: new Date(client.created_at).toISOString(),
+          createdAt: client.created_at ? new Date(client.created_at).toISOString() : '',
           plans: client.plans || []
       } as Client;
   }

@@ -46,7 +46,7 @@ export const getExpenses = ai.defineFlow(
         id: exp.id,
         description: exp.description,
         amount: typeof exp.amount === 'string' ? parseFloat(exp.amount) : exp.amount,
-        dueDate: exp.due_date,
+        dueDate: exp.due_date ? new Date(exp.due_date).toISOString() : '',
         status: exp.status,
         categoryId: exp.category_id,
     })) as Expense[];
@@ -94,7 +94,7 @@ export const updateExpense = ai.defineFlow(
                 id: exp.id,
                 description: exp.description,
                 amount: typeof exp.amount === 'string' ? parseFloat(exp.amount) : exp.amount,
-                dueDate: exp.due_date,
+                dueDate: exp.due_date ? new Date(exp.due_date).toISOString() : '',
                 status: exp.status,
                 categoryId: exp.category_id,
             } as Expense;
@@ -127,7 +127,7 @@ export const updateExpense = ai.defineFlow(
             id: exp.id,
             description: exp.description,
             amount: typeof exp.amount === 'string' ? parseFloat(exp.amount) : exp.amount,
-            dueDate: exp.due_date,
+            dueDate: exp.due_date ? new Date(exp.due_date).toISOString() : '',
             status: exp.status,
             categoryId: exp.category_id,
         } as Expense;
