@@ -55,11 +55,6 @@ export default function SettingsPage() {
                     const storedSettings = await StorageService.getItem<CompanySettings>('company-settings', 'single-settings');
                     if (storedSettings) {
                         setSettings(storedSettings);
-                    } else if (!isDbEnabled) {
-                        // Only create initial if in local storage mode and it doesn't exist.
-                        // In DB mode, it should come as null if the table is empty.
-                        await StorageService.addItem('company-settings', emptySettings);
-                        setSettings(emptySettings);
                     } else {
                         setSettings(emptySettings);
                     }
@@ -108,7 +103,6 @@ export default function SettingsPage() {
         }
         setIsSaving(true);
         try {
-            // updateItem will handle both creation (via INSERT ON DUPLICATE KEY) and update
             await StorageService.updateItem('company-settings', 'single-settings', settings);
             toast({ title: "Sucesso!", description: "Configurações salvas com sucesso." });
         } catch (error) {
@@ -232,35 +226,35 @@ export default function SettingsPage() {
                         <CardContent className="grid gap-6">
                             <div className="grid gap-2">
                                 <Label htmlFor="name">Nome da Empresa</Label>
-                                <Input id="name" value={settings.name} onChange={handleInputChange} placeholder="Sua Empresa LTDA" />
+                                <Input id="name" value={settings?.name ?? ''} onChange={handleInputChange} placeholder="Sua Empresa LTDA" />
                             </div>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <div className="grid gap-2">
                                     <Label htmlFor="cpf">CPF</Label>
-                                    <Input id="cpf" value={settings.cpf} onChange={handleInputChange} placeholder="000.000.000-00" />
+                                    <Input id="cpf" value={settings?.cpf ?? ''} onChange={handleInputChange} placeholder="000.000.000-00" />
                                 </div>
                                 <div className="grid gap-2">
                                     <Label htmlFor="cnpj">CNPJ</Label>
-                                    <Input id="cnpj" value={settings.cnpj} onChange={handleInputChange} placeholder="00.000.000/0000-00" />
+                                    <Input id="cnpj" value={settings?.cnpj ?? ''} onChange={handleInputChange} placeholder="00.000.000/0000-00" />
                                 </div>
                             </div>
                             <div className="grid gap-2">
                                 <Label htmlFor="address">Endereço</Label>
-                                <Textarea id="address" value={settings.address} onChange={handleInputChange} placeholder="Rua Exemplo, 123, Bairro, Cidade - Estado, CEP" />
+                                <Textarea id="address" value={settings?.address ?? ''} onChange={handleInputChange} placeholder="Rua Exemplo, 123, Bairro, Cidade - Estado, CEP" />
                             </div>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <div className="grid gap-2">
                                     <Label htmlFor="phone">Telefone</Label>
-                                    <Input id="phone" value={settings.phone} onChange={handleInputChange} placeholder="(00) 12345-6789" />
+                                    <Input id="phone" value={settings?.phone ?? ''} onChange={handleInputChange} placeholder="(00) 12345-6789" />
                                 </div>
                                 <div className="grid gap-2">
                                     <Label htmlFor="email">Email</Label>
-                                    <Input id="email" type="email" value={settings.email} onChange={handleInputChange} placeholder="contato@suaempresa.com" />
+                                    <Input id="email" type="email" value={settings?.email ?? ''} onChange={handleInputChange} placeholder="contato@suaempresa.com" />
                                 </div>
                             </div>
                             <div className="grid gap-2">
                                 <Label htmlFor="website">Website</Label>
-                                <Input id="website" value={settings.website} onChange={handleInputChange} placeholder="www.suaempresa.com" />
+                                <Input id="website" value={settings?.website ?? ''} onChange={handleInputChange} placeholder="www.suaempresa.com" />
                             </div>
                         </CardContent>
                     </Card>
@@ -272,7 +266,7 @@ export default function SettingsPage() {
                         </CardHeader>
                         <CardContent className="flex flex-col items-center gap-4">
                             <div className="w-full h-32 border-2 border-dashed rounded-md flex items-center justify-center bg-muted/50">
-                                {settings.logoDataUrl ? (
+                                {settings?.logoDataUrl ? (
                                     <img src={settings.logoDataUrl} alt="Logo preview" className="object-contain max-h-full max-w-full" />
                                 ) : (
                                     <p className="text-sm text-muted-foreground">Pré-visualização</p>
@@ -280,7 +274,7 @@ export default function SettingsPage() {
                             </div>
                             <div className="flex w-full gap-2">
                                 <Input id="logo" type="file" onChange={handleLogoChange} accept="image/png, image/jpeg, image/svg+xml" className="text-sm flex-grow" />
-                                {settings.logoDataUrl && (
+                                {settings?.logoDataUrl && (
                                     <Button variant="destructive" size="icon" onClick={handleRemoveLogo}>
                                         <X className="h-4 w-4" />
                                         <span className="sr-only">Remover Logo</span>
@@ -352,3 +346,5 @@ export default function SettingsPage() {
         </div>
     );
 }
+
+    
