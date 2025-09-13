@@ -59,21 +59,16 @@ export default function PlansPage() {
         }
 
         try {
-            const planData: Partial<Plan> = {
-                ...currentPlan,
-            };
+            const planData = { ...currentPlan };
 
             if (planData.type === 'one-time') {
-                delete planData.recurrenceValue;
-                delete planData.recurrencePeriod;
-            } else {
-                 planData.recurrenceValue = planData.recurrenceValue || 1;
-                 planData.recurrencePeriod = planData.recurrencePeriod || 'meses';
+                planData.recurrenceValue = null;
+                planData.recurrencePeriod = null;
             }
 
-
             if ('id' in currentPlan) {
-                await updatePlan(currentPlan.id, planData);
+                const { id, ...updates } = planData;
+                await updatePlan(currentPlan.id, updates);
                 toast({ title: "Sucesso", description: "Plano atualizado com sucesso." });
             } else {
                 await addPlan(planData);
@@ -181,8 +176,8 @@ export default function PlansPage() {
                                 <div className="p-4 border rounded-lg space-y-4">
                                      <Label className="font-semibold">Configuração de Recorrência</Label>
                                     <div className="grid grid-cols-2 gap-2">
-                                        <Input id="recurrenceValue" type="number" placeholder="Ex: 1" value={currentPlan.recurrenceValue} onChange={handleInputChange} min="1" />
-                                        <Select value={currentPlan.recurrencePeriod} onValueChange={(value) => handleSelectChange('recurrencePeriod', value as any)}>
+                                        <Input id="recurrenceValue" type="number" placeholder="Ex: 1" value={currentPlan.recurrenceValue ?? 1} onChange={handleInputChange} min="1" />
+                                        <Select value={currentPlan.recurrencePeriod ?? 'meses'} onValueChange={(value) => handleSelectChange('recurrencePeriod', value as any)}>
                                             <SelectTrigger>
                                                 <SelectValue placeholder="Período" />
                                             </SelectTrigger>
@@ -286,4 +281,3 @@ export default function PlansPage() {
         </div>
     );
 }
-
