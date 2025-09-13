@@ -25,6 +25,18 @@ import {
     AddInvoiceInputSchema
 } from '@/lib/types/invoice-types';
 import { pool } from '@/lib/db';
+import { format } from 'date-fns';
+
+// Helper function to format dates for MySQL
+const formatDateForMySQL = (date: string | Date | null | undefined): string | null => {
+    if (!date) return null;
+    try {
+        const dateObj = typeof date === 'string' ? new Date(date) : date;
+        return format(dateObj, 'yyyy-MM-dd HH:mm:ss');
+    } catch {
+        return null;
+    }
+};
 
 
 // Flow to get all invoices
@@ -43,10 +55,10 @@ export const getInvoices = ai.defineFlow(
         clientName: inv.client_name,
         planName: inv.plan_name,
         amount: inv.amount,
-        issueDate: inv.issue_date,
-        dueDate: inv.due_date,
+        issueDate: new Date(inv.issue_date).toISOString(),
+        dueDate: new Date(inv.due_date).toISOString(),
         status: inv.status,
-        paymentDate: inv.payment_date,
+        paymentDate: inv.payment_date ? new Date(inv.payment_date).toISOString() : null,
         paymentMethod: inv.payment_method,
         paymentNotes: inv.payment_notes,
     })) as Invoice[];
@@ -74,9 +86,18 @@ export const addInvoice = ai.defineFlow(
       `INSERT INTO invoices (id, client_id, plan_id, client_name, plan_name, amount, issue_date, due_date, status, payment_date, payment_method, payment_notes) 
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
-        newInvoice.id, newInvoice.clientId, newInvoice.planId, newInvoice.clientName, newInvoice.planName, 
-        newInvoice.amount, newInvoice.issueDate, newInvoice.dueDate, newInvoice.status, 
-        newInvoice.paymentDate, newInvoice.paymentMethod, newInvoice.paymentNotes
+        newInvoice.id, 
+        newInvoice.clientId, 
+        newInvoice.planId, 
+        newInvoice.clientName, 
+        newInvoice.planName, 
+        newInvoice.amount, 
+        formatDateForMySQL(newInvoice.issueDate), 
+        formatDateForMySQL(newInvoice.dueDate), 
+        newInvoice.status, 
+        formatDateForMySQL(newInvoice.paymentDate), 
+        newInvoice.paymentMethod, 
+        newInvoice.paymentNotes
       ]
     );
 
@@ -104,8 +125,18 @@ export const addInvoices = ai.defineFlow(
     }));
 
     const values = newInvoices.map(inv => [
-        inv.id, inv.clientId, inv.planId, inv.clientName, inv.planName, inv.amount, 
-        inv.issueDate, inv.dueDate, inv.status, inv.paymentDate, inv.paymentMethod, inv.paymentNotes
+        inv.id, 
+        inv.clientId, 
+        inv.planId, 
+        inv.clientName, 
+        inv.planName, 
+        inv.amount, 
+        formatDateForMySQL(inv.issueDate), 
+        formatDateForMySQL(inv.dueDate), 
+        inv.status, 
+        formatDateForMySQL(inv.paymentDate), 
+        inv.paymentMethod, 
+        inv.paymentNotes
     ]);
     
     const connection = await pool.getConnection();
@@ -150,10 +181,10 @@ export const updateInvoice = ai.defineFlow(
                 clientName: inv.client_name,
                 planName: inv.plan_name,
                 amount: inv.amount,
-                issueDate: inv.issue_date,
-                dueDate: inv.due_date,
+                issueDate: new Date(inv.issue_date).toISOString(),
+                dueDate: new Date(inv.due_date).toISOString(),
                 status: inv.status,
-                paymentDate: inv.payment_date,
+                paymentDate: inv.payment_date ? new Date(inv.payment_date).toISOString() : null,
                 paymentMethod: inv.payment_method,
                 paymentNotes: inv.payment_notes,
             } as Invoice;
@@ -165,7 +196,11 @@ export const updateInvoice = ai.defineFlow(
     for (const key in updates) {
         if (Object.prototype.hasOwnProperty.call(updates, key)) {
             const dbKey = key.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
-            (dbUpdates as any)[dbKey] = (updates as any)[key];
+            if (key === 'issueDate' || key === 'dueDate' || key === 'paymentDate') {
+                (dbUpdates as any)[dbKey] = formatDateForMySQL((updates as any)[key]);
+            } else {
+                (dbUpdates as any)[dbKey] = (updates as any)[key];
+            }
         }
     }
 
@@ -185,10 +220,10 @@ export const updateInvoice = ai.defineFlow(
                 clientName: inv.client_name,
                 planName: inv.plan_name,
                 amount: inv.amount,
-                issueDate: inv.issue_date,
-                dueDate: inv.due_date,
+                issueDate: new Date(inv.issue_date).toISOString(),
+                dueDate: new Date(inv.due_date).toISOString(),
                 status: inv.status,
-                paymentDate: inv.payment_date,
+                paymentDate: inv.payment_date ? new Date(inv.payment_date).toISOString() : null,
                 paymentMethod: inv.payment_method,
                 paymentNotes: inv.payment_notes,
             } as Invoice;
