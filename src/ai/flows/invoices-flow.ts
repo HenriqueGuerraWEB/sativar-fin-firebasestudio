@@ -18,10 +18,11 @@ import { randomUUID } from 'crypto';
 import { 
     InvoiceSchema,
     Invoice,
-    AddInvoiceInputSchema,
+    AddInvoiceInput,
     AddInvoicesInputSchema,
     UpdateInvoiceInputSchema,
-    DeleteInvoicesInputSchema
+    DeleteInvoicesInputSchema,
+    AddInvoiceInputSchema
 } from '@/lib/types/invoice-types';
 import { pool } from '@/lib/db';
 
@@ -90,7 +91,7 @@ export const addInvoices = ai.defineFlow(
     inputSchema: AddInvoicesInputSchema,
     outputSchema: z.array(InvoiceSchema),
   },
-  async (invoicesData) => {
+  async (invoicesData: AddInvoiceInput[]) => {
     console.log(`[INVOICES_FLOW] Adding ${invoicesData.length} new invoices to database...`);
     if (invoicesData.length === 0) return [];
     
@@ -107,14 +108,26 @@ export const addInvoices = ai.defineFlow(
         inv.issueDate, inv.dueDate, inv.status, inv.paymentDate, inv.paymentMethod, inv.paymentNotes
     ]);
     
-    await executeQuery(
-        `INSERT INTO invoices (id, client_id, plan_id, client_name, plan_name, amount, issue_date, due_date, status, payment_date, payment_method, payment_notes) VALUES ?`,
-        [values]
-    );
-
+    const connection = await pool.getConnection();
+    try {
+        await connection.beginTransaction();
+        await connection.query(
+            `INSERT INTO invoices (id, client_id, plan_id, client_name, plan_name, amount, issue_date, due_date, status, payment_date, payment_method, payment_notes) VALUES ?`,
+            [values]
+        );
+        await connection.commit();
+    } catch (error) {
+        await connection.rollback();
+        console.error("Error in addInvoices transaction, rolling back.", error);
+        throw new Error("Failed to add invoices in a transaction.");
+    } finally {
+        connection.release();
+    }
+    
     return newInvoices;
   }
 );
+
 
 // Flow to update an existing invoice
 export const updateInvoice = ai.defineFlow(
