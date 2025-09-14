@@ -2,11 +2,11 @@
 "use client";
 
 import "@blocknote/core/fonts/inter.css";
-import { BlockNoteView } from "@blocknote/react";
+import { BlockNoteView, useBlockNote } from "@blocknote/react";
 import "@blocknote/react/style.css";
-import { BlockNoteEditor, PartialBlock } from "@blocknote/core";
+import { Block, PartialBlock } from "@blocknote/core";
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -23,16 +23,9 @@ export default function ArticlePage({ params }: { params: { id: string } }) {
     const [article, setArticle] = useState<KnowledgeBaseArticle | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     
-    // Creates a new editor instance.
-    const editor = useMemo(() => {
-        if (isLoading || !article) {
-          return undefined;
-        }
-        return BlockNoteEditor.create({ initialContent: article.content as PartialBlock[] });
-    }, [article, isLoading]);
-    
-    const debouncedUpdates = useDebouncedCallback(async (jsonBlocks: PartialBlock[]) => {
+    const debouncedUpdates = useDebouncedCallback(async (editorContent: Block[]) => {
         if (article) {
+             const jsonBlocks = editor.topLevelBlocks;
              await updateArticle(article.id, { content: jsonBlocks });
             toast({
               title: "Salvo Automaticamente",
@@ -50,6 +43,13 @@ export default function ArticlePage({ params }: { params: { id: string } }) {
             });
         }
     }, 1000);
+
+    const editor = useBlockNote({
+        initialContent: article?.content ? article.content as PartialBlock[] : undefined,
+        onEditorContentChange: (editor) => {
+            debouncedUpdates(editor.topLevelBlocks);
+        }
+    });
 
 
     useEffect(() => {
@@ -103,9 +103,6 @@ export default function ArticlePage({ params }: { params: { id: string } }) {
             <BlockNoteView 
                 editor={editor} 
                 theme={"dark"}
-                onChange={() => {
-                   debouncedUpdates(editor.document);
-                }}
              />
         </div>
     );
