@@ -2,8 +2,9 @@
 "use client";
 
 import "@blocknote/core/fonts/inter.css";
-import { BlockNoteView, useBlockNote } from "@blocknote/react";
-import "@blocknote/react/style.css";
+import { useCreateBlockNote } from "@blocknote/react";
+import { BlockNoteView } from "@blocknote/mantine";
+import "@blocknote/mantine/style.css";
 import { Block, PartialBlock } from "@blocknote/core";
 
 import React, { useState, useEffect } from 'react';
@@ -23,9 +24,12 @@ export default function ArticlePage({ params }: { params: { id: string } }) {
     const [article, setArticle] = useState<KnowledgeBaseArticle | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     
-    const debouncedUpdates = useDebouncedCallback(async (editorContent: Block[]) => {
-        if (article) {
-             const jsonBlocks = editor.topLevelBlocks;
+    // Creates a new editor instance.
+    const editor = useCreateBlockNote();
+
+    const debouncedUpdates = useDebouncedCallback(async () => {
+        if (article && editor) {
+             const jsonBlocks = editor.document;
              await updateArticle(article.id, { content: jsonBlocks });
             toast({
               title: "Salvo Automaticamente",
@@ -44,13 +48,6 @@ export default function ArticlePage({ params }: { params: { id: string } }) {
         }
     }, 1000);
 
-    const editor = useBlockNote({
-        initialContent: article?.content ? article.content as PartialBlock[] : undefined,
-        onEditorContentChange: (editor) => {
-            debouncedUpdates(editor.topLevelBlocks);
-        }
-    });
-
 
     useEffect(() => {
         const fetchArticle = async () => {
@@ -60,6 +57,10 @@ export default function ArticlePage({ params }: { params: { id: string } }) {
                 const fetchedArticle = await getArticle(params.id);
                 if (fetchedArticle) {
                     setArticle(fetchedArticle);
+                    // Load the previously saved content into the editor.
+                    if (editor && fetchedArticle.content && fetchedArticle.content.length > 0) {
+                        editor.replaceBlocks(editor.document, fetchedArticle.content as PartialBlock[]);
+                    }
                 } else {
                     toast({
                         title: "Artigo não encontrado",
@@ -80,9 +81,9 @@ export default function ArticlePage({ params }: { params: { id: string } }) {
             }
         };
         fetchArticle();
-    }, [params.id, router, toast, getArticle]);
+    }, [params.id, router, toast, getArticle, editor]);
 
-    if (isLoading || !editor || loading) {
+    if (isLoading || !editor) {
         return (
             <div className="space-y-4">
                 <Skeleton className="h-12 w-1/2" />
@@ -103,6 +104,7 @@ export default function ArticlePage({ params }: { params: { id: string } }) {
             <BlockNoteView 
                 editor={editor} 
                 theme={"dark"}
+                onChange={debouncedUpdates}
              />
         </div>
     );
