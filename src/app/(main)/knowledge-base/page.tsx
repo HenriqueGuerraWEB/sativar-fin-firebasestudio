@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { PlusCircle, BookText } from "lucide-react";
@@ -10,40 +10,15 @@ import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { addArticle } from '@/ai/flows/knowledge-base-flow';
 import { useAuth } from '@/hooks/use-auth';
-import { getArticles } from '@/ai/flows/knowledge-base-flow';
-import type { KnowledgeBaseArticle } from '@/lib/types/knowledge-base-types';
-
-type ArticleMeta = Omit<KnowledgeBaseArticle, 'content'>;
+import { useKnowledgeBase } from '@/hooks/use-knowledge-base';
 
 export default function KnowledgeBasePage() {
     const router = useRouter();
     const { toast } = useToast();
     const { user } = useAuth();
-    const [articles, setArticles] = useState<ArticleMeta[]>([]);
-    const [isLoading, setIsLoading] = useState(true);
+    const { articles, addArticle, loading: isLoading } = useKnowledgeBase();
     const [isCreating, setIsCreating] = useState(false);
-
-    useEffect(() => {
-        const fetchArticles = async () => {
-            setIsLoading(true);
-            try {
-                const fetchedArticles = await getArticles();
-                setArticles(fetchedArticles);
-            } catch (error) {
-                console.error("Failed to fetch articles:", error);
-                toast({
-                    title: "Erro ao Carregar",
-                    description: "Não foi possível buscar os artigos da base de conhecimento.",
-                    variant: "destructive"
-                });
-            } finally {
-                setIsLoading(false);
-            }
-        };
-        fetchArticles();
-    }, [toast]);
 
     const handleCreateNewArticle = async () => {
         setIsCreating(true);
@@ -63,6 +38,7 @@ export default function KnowledgeBasePage() {
                 description: "Não foi possível criar um novo artigo.",
                 variant: "destructive"
             });
+        } finally {
             setIsCreating(false);
         }
     };
@@ -74,7 +50,7 @@ export default function KnowledgeBasePage() {
                     <h1 className="text-3xl font-bold tracking-tight">Base de Conhecimento</h1>
                     <p className="text-muted-foreground">Crie e gerencie documentação interna, tutoriais e anotações.</p>
                 </div>
-                <Button size="sm" className="gap-1 w-full sm:w-auto" onClick={handleCreateNewArticle} disabled={isCreating}>
+                <Button size="sm" className="gap-1 w-full sm:w-auto" onClick={handleCreateNewArticle} disabled={isCreating || isLoading}>
                     <PlusCircle className="h-4 w-4" />
                     {isCreating ? 'Criando...' : 'Novo Artigo'}
                 </Button>

@@ -11,14 +11,15 @@ import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Input } from "@/components/ui/input";
-import { getArticleById, updateArticle } from '@/ai/flows/knowledge-base-flow';
-import type { KnowledgeBaseArticle } from '@/lib/types/knowledge-base-types';
 import { useDebouncedCallback } from 'use-debounce';
+import { useKnowledgeBase } from "@/hooks/use-knowledge-base";
+import type { KnowledgeBaseArticle } from "@/lib/types/knowledge-base-types";
 
 
 export default function ArticlePage({ params }: { params: { id: string } }) {
     const router = useRouter();
     const { toast } = useToast();
+    const { getArticle, updateArticle, loading } = useKnowledgeBase();
     const [article, setArticle] = useState<KnowledgeBaseArticle | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     
@@ -32,10 +33,7 @@ export default function ArticlePage({ params }: { params: { id: string } }) {
     
     const debouncedUpdates = useDebouncedCallback(async (jsonBlocks: PartialBlock[]) => {
         if (article) {
-             await updateArticle({
-                articleId: article.id,
-                updates: { content: jsonBlocks }
-            });
+             await updateArticle(article.id, { content: jsonBlocks });
             toast({
               title: "Salvo Automaticamente",
               description: "Suas alterações foram salvas.",
@@ -45,10 +43,7 @@ export default function ArticlePage({ params }: { params: { id: string } }) {
 
     const handleTitleChange = useDebouncedCallback(async (newTitle: string) => {
         if (article) {
-            await updateArticle({
-                articleId: article.id,
-                updates: { title: newTitle }
-            });
+            await updateArticle(article.id, { title: newTitle });
             toast({
               title: "Título Atualizado",
               description: "O título do artigo foi salvo.",
@@ -62,7 +57,7 @@ export default function ArticlePage({ params }: { params: { id: string } }) {
             if (!params.id) return;
             setIsLoading(true);
             try {
-                const fetchedArticle = await getArticleById(params.id);
+                const fetchedArticle = await getArticle(params.id);
                 if (fetchedArticle) {
                     setArticle(fetchedArticle);
                 } else {
@@ -85,9 +80,9 @@ export default function ArticlePage({ params }: { params: { id: string } }) {
             }
         };
         fetchArticle();
-    }, [params.id, router, toast]);
+    }, [params.id, router, toast, getArticle]);
 
-    if (isLoading || !editor) {
+    if (isLoading || !editor || loading) {
         return (
             <div className="space-y-4">
                 <Skeleton className="h-12 w-1/2" />
@@ -115,4 +110,3 @@ export default function ArticlePage({ params }: { params: { id: string } }) {
         </div>
     );
 }
-

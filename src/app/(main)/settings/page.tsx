@@ -162,6 +162,7 @@ export default function SettingsPage() {
             const invoices = LocalStorageService.getCollection('invoices');
             const expenses = LocalStorageService.getCollection('expenses');
             const expenseCategories = LocalStorageService.getCollection('expenseCategories');
+            const knowledgeBaseArticles = LocalStorageService.getCollection('knowledge-base-articles');
             const settingsData = LocalStorageService.getItem<CompanySettings>('company-settings', 'single-settings');
 
             const migrationData: DataMigrationInput = {
@@ -170,6 +171,7 @@ export default function SettingsPage() {
                 invoices: invoices.length > 0 ? invoices : undefined,
                 expenses: expenses.length > 0 ? expenses : undefined,
                 expenseCategories: expenseCategories.length > 0 ? expenseCategories : undefined,
+                knowledgeBaseArticles: knowledgeBaseArticles.length > 0 ? knowledgeBaseArticles : undefined,
                 settings: settingsData || undefined,
             };
 
@@ -346,5 +348,3 @@ export default function SettingsPage() {
         </div>
     );
 }
-
-    
