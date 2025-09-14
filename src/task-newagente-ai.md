@@ -208,17 +208,6 @@ As páginas `Financeiro` e `Faturas` e os hooks associados (`useInvoices`, `useE
       `logo` LONGTEXT
     );
     
-    -- Tabela da Base de Conhecimento
-    CREATE TABLE IF NOT EXISTS `knowledge_base_articles` (
-        `id` VARCHAR(255) PRIMARY KEY,
-        `title` VARCHAR(255) NOT NULL,
-        `content` JSON,
-        `metadata` JSON,
-        `authorId` VARCHAR(255),
-        `createdAt` DATETIME NOT NULL,
-        `updatedAt` DATETIME NOT NULL
-    );
-
     -- Tabela de Tarefas
     CREATE TABLE IF NOT EXISTS `tasks` (
         `id` VARCHAR(255) PRIMARY KEY,

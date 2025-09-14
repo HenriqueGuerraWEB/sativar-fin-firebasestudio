@@ -34,13 +34,6 @@ import {
     updateExpenseCategory,
     deleteExpenseCategory,
 } from '@/ai/flows/expense-categories-flow';
-import { 
-    getArticles, 
-    getArticleById, 
-    addArticle, 
-    updateArticle, 
-    deleteArticle 
-} from '@/ai/flows/knowledge-base-flow';
 import { getCompanySettings, updateCompanySettings } from '@/ai/flows/company-settings-flow';
 import { getTasks, addTask, updateTask, deleteTask } from '@/ai/flows/tasks-flow';
 import { migrateData } from '@/ai/flows/data-migration-flow';
@@ -51,7 +44,6 @@ import type { Client, AddClientInput } from '@/lib/types/client-types';
 import type { Invoice, AddInvoiceInput, UpdateInvoiceInput } from '@/lib/types/invoice-types';
 import type { Expense, AddExpenseInput, UpdateExpenseInput } from '@/lib/types/expense-types';
 import type { ExpenseCategory, AddExpenseCategoryInput, UpdateExpenseCategoryInput } from '@/lib/types/expense-category-types';
-import type { KnowledgeBaseArticle, AddArticleInput, UpdateArticleInput } from '@/lib/types/knowledge-base-types';
 import type { CompanySettings } from '@/lib/types/company-settings-types';
 import type { Task, AddTaskInput, UpdateTaskInput } from '@/lib/types/task-types';
 
@@ -75,8 +67,6 @@ export const ApiService = {
                 return await getExpenses() as T[];
             case 'expenseCategories':
                 return await getExpenseCategories() as T[];
-            case 'knowledge-base-articles':
-                return await getArticles() as T[];
             case 'tasks':
                 return await getTasks() as T[];
             default:
@@ -99,8 +89,6 @@ export const ApiService = {
         switch (collectionKey) {
             case 'company-settings':
                 return await getCompanySettings() as T | null;
-            case 'knowledge-base-articles':
-                return await getArticleById(itemId) as T | null;
             // This is inefficient for other types. It's better to create specific `getItem` flows if needed.
             default:
                 const collection = await ApiService.getCollection<T>(collectionKey);
@@ -123,8 +111,6 @@ export const ApiService = {
                 return await addExpense(itemData as AddExpenseInput) as T;
             case 'expenseCategories':
                 return await addExpenseCategory(itemData as AddExpenseCategoryInput) as T;
-            case 'knowledge-base-articles':
-                return await addArticle(itemData as AddArticleInput) as T;
              case 'tasks':
                 return await addTask(itemData as AddTaskInput) as T;
             case 'company-settings':
@@ -164,9 +150,6 @@ export const ApiService = {
             case 'expenseCategories':
                 const categoryInput: UpdateExpenseCategoryInput = { categoryId: itemId, updates: updates as Partial<ExpenseCategory> };
                 return await updateExpenseCategory(categoryInput) as T | null;
-            case 'knowledge-base-articles':
-                 const articleInput: UpdateArticleInput = { articleId: itemId, updates: updates as Partial<KnowledgeBaseArticle> };
-                 return await updateArticle(articleInput) as T | null;
             case 'tasks':
                  const taskInput: UpdateTaskInput = { taskId: itemId, updates: updates as Partial<Task> };
                  return await updateTask(taskInput) as T | null;
@@ -192,8 +175,6 @@ export const ApiService = {
                 return await deleteExpense(itemId);
             case 'expenseCategories':
                 return await deleteExpenseCategory(itemId);
-            case 'knowledge-base-articles':
-                return await deleteArticle(itemId);
             case 'tasks':
                 return await deleteTask(itemId);
             default:
