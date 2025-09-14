@@ -1,21 +1,18 @@
-
 "use client";
 
 import "@blocknote/core/fonts/inter.css";
 import { useCreateBlockNote } from "@blocknote/react";
 import { BlockNoteView } from "@blocknote/mantine";
 import "@blocknote/mantine/style.css";
-import { Block, PartialBlock } from "@blocknote/core";
+import { PartialBlock } from "@blocknote/core";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Input } from "@/components/ui/input";
-import { useDebouncedCallback } from 'use-debounce';
 import { useKnowledgeBase } from "@/hooks/use-knowledge-base";
 import type { KnowledgeBaseArticle } from "@/lib/types/knowledge-base-types";
-
 
 export default function ArticlePage({ params }: { params: { id: string } }) {
     const router = useRouter();
@@ -26,9 +23,22 @@ export default function ArticlePage({ params }: { params: { id: string } }) {
     
     // Creates a new editor instance.
     const editor = useCreateBlockNote();
+    
+    // Debounce function implemented manually to avoid external dependency issues
+    const useDebouncedCallback = (callback: (...args: any[]) => void, delay: number) => {
+        const timeoutRef = React.useRef<NodeJS.Timeout>();
+
+        return useCallback((...args: any[]) => {
+            clearTimeout(timeoutRef.current);
+            timeoutRef.current = setTimeout(() => {
+                callback(...args);
+            }, delay);
+        }, [callback, delay]);
+    };
+
 
     const debouncedUpdates = useDebouncedCallback(async () => {
-        if (article && editor) {
+        if (article && editor && !loading) {
              const jsonBlocks = editor.document;
              await updateArticle(article.id, { content: jsonBlocks });
             toast({
@@ -39,7 +49,7 @@ export default function ArticlePage({ params }: { params: { id: string } }) {
     }, 2000);
 
     const handleTitleChange = useDebouncedCallback(async (newTitle: string) => {
-        if (article) {
+        if (article && !loading) {
             await updateArticle(article.id, { title: newTitle });
             toast({
               title: "Título Atualizado",
@@ -57,9 +67,11 @@ export default function ArticlePage({ params }: { params: { id: string } }) {
                 const fetchedArticle = await getArticle(params.id);
                 if (fetchedArticle) {
                     setArticle(fetchedArticle);
-                    // Load the previously saved content into the editor.
                     if (editor && fetchedArticle.content && fetchedArticle.content.length > 0) {
-                        editor.replaceBlocks(editor.document, fetchedArticle.content as PartialBlock[]);
+                        // Using a timeout to ensure the editor is fully ready before inserting blocks
+                        setTimeout(() => {
+                           editor.replaceBlocks(editor.document, fetchedArticle.content as PartialBlock[]);
+                        }, 0);
                     }
                 } else {
                     toast({
@@ -80,7 +92,11 @@ export default function ArticlePage({ params }: { params: { id: string } }) {
                 setIsLoading(false);
             }
         };
-        fetchArticle();
+        
+        if (editor) {
+            fetchArticle();
+        }
+
     }, [params.id, router, toast, getArticle, editor]);
 
     if (isLoading || !editor) {
