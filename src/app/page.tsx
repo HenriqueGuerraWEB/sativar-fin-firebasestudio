@@ -3,6 +3,7 @@
 import { useAuth } from "@/hooks/use-auth";
 import { redirect } from 'next/navigation';
 import { useEffect } from 'react';
+import { LoadingPage } from "@/components/layout/loading-page";
 
 export default function Home() {
   const { user, loading } = useAuth();
@@ -17,9 +18,5 @@ export default function Home() {
     }
   }, [user, loading]);
 
-  return (
-      <div className="flex h-screen w-full items-center justify-center">
-          <div className="h-16 w-16 animate-spin rounded-full border-4 border-solid border-primary border-t-transparent"></div>
-      </div>
-  )
+  return <LoadingPage />
 }
