@@ -208,6 +208,18 @@ As páginas `Financeiro` e `Faturas` e os hooks associados (`useInvoices`, `useE
       `website` VARCHAR(255),
       `logo` LONGTEXT
     );
+    
+    -- Tabela da Base de Conhecimento
+    CREATE TABLE IF NOT EXISTS `knowledge_base_articles` (
+        `id` VARCHAR(255) PRIMARY KEY,
+        `title` VARCHAR(255) NOT NULL,
+        `content` JSON,
+        `metadata` JSON,
+        `authorId` VARCHAR(255),
+        `createdAt` DATETIME NOT NULL,
+        `updatedAt` DATETIME NOT NULL
+    );
+
     ```
 4.  **Execute a Aplicação:**
     *   Terminal 1 (Frontend): `npm run dev` (acessível em `http://localhost:9002`)
