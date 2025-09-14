@@ -1,0 +1,27 @@
+diff --git a/node_modules/@blocknote/mantine/package.json b/node_modules/@blocknote/mantine/package.json
+index 548ad72..b5e985b 100644
+--- a/node_modules/@blocknote/mantine/package.json
++++ b/node_modules/@blocknote/mantine/package.json
+@@ -58,9 +58,7 @@
+     "@mantine/hooks": "^7.5.3",
+     "@blocknote/core": "0.14.0",
+     "@blocknote/react": "0.14.0",
+-    "react": "^18.2.0",
+-    "react-dom": "^18.2.0",
+-    "react-pro-sidebar": "^1.0.0"
++    "react-pro-sidebar": "^1.0.0" 
+   },
+   "types": "./dist/index.d.ts",
+   "typesVersions": {
+@@ -75,6 +73,10 @@
+   },
+   "sideEffects": [
+     "**/*.css"
+-  ]
++  ],
++  "peerDependencies": {
++    "react": ">=18.2.0",
++    "react-dom": ">=18.2.0"
++  }
+ }
+ 
