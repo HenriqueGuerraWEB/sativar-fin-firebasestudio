@@ -21,10 +21,9 @@ export default function ArticlePage({ params }: { params: { id: string } }) {
     const [article, setArticle] = useState<KnowledgeBaseArticle | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     
-    // Creates a new editor instance.
     const editor = useCreateBlockNote();
-    
-    // Debounce function implemented manually to avoid external dependency issues
+
+    // Debounce implementation without external library
     const useDebouncedCallback = (callback: (...args: any[]) => void, delay: number) => {
         const timeoutRef = React.useRef<NodeJS.Timeout>();
 
@@ -36,19 +35,18 @@ export default function ArticlePage({ params }: { params: { id: string } }) {
         }, [callback, delay]);
     };
 
-
-    const debouncedUpdates = useDebouncedCallback(async () => {
+    const debouncedContentUpdate = useDebouncedCallback(async () => {
         if (article && editor && !loading) {
-             const jsonBlocks = editor.document;
-             await updateArticle(article.id, { content: jsonBlocks });
+            const jsonBlocks = editor.document;
+            await updateArticle(article.id, { content: jsonBlocks });
             toast({
               title: "Salvo Automaticamente",
-              description: "Suas alterações foram salvas.",
+              description: "Suas alterações no conteúdo foram salvas.",
             });
         }
     }, 2000);
 
-    const handleTitleChange = useDebouncedCallback(async (newTitle: string) => {
+    const debouncedTitleUpdate = useDebouncedCallback(async (newTitle: string) => {
         if (article && !loading) {
             await updateArticle(article.id, { title: newTitle });
             toast({
@@ -68,7 +66,6 @@ export default function ArticlePage({ params }: { params: { id: string } }) {
                 if (fetchedArticle) {
                     setArticle(fetchedArticle);
                     if (editor && fetchedArticle.content && fetchedArticle.content.length > 0) {
-                        // Using a timeout to ensure the editor is fully ready before inserting blocks
                         setTimeout(() => {
                            editor.replaceBlocks(editor.document, fetchedArticle.content as PartialBlock[]);
                         }, 0);
@@ -113,14 +110,14 @@ export default function ArticlePage({ params }: { params: { id: string } }) {
         <div className="max-w-4xl mx-auto">
             <Input 
                 defaultValue={article?.title}
-                onChange={(e) => handleTitleChange(e.target.value)}
+                onChange={(e) => debouncedTitleUpdate(e.target.value)}
                 className="text-4xl font-bold border-none shadow-none focus-visible:ring-0 p-0 h-auto mb-8"
                 placeholder="Título do Artigo"
             />
             <BlockNoteView 
                 editor={editor} 
                 theme={"dark"}
-                onChange={debouncedUpdates}
+                onChange={debouncedContentUpdate}
              />
         </div>
     );
