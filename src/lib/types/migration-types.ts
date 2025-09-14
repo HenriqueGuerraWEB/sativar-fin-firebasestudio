@@ -10,14 +10,14 @@ import { TaskSchema } from './task-types';
 
 const CompanySettingsSchema = z.object({
     id: z.string(),
-    name: z.string(),
-    address: z.string(),
-    phone: z.string(),
-    email: z.string(),
-    website: z.string(),
-    logoDataUrl: z.string(),
-    cpf: z.string(),
-    cnpj: z.string(),
+    name: z.string().nullable().optional(),
+    address: z.string().nullable().optional(),
+    phone: z.string().nullable().optional(),
+    email: z.string().nullable().optional(),
+    website: z.string().nullable().optional(),
+    logoDataUrl: z.string().nullable().optional(),
+    cpf: z.string().nullable().optional(),
+    cnpj: z.string().nullable().optional(),
 });
 
 // Input schema for the migration flow
