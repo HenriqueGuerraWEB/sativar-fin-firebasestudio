@@ -163,6 +163,7 @@ export default function SettingsPage() {
             const expenses = LocalStorageService.getCollection('expenses');
             const expenseCategories = LocalStorageService.getCollection('expenseCategories');
             const knowledgeBaseArticles = LocalStorageService.getCollection('knowledge-base-articles');
+            const tasks = LocalStorageService.getCollection('tasks');
             const settingsData = LocalStorageService.getItem<CompanySettings>('company-settings', 'single-settings');
 
             const migrationData: DataMigrationInput = {
@@ -172,6 +173,7 @@ export default function SettingsPage() {
                 expenses: expenses.length > 0 ? expenses : undefined,
                 expenseCategories: expenseCategories.length > 0 ? expenseCategories : undefined,
                 knowledgeBaseArticles: knowledgeBaseArticles.length > 0 ? knowledgeBaseArticles : undefined,
+                tasks: tasks.length > 0 ? tasks : undefined,
                 settings: settingsData || undefined,
             };
 

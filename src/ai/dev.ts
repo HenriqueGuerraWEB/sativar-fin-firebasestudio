@@ -9,3 +9,4 @@ import './flows/expense-categories-flow';
 import './flows/invoices-flow';
 import './flows/company-settings-flow';
 import './flows/knowledge-base-flow';
+import './flows/tasks-flow';

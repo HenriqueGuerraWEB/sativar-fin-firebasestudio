@@ -52,7 +52,7 @@ USE sativar_db;
 
 ### 3.2. Criar as Tabelas
 
-Execute os scripts abaixo para criar as tabelas `plans`, `expense_categories`, `expenses`, `clients`, `invoices`, `company_settings` e `knowledge_base_articles`.
+Execute os scripts abaixo para criar as tabelas `plans`, `expense_categories`, `expenses`, `clients`, `invoices`, `company_settings`, `knowledge_base_articles` e `tasks`.
 
 ```sql
 -- Tabela de Planos
@@ -138,6 +138,18 @@ CREATE TABLE IF NOT EXISTS `knowledge_base_articles` (
     `authorId` VARCHAR(255),
     `createdAt` DATETIME NOT NULL,
     `updatedAt` DATETIME NOT NULL
+);
+
+-- Tabela de Tarefas
+CREATE TABLE IF NOT EXISTS `tasks` (
+    `id` VARCHAR(255) PRIMARY KEY,
+    `title` VARCHAR(255) NOT NULL,
+    `description` TEXT,
+    `due_date` DATETIME NOT NULL,
+    `status` VARCHAR(50) NOT NULL,
+    `user_id` VARCHAR(255),
+    `related_client_id` VARCHAR(255),
+    FOREIGN KEY (`related_client_id`) REFERENCES `clients`(`id`) ON DELETE SET NULL
 );
 ```
 

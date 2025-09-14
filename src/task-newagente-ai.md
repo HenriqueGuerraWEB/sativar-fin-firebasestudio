@@ -6,7 +6,6 @@
 
 **Tech Stack:**
 *   **Frontend:** Next.js (App Router), React, TypeScript
-*   **UI:** Tailwind CSS, ShadCN UI
 *   **Backend (Server Actions):** Genkit (para orquestração de fluxos de API)
 *   **Banco de Dados:** MySQL
 
@@ -23,7 +22,7 @@ A característica central da aplicação é seu sistema de armazenamento duplo, 
 *   **Fluxo de Migração:** A página de **Configurações** contém a lógica para migrar os dados do `localStorage` para o MySQL.
     1.  O usuário primeiro testa a conexão com o banco de dados.
     2.  Se o teste for bem-sucedido, o botão "Iniciar Migração de Dados" é habilitado.
-    3.  Ao clicar, a aplicação coleta todos os dados do `localStorage`, os envia para o fluxo `migrateDataFlow` no backend, que então os insere no banco de dados MySQL.
+    3.  Ao clicar, a aplicação coleta todos os dados do `localStorage`, os envia para o fluxo `migrateDataFlow` no backend, que então os insere no banco de dados.
 
 ---
 
@@ -218,6 +217,18 @@ As páginas `Financeiro` e `Faturas` e os hooks associados (`useInvoices`, `useE
         `authorId` VARCHAR(255),
         `createdAt` DATETIME NOT NULL,
         `updatedAt` DATETIME NOT NULL
+    );
+
+    -- Tabela de Tarefas
+    CREATE TABLE IF NOT EXISTS `tasks` (
+        `id` VARCHAR(255) PRIMARY KEY,
+        `title` VARCHAR(255) NOT NULL,
+        `description` TEXT,
+        `due_date` DATETIME NOT NULL,
+        `status` VARCHAR(50) NOT NULL,
+        `user_id` VARCHAR(255),
+        `related_client_id` VARCHAR(255),
+        FOREIGN KEY (`related_client_id`) REFERENCES `clients`(`id`) ON DELETE SET NULL
     );
 
     ```

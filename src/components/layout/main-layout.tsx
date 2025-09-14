@@ -15,7 +15,7 @@ import {
   useSidebar,
 } from '@/components/ui/sidebar';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { LayoutDashboard, Users, Package, Banknote, FileText, Settings, LogOut, Shapes, PanelLeft, BookText } from 'lucide-react';
+import { LayoutDashboard, Users, Package, Banknote, FileText, Settings, LogOut, Shapes, PanelLeft, BookText, CalendarCheck } from 'lucide-react';
 import React, { useState, useEffect } from 'react';
 import { SativarLogo } from '@/components/sativar-logo';
 import { useAuth } from '@/hooks/use-auth';
@@ -25,6 +25,7 @@ import { ModeToggle } from '../mode-toggle';
 import { StorageService } from '@/lib/storage-service';
 import type { CompanySettings } from '@/lib/types/company-settings-types';
 import { Skeleton } from '../ui/skeleton';
+import { NotificationBell } from './notification-bell';
 
 function HeaderContent() {
     const { user, logout } = useAuth();
@@ -84,6 +85,7 @@ function HeaderContent() {
                 )}
             </div>
             <div className="flex items-center gap-4">
+                <NotificationBell />
                 <ModeToggle />
                 <DropdownMenu>
                     <DropdownMenuTrigger asChild>
@@ -119,6 +121,7 @@ function MainLayoutContent({ children }: { children: React.ReactNode }) {
 
     const menuItems = [
       { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+      { href: '/tasks', label: 'Tarefas', icon: CalendarCheck },
       { href: '/clients', label: 'Clientes', icon: Users },
       { href: '/plans', label: 'Planos', icon: Package },
       { href: '/settings/categories', label: 'Categorias', icon: Shapes },
@@ -137,7 +140,7 @@ function MainLayoutContent({ children }: { children: React.ReactNode }) {
       if (href === '/dashboard') {
           return pathname === href;
       }
-      if (['/clients', '/plans', '/finance', '/invoices', '/settings', '/knowledge-base'].includes(href)) {
+      if (['/clients', '/plans', '/finance', '/invoices', '/settings', '/knowledge-base', '/tasks'].includes(href)) {
           return pathname.startsWith(href);
       }
        if (href === '/settings/categories') {
