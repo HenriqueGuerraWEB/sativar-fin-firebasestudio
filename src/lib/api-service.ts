@@ -36,6 +36,13 @@ import {
 } from '@/ai/flows/expense-categories-flow';
 import { getCompanySettings, updateCompanySettings } from '@/ai/flows/company-settings-flow';
 import { getTasks, addTask, updateTask, deleteTask } from '@/ai/flows/tasks-flow';
+import {
+    getArticles,
+    getArticle,
+    createArticle,
+    updateArticle,
+    deleteArticle,
+} from '@/ai/flows/knowledge-base-flow';
 import { migrateData } from '@/ai/flows/data-migration-flow';
 
 import type { Plan, UpdatePlanInput } from '@/lib/types/plan-types';
@@ -46,6 +53,7 @@ import type { Expense, AddExpenseInput, UpdateExpenseInput } from '@/lib/types/e
 import type { ExpenseCategory, AddExpenseCategoryInput, UpdateExpenseCategoryInput } from '@/lib/types/expense-category-types';
 import type { CompanySettings } from '@/lib/types/company-settings-types';
 import type { Task, AddTaskInput, UpdateTaskInput } from '@/lib/types/task-types';
+import type { KnowledgeBaseArticle, CreateArticleInput, UpdateArticleInput } from '@/lib/types/knowledge-base-types';
 
 
 /**
@@ -69,6 +77,8 @@ export const ApiService = {
                 return await getExpenseCategories() as T[];
             case 'tasks':
                 return await getTasks() as T[];
+            case 'knowledge-base-articles':
+                return await getArticles() as T[];
             default:
                 console.warn(`ApiService: No getCollection handler for ${collectionKey}`);
                 return Promise.resolve([]);
@@ -89,6 +99,8 @@ export const ApiService = {
         switch (collectionKey) {
             case 'company-settings':
                 return await getCompanySettings() as T | null;
+            case 'knowledge-base-articles':
+                return await getArticle(itemId) as T | null;
             // This is inefficient for other types. It's better to create specific `getItem` flows if needed.
             default:
                 const collection = await ApiService.getCollection<T>(collectionKey);
@@ -113,6 +125,8 @@ export const ApiService = {
                 return await addExpenseCategory(itemData as AddExpenseCategoryInput) as T;
              case 'tasks':
                 return await addTask(itemData as AddTaskInput) as T;
+            case 'knowledge-base-articles':
+                return await createArticle(itemData as CreateArticleInput) as T;
             case 'company-settings':
                  // Since there's only one settings object, 'addItem' is the same as 'update'
                  return await updateCompanySettings(itemData as CompanySettings) as T;
@@ -153,6 +167,8 @@ export const ApiService = {
             case 'tasks':
                  const taskInput: UpdateTaskInput = { taskId: itemId, updates: updates as Partial<Task> };
                  return await updateTask(taskInput) as T | null;
+            case 'knowledge-base-articles':
+                 return await updateArticle({ articleId: itemId, updates: updates as UpdateArticleInput }) as T | null;
             case 'company-settings':
                  // The backend takes the full object for simplicity of the INSERT...ON DUPLICATE KEY query
                  return await updateCompanySettings(updates as CompanySettings) as T | null;
@@ -177,6 +193,8 @@ export const ApiService = {
                 return await deleteExpenseCategory(itemId);
             case 'tasks':
                 return await deleteTask(itemId);
+            case 'knowledge-base-articles':
+                return await deleteArticle(itemId);
             default:
                 console.warn(`ApiService: No deleteItem handler for ${collectionKey}`);
                 return Promise.resolve();

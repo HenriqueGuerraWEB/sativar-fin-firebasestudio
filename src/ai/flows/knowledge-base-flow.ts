@@ -1,0 +1,173 @@
+
+'use server';
+/**
+ * @fileOverview Genkit flows for managing knowledge base articles.
+ * 
+ * - getArticles - Retrieves all articles (metadata only).
+ * - getArticle - Retrieves a single article by ID, including content.
+ * - createArticle - Adds a new, empty article.
+ * - updateArticle - Updates an existing article.
+ * - deleteArticle - Deletes an article.
+ */
+
+import { ai } from '@/ai/genkit';
+import { z } from 'genkit';
+import { executeQuery } from '@/lib/db';
+import { randomUUID } from 'crypto';
+import { format } from 'date-fns';
+import { RowDataPacket } from 'mysql2';
+import { 
+    KnowledgeBaseArticleSchema, 
+    KnowledgeBaseArticle,
+    CreateArticleInputSchema,
+    UpdateArticleInputSchema,
+    ArticleListItemSchema
+} from '@/lib/types/knowledge-base-types';
+
+
+// Flow to get all articles (metadata only for list view)
+export const getArticles = ai.defineFlow(
+  {
+    name: 'getArticles',
+    outputSchema: z.array(ArticleListItemSchema),
+  },
+  async () => {
+    console.log('[KB_FLOW] Fetching all articles from database...');
+    const results = await executeQuery(
+        'SELECT id, title, metadata, authorId, createdAt, updatedAt FROM knowledge_base_articles ORDER BY updatedAt DESC'
+    ) as RowDataPacket[];
+
+    return results.map(article => ({
+        id: article.id,
+        title: article.title,
+        metadata: article.metadata || {}, // mysql2 driver handles JSON parsing
+        authorId: article.authorId,
+        createdAt: article.createdAt ? new Date(article.createdAt).toISOString() : '',
+        updatedAt: article.updatedAt ? new Date(article.updatedAt).toISOString() : '',
+    }));
+  }
+);
+
+
+// Flow to get a single full article
+export const getArticle = ai.defineFlow(
+  {
+    name: 'getArticle',
+    inputSchema: z.string(), // articleId
+    outputSchema: KnowledgeBaseArticleSchema.nullable(),
+  },
+  async (articleId) => {
+    console.log(`[KB_FLOW] Fetching article ${articleId} from database...`);
+    const results = await executeQuery('SELECT * FROM knowledge_base_articles WHERE id = ?', [articleId]) as RowDataPacket[];
+    
+    if (results.length === 0) {
+      return null;
+    }
+    const article = results[0];
+    return {
+        id: article.id,
+        title: article.title,
+        content: article.content, // mysql2 driver handles JSON parsing
+        metadata: article.metadata,
+        authorId: article.authorId,
+        createdAt: new Date(article.createdAt).toISOString(),
+        updatedAt: new Date(article.updatedAt).toISOString(),
+    };
+  }
+);
+
+
+// Flow to create a new article
+export const createArticle = ai.defineFlow(
+  {
+    name: 'createArticle',
+    inputSchema: CreateArticleInputSchema,
+    outputSchema: KnowledgeBaseArticleSchema,
+  },
+  async (articleData) => {
+    console.log('[KB_FLOW] Adding new article to database...');
+    const now = new Date();
+    const newArticle: KnowledgeBaseArticle = {
+      id: randomUUID(),
+      title: articleData.title || "Artigo sem Título",
+      content: articleData.content || {},
+      metadata: articleData.metadata || {},
+      authorId: articleData.authorId,
+      createdAt: now.toISOString(),
+      updatedAt: now.toISOString(),
+    };
+    
+    const formattedNow = format(now, 'yyyy-MM-dd HH:mm:ss');
+    await executeQuery(
+      'INSERT INTO knowledge_base_articles (id, title, content, metadata, authorId, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [
+        newArticle.id, 
+        newArticle.title, 
+        JSON.stringify(newArticle.content), 
+        JSON.stringify(newArticle.metadata),
+        newArticle.authorId,
+        formattedNow,
+        formattedNow
+      ]
+    );
+
+    return newArticle;
+  }
+);
+
+// Flow to update an existing article
+export const updateArticle = ai.defineFlow(
+  {
+    name: 'updateArticle',
+    inputSchema: UpdateArticleInputSchema,
+    outputSchema: KnowledgeBaseArticleSchema.nullable(),
+  },
+  async ({ articleId, updates }) => {
+    console.log(`[KB_FLOW] Updating article ${articleId} in database...`);
+    
+    // Add updatedAt timestamp to the updates
+    const updatesWithTimestamp = {
+        ...updates,
+        updatedAt: new Date().toISOString(),
+    };
+
+    const dbUpdates: { [key: string]: any } = {};
+    for (const key in updatesWithTimestamp) {
+      if (Object.prototype.hasOwnProperty.call(updatesWithTimestamp, key)) {
+          const dbKey = key.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
+          if (key === 'content' || key === 'metadata') {
+             (dbUpdates as any)[dbKey] = JSON.stringify((updatesWithTimestamp as any)[key]);
+          } else if (key === 'createdAt' || key === 'updatedAt') {
+             (dbUpdates as any)[dbKey] = format(new Date((updatesWithTimestamp as any)[key]), 'yyyy-MM-dd HH:mm:ss');
+          }
+          else {
+              (dbUpdates as any)[dbKey] = (updatesWithTimestamp as any)[key];
+          }
+      }
+    }
+    
+    const fields = Object.keys(dbUpdates);
+    const values = Object.values(dbUpdates);
+    const setClause = fields.map(field => `\`${field.replace(/`/g, '``')}\` = ?`).join(', ');
+
+    await executeQuery(`UPDATE knowledge_base_articles SET ${setClause} WHERE id = ?`, [...values, articleId]);
+    
+    // Fetch the updated article to return it
+    const result = await getArticle(articleId);
+    return result;
+  }
+);
+
+// Flow to delete an article
+export const deleteArticle = ai.defineFlow(
+  {
+    name: 'deleteArticle',
+    inputSchema: z.string(), // articleId
+    outputSchema: z.void(),
+  },
+  async (articleId) => {
+    console.log(`[KB_FLOW] Deleting article ${articleId} from database...`);
+    await executeQuery('DELETE FROM knowledge_base_articles WHERE id = ?', [articleId]);
+    console.log(`Article ${articleId} deleted.`);
+  }
+);

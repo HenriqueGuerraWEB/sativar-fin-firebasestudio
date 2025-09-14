@@ -15,7 +15,7 @@ import {
   useSidebar,
 } from '@/components/ui/sidebar';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { LayoutDashboard, Users, Package, Banknote, FileText, Settings, LogOut, Shapes, PanelLeft, CalendarCheck } from 'lucide-react';
+import { LayoutDashboard, Users, Package, Banknote, FileText, Settings, LogOut, Shapes, PanelLeft, CalendarCheck, BookText } from 'lucide-react';
 import React, { useState, useEffect } from 'react';
 import { SativarLogo } from '@/components/sativar-logo';
 import { useAuth } from '@/hooks/use-auth';
@@ -124,6 +124,7 @@ function MainLayoutContent({ children }: { children: React.ReactNode }) {
       { href: '/tasks', label: 'Tarefas', icon: CalendarCheck },
       { href: '/clients', label: 'Clientes', icon: Users },
       { href: '/plans', label: 'Planos', icon: Package },
+      { href: '/knowledge-base', label: 'Base de Conhecimento', icon: BookText },
       { href: '/settings/categories', label: 'Categorias', icon: Shapes },
       { href: '/finance', label: 'Financeiro', icon: Banknote },
       { href: '/invoices', label: 'Faturas', icon: FileText },
@@ -139,7 +140,7 @@ function MainLayoutContent({ children }: { children: React.ReactNode }) {
       if (href === '/dashboard') {
           return pathname === href;
       }
-      if (['/clients', '/plans', '/finance', '/invoices', '/settings', '/tasks'].includes(href)) {
+      if (['/clients', '/plans', '/finance', '/invoices', '/settings', '/tasks', '/knowledge-base'].includes(href)) {
           return pathname.startsWith(href);
       }
        if (href === '/settings/categories') {

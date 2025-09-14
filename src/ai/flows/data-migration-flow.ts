@@ -141,6 +141,18 @@ const migrateDataFlow = ai.defineFlow(
             console.log(`${input.tasks.length} tasks migrated.`);
         }
 
+        // 8. Migrate Knowledge Base Articles
+        if (input.articles && input.articles.length > 0) {
+            const articleValues = input.articles.map(a => [
+                a.id, a.title, JSON.stringify(a.content || {}), JSON.stringify(a.metadata || []), a.authorId, formatDateForMySQL(a.createdAt), formatDateForMySQL(a.updatedAt)
+            ]);
+            await connection.query(
+                'INSERT INTO knowledge_base_articles (id, title, content, metadata, authorId, createdAt, updatedAt) VALUES ? ON DUPLICATE KEY UPDATE title=VALUES(title), content=VALUES(content), metadata=VALUES(metadata), authorId=VALUES(authorId), createdAt=VALUES(createdAt), updatedAt=VALUES(updatedAt)',
+                [articleValues]
+            );
+            console.log(`${input.articles.length} articles migrated.`);
+        }
+
         await connection.commit();
         console.log("Transaction committed successfully.");
         
@@ -150,6 +162,7 @@ const migrateDataFlow = ai.defineFlow(
                         (input.expenses?.length || 0) === 0 &&
                         (input.expenseCategories?.length || 0) === 0 &&
                         (input.tasks?.length || 0) === 0 &&
+                        (input.articles?.length || 0) === 0 &&
                         !input.settings
                         ? 'Nenhum dado local encontrado para migrar, mas a conexão com o banco de dados foi verificada e as tabelas estão prontas.'
                         : 'Migração de dados concluída com sucesso! Todos os dados foram salvos no banco de dados.';
@@ -164,6 +177,7 @@ const migrateDataFlow = ai.defineFlow(
             expensesMigrated: input.expenses?.length || 0,
             categoriesMigrated: input.expenseCategories?.length || 0,
             tasksMigrated: input.tasks?.length || 0,
+            articlesMigrated: input.articles?.length || 0,
         };
     } catch (error: any) {
         await connection.rollback();

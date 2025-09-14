@@ -1,3 +1,4 @@
+
 # Guia de Instalação e Configuração Local
 
 Este guia descreve os passos necessários para configurar e executar a aplicação Sativar Manager em seu ambiente de desenvolvimento local.
@@ -52,7 +53,7 @@ USE sativar_db;
 
 ### 3.2. Criar as Tabelas
 
-Execute os scripts abaixo para criar as tabelas `plans`, `expense_categories`, `expenses`, `clients`, `invoices`, `company_settings` e `tasks`.
+Execute os scripts abaixo para criar as tabelas `plans`, `expense_categories`, `expenses`, `clients`, `invoices`, `company_settings`, `tasks` e `knowledge_base_articles`.
 
 ```sql
 -- Tabela de Planos
@@ -139,6 +140,17 @@ CREATE TABLE IF NOT EXISTS `tasks` (
     `user_id` VARCHAR(255),
     `related_client_id` VARCHAR(255),
     FOREIGN KEY (`related_client_id`) REFERENCES `clients`(`id`) ON DELETE SET NULL
+);
+
+-- Tabela da Base de Conhecimento
+CREATE TABLE IF NOT EXISTS `knowledge_base_articles` (
+    `id` VARCHAR(255) PRIMARY KEY,
+    `title` VARCHAR(255) NOT NULL,
+    `content` JSON,
+    `metadata` JSON,
+    `authorId` VARCHAR(255),
+    `createdAt` DATETIME,
+    `updatedAt` DATETIME
 );
 ```
 

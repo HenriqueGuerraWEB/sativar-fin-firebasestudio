@@ -6,6 +6,7 @@ import { InvoiceSchema } from './invoice-types';
 import { ExpenseSchema } from './expense-types';
 import { ExpenseCategorySchema } from './expense-category-types';
 import { TaskSchema } from './task-types';
+import { KnowledgeBaseArticleSchema } from './knowledge-base-types';
 
 const CompanySettingsSchema = z.object({
     id: z.string(),
@@ -27,6 +28,7 @@ export const DataMigrationInputSchema = z.object({
     expenses: z.array(ExpenseSchema).optional(),
     expenseCategories: z.array(ExpenseCategorySchema).optional(),
     tasks: z.array(TaskSchema).optional(),
+    articles: z.array(KnowledgeBaseArticleSchema).optional(),
     settings: CompanySettingsSchema.optional(),
 });
 export type DataMigrationInput = z.infer<typeof DataMigrationInputSchema>;
@@ -42,5 +44,6 @@ export const DataMigrationOutputSchema = z.object({
     expensesMigrated: z.number(),
     categoriesMigrated: z.number(),
     tasksMigrated: z.number(),
+    articlesMigrated: z.number(),
 });
 export type DataMigrationOutput = z.infer<typeof DataMigrationOutputSchema>;
