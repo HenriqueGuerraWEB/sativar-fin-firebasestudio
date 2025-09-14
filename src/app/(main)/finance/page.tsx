@@ -560,6 +560,7 @@ export default function FinancePage() {
                            
                            {cashFlowView !== 'daily' && (
                             <div className="h-[350px]">
+                                {isLoading ? <Skeleton className="w-full h-full" /> : (
                                 <ResponsiveContainer width="100%" height="100%">
                                     <BarChart data={cashFlowReport.chartData}>
                                     <CartesianGrid strokeDasharray="3 3" />
@@ -571,6 +572,7 @@ export default function FinancePage() {
                                     <Bar dataKey="Saídas" fill="#dc2626" radius={[4, 4, 0, 0]} />
                                     </BarChart>
                                 </ResponsiveContainer>
+                                )}
                             </div>
                            )}
 
@@ -621,3 +623,5 @@ export default function FinancePage() {
         </div>
     );
 }
+
+    

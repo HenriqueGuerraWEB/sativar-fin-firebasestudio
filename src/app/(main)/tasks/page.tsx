@@ -155,29 +155,33 @@ export default function TasksPage() {
             
             <Card>
                 <CardContent className="p-2 sm:p-4">
-                     <style>{`
-                        .rdp-day { height: 6rem; }
-                        .rdp-day_selected { background-color: hsl(var(--accent)); }
-                        .rdp-button:hover:not([disabled]):not(.rdp-day_selected) { background-color: hsl(var(--accent)); }
-                    `}</style>
-                    <DayPicker
-                        mode="single"
-                        onSelect={handleDateSelect}
-                        month={currentMonth}
-                        onMonthChange={handleMonthChange}
-                        locale={ptBR}
-                        className="w-full"
-                        classNames={{
-                            months: "flex flex-col sm:flex-row space-y-4 sm:space-x-4 sm:space-y-0",
-                            month: "space-y-4 w-full",
-                            table: "w-full border-collapse",
-                            head_row: "flex",
-                            head_cell: "text-muted-foreground rounded-md w-full font-normal text-[0.8rem]",
-                            row: "flex w-full mt-2",
-                            cell: "w-full text-center text-sm p-0 relative [&:has([aria-selected])]:bg-accent first:[&:has([aria-selected])]:rounded-l-md last:[&:has([aria-selected])]:rounded-r-md focus-within:relative focus-within:z-20",
-                        }}
-                        components={{ DayContent }}
-                    />
+                     {isLoading ? <Skeleton className="w-full h-[450px]" /> : (
+                     <>
+                        <style>{`
+                            .rdp-day { height: 6rem; }
+                            .rdp-day_selected { background-color: hsl(var(--accent)); }
+                            .rdp-button:hover:not([disabled]):not(.rdp-day_selected) { background-color: hsl(var(--accent)); }
+                        `}</style>
+                        <DayPicker
+                            mode="single"
+                            onSelect={handleDateSelect}
+                            month={currentMonth}
+                            onMonthChange={handleMonthChange}
+                            locale={ptBR}
+                            className="w-full"
+                            classNames={{
+                                months: "flex flex-col sm:flex-row space-y-4 sm:space-x-4 sm:space-y-0",
+                                month: "space-y-4 w-full",
+                                table: "w-full border-collapse",
+                                head_row: "flex",
+                                head_cell: "text-muted-foreground rounded-md w-full font-normal text-[0.8rem]",
+                                row: "flex w-full mt-2",
+                                cell: "w-full text-center text-sm p-0 relative [&:has([aria-selected])]:bg-accent first:[&:has([aria-selected])]:rounded-l-md last:[&:has([aria-selected])]:rounded-r-md focus-within:relative focus-within:z-20",
+                            }}
+                            components={{ DayContent }}
+                        />
+                     </>
+                     )}
                 </CardContent>
             </Card>
 
@@ -286,3 +290,5 @@ export default function TasksPage() {
         </div>
     );
 }
+
+    
