@@ -32,8 +32,9 @@ export const getArticles = ai.defineFlow(
   },
   async () => {
     console.log('[KB_FLOW] Fetching all articles from database...');
+    // Select all columns to be resilient to schema changes
     const results = await executeQuery(
-        'SELECT id, title, category, icon, metadata, authorId, createdAt, updatedAt FROM knowledge_base_articles ORDER BY updatedAt DESC'
+        'SELECT * FROM knowledge_base_articles ORDER BY updatedAt DESC'
     ) as RowDataPacket[];
 
     return results.map(article => ({
@@ -41,8 +42,10 @@ export const getArticles = ai.defineFlow(
         title: article.title,
         category: article.category,
         icon: article.icon,
-        // Ensure metadata is always an array, even if DB returns null or a JSON string that is not an array
-        metadata: Array.isArray(article.metadata) ? article.metadata : (article.metadata && typeof article.metadata === 'string' ? JSON.parse(article.metadata) : []),
+        // Ensure metadata is always an array, even if DB returns null, string, or object
+        metadata: Array.isArray(article.metadata) 
+            ? article.metadata 
+            : (article.metadata && typeof article.metadata === 'string' ? JSON.parse(article.metadata) : []),
         authorId: article.authorId,
         createdAt: article.createdAt ? new Date(article.createdAt).toISOString() : '',
         updatedAt: article.updatedAt ? new Date(article.updatedAt).toISOString() : '',
@@ -73,7 +76,9 @@ export const getArticle = ai.defineFlow(
         icon: article.icon,
         content: article.content, // mysql2 driver handles JSON parsing
         // Ensure metadata is always an array
-        metadata: Array.isArray(article.metadata) ? article.metadata : [],
+        metadata: Array.isArray(article.metadata) 
+            ? article.metadata 
+            : (article.metadata && typeof article.metadata === 'string' ? JSON.parse(article.metadata) : []),
         authorId: article.authorId,
         createdAt: new Date(article.createdAt).toISOString(),
         updatedAt: new Date(article.updatedAt).toISOString(),
