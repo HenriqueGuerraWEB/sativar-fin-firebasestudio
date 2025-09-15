@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useMemo } from 'react';
@@ -282,113 +283,115 @@ export default function TasksPage() {
                 setIsSheetOpen(isOpen);
                 if (!isOpen) setCurrentTask(emptyTask as Omit<Task, 'id' | 'subtasks'>);
             }}>
-                <SheetContent className="sm:max-w-lg">
+                <SheetContent className="flex flex-col sm:max-w-lg">
                     <SheetHeader>
                         <SheetTitle>{'id' in currentTask ? 'Editar Tarefa' : 'Adicionar Nova Tarefa'}</SheetTitle>
                         <SheetDescription>
                             Preencha os detalhes da tarefa. Clique em salvar quando terminar.
                         </SheetDescription>
                     </SheetHeader>
-                    <div className="grid gap-6 py-6">
-                        <div className="space-y-2">
-                            <Label htmlFor="title">Título</Label>
-                            <Input id="title" value={currentTask.title} onChange={handleInputChange} />
-                        </div>
-                         <div className="space-y-2">
-                            <Label htmlFor="description">Descrição</Label>
-                            <Textarea id="description" value={currentTask.description ?? ''} onChange={handleInputChange} />
-                        </div>
-                        <div className="space-y-2">
-                            <Label htmlFor="dueDate">Data de Vencimento</Label>
-                             <Popover>
-                                <PopoverTrigger asChild>
-                                <Button
-                                    variant={"outline"}
-                                    className={cn("w-full justify-start text-left font-normal", !currentTask.dueDate && "text-muted-foreground")}
-                                >
-                                    <CalendarIcon className="mr-2 h-4 w-4" />
-                                    {currentTask.dueDate ? format(currentTask.dueDate as Date, "PPP", { locale: ptBR }) : <span>Escolha uma data</span>}
-                                </Button>
-                                </PopoverTrigger>
-                                <PopoverContent className="w-auto p-0">
-                                <Calendar
-                                    mode="single"
-                                    selected={currentTask.dueDate as Date}
-                                    onSelect={handleDueDateChange}
-                                    initialFocus
-                                />
-                                </PopoverContent>
-                            </Popover>
-                        </div>
-                        <div className="space-y-2">
-                            <Label htmlFor="status">Status</Label>
-                            <Select value={'id' in currentTask ? currentTask.status : 'Pendente'} onValueChange={(value) => handleSelectChange('status', value)}>
-                                <SelectTrigger>
-                                    <SelectValue placeholder="Selecione o status" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="Pendente">Pendente</SelectItem>
-                                    <SelectItem value="Em Progresso">Em Progresso</SelectItem>
-                                    <SelectItem value="Concluída">Concluída</SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
-                        <div className="space-y-2">
-                            <Label htmlFor="relatedClientId">Cliente Associado (Opcional)</Label>
-                            <Select value={currentTask.relatedClientId ?? ''} onValueChange={(value) => handleSelectChange('relatedClientId', value)}>
-                                <SelectTrigger>
-                                    <SelectValue placeholder="Selecione um cliente" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="none">Nenhum</SelectItem>
-                                    {clients.map(client => (
-                                        <SelectItem key={client.id} value={client.id}>{client.name}</SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </div>
-                        
-                        {'id' in currentTask && currentTask.subtasks && currentTask.subtasks.length > 0 && (
-                            <>
-                                <Separator />
-                                <div className="space-y-2">
-                                    <Label>Subtarefas</Label>
-                                    <div className="space-y-2 rounded-md border p-2">
-                                    {currentTask.subtasks.map(subtask => (
-                                        <div key={subtask.id} className="flex items-center gap-2 group">
-                                             <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleToggleComplete(subtask)}>
-                                                <div className={cn("h-4 w-4 rounded-sm border border-primary flex items-center justify-center", subtask.status === 'Concluída' && "bg-primary")}>
-                                                    {subtask.status === 'Concluída' && <Check className="h-3 w-3 text-primary-foreground" />}
-                                                </div>
-                                            </Button>
-                                            <span className={cn("flex-1 cursor-pointer text-sm", subtask.status === 'Concluída' && "line-through text-muted-foreground")} onClick={() => handleEditTask(subtask)}>
-                                                {subtask.title}
-                                            </span>
-                                             <AlertDialog>
-                                                <AlertDialogTrigger asChild>
-                                                    <Button variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover:opacity-100">
-                                                        <Trash2 className="h-4 w-4 text-destructive" />
-                                                    </Button>
-                                                </AlertDialogTrigger>
-                                                <AlertDialogContent>
-                                                    <AlertDialogHeader>
-                                                        <AlertDialogTitle>Excluir subtarefa?</AlertDialogTitle>
-                                                        <AlertDialogDescription>
-                                                            A ação de excluir a subtarefa "{subtask.title}" não poderá ser desfeita.
-                                                        </AlertDialogDescription>
-                                                    </AlertDialogHeader>
-                                                    <AlertDialogFooter>
-                                                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                                        <AlertDialogAction onClick={() => handleDeleteTask(subtask.id)}>Excluir</AlertDialogAction>
-                                                    </AlertDialogFooter>
-                                                </AlertDialogContent>
-                                            </AlertDialog>
+                    <div className="flex-1 overflow-y-auto -mx-6 px-6 py-6">
+                        <div className="grid gap-6">
+                            <div className="space-y-2">
+                                <Label htmlFor="title">Título</Label>
+                                <Input id="title" value={currentTask.title} onChange={handleInputChange} />
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="description">Descrição</Label>
+                                <Textarea id="description" value={currentTask.description ?? ''} onChange={handleInputChange} />
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="dueDate">Data de Vencimento</Label>
+                                <Popover>
+                                    <PopoverTrigger asChild>
+                                    <Button
+                                        variant={"outline"}
+                                        className={cn("w-full justify-start text-left font-normal", !currentTask.dueDate && "text-muted-foreground")}
+                                    >
+                                        <CalendarIcon className="mr-2 h-4 w-4" />
+                                        {currentTask.dueDate ? format(currentTask.dueDate as Date, "PPP", { locale: ptBR }) : <span>Escolha uma data</span>}
+                                    </Button>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-auto p-0">
+                                    <Calendar
+                                        mode="single"
+                                        selected={currentTask.dueDate as Date}
+                                        onSelect={handleDueDateChange}
+                                        initialFocus
+                                    />
+                                    </PopoverContent>
+                                </Popover>
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="status">Status</Label>
+                                <Select value={'id' in currentTask ? currentTask.status : 'Pendente'} onValueChange={(value) => handleSelectChange('status', value)}>
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Selecione o status" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="Pendente">Pendente</SelectItem>
+                                        <SelectItem value="Em Progresso">Em Progresso</SelectItem>
+                                        <SelectItem value="Concluída">Concluída</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="relatedClientId">Cliente Associado (Opcional)</Label>
+                                <Select value={currentTask.relatedClientId ?? ''} onValueChange={(value) => handleSelectChange('relatedClientId', value)}>
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Selecione um cliente" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="none">Nenhum</SelectItem>
+                                        {clients.map(client => (
+                                            <SelectItem key={client.id} value={client.id}>{client.name}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            
+                            {'id' in currentTask && currentTask.subtasks && currentTask.subtasks.length > 0 && (
+                                <>
+                                    <Separator />
+                                    <div className="space-y-2">
+                                        <Label>Subtarefas</Label>
+                                        <div className="space-y-2 rounded-md border p-2">
+                                        {currentTask.subtasks.map(subtask => (
+                                            <div key={subtask.id} className="flex items-center gap-2 group">
+                                                <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleToggleComplete(subtask)}>
+                                                    <div className={cn("h-4 w-4 rounded-sm border border-primary flex items-center justify-center", subtask.status === 'Concluída' && "bg-primary")}>
+                                                        {subtask.status === 'Concluída' && <Check className="h-3 w-3 text-primary-foreground" />}
+                                                    </div>
+                                                </Button>
+                                                <span className={cn("flex-1 cursor-pointer text-sm", subtask.status === 'Concluída' && "line-through text-muted-foreground")} onClick={() => handleEditTask(subtask)}>
+                                                    {subtask.title}
+                                                </span>
+                                                <AlertDialog>
+                                                    <AlertDialogTrigger asChild>
+                                                        <Button variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover:opacity-100">
+                                                            <Trash2 className="h-4 w-4 text-destructive" />
+                                                        </Button>
+                                                    </AlertDialogTrigger>
+                                                    <AlertDialogContent>
+                                                        <AlertDialogHeader>
+                                                            <AlertDialogTitle>Excluir subtarefa?</AlertDialogTitle>
+                                                            <AlertDialogDescription>
+                                                                A ação de excluir a subtarefa "{subtask.title}" não poderá ser desfeita.
+                                                            </AlertDialogDescription>
+                                                        </AlertDialogHeader>
+                                                        <AlertDialogFooter>
+                                                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                                            <AlertDialogAction onClick={() => handleDeleteTask(subtask.id)}>Excluir</AlertDialogAction>
+                                                        </AlertDialogFooter>
+                                                    </AlertDialogContent>
+                                                </AlertDialog>
+                                            </div>
+                                        ))}
                                         </div>
-                                    ))}
                                     </div>
-                                </div>
-                            </>
-                        )}
+                                </>
+                            )}
+                        </div>
                     </div>
                     <SheetFooter className="flex-col sm:flex-row sm:justify-between w-full">
                         <Button variant="outline" className="w-full sm:w-auto" onClick={() => 'id' in currentTask && handleAddSubtask(currentTask.id)}>
@@ -406,3 +409,5 @@ export default function TasksPage() {
         </div>
     );
 }
+
+    

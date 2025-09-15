@@ -292,25 +292,27 @@ export default function KnowledgeBasePage() {
             </Card>
 
              <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
-                <SheetContent>
+                <SheetContent className="flex flex-col">
                     <SheetHeader>
                         <SheetTitle>{sheetMode === 'add' ? 'Nova Categoria' : 'Editar Categoria'}</SheetTitle>
                         <SheetDescription>
                            {sheetMode === 'add' ? 'Digite o nome da nova categoria.' : `Renomear a categoria "${originalCategoryName}".`}
                         </SheetDescription>
                     </SheetHeader>
-                    <div className="grid gap-4 py-4">
-                        <div className="grid grid-cols-4 items-center gap-4">
-                            <Label htmlFor="category-name" className="text-right">
-                                Nome
-                            </Label>
-                            <Input
-                                id="category-name"
-                                value={currentCategory}
-                                onChange={(e) => setCurrentCategory(e.target.value)}
-                                className="col-span-3"
-                                placeholder="Ex: Documentação"
-                            />
+                    <div className="flex-1 overflow-y-auto -mx-6 px-6 py-4">
+                        <div className="grid gap-4">
+                            <div className="grid grid-cols-4 items-center gap-4">
+                                <Label htmlFor="category-name" className="text-right">
+                                    Nome
+                                </Label>
+                                <Input
+                                    id="category-name"
+                                    value={currentCategory}
+                                    onChange={(e) => setCurrentCategory(e.target.value)}
+                                    className="col-span-3"
+                                    placeholder="Ex: Documentação"
+                                />
+                            </div>
                         </div>
                     </div>
                     <SheetFooter>
@@ -322,3 +324,5 @@ export default function KnowledgeBasePage() {
         </div>
     );
 }
+
+    

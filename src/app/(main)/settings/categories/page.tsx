@@ -94,20 +94,23 @@ export default function ExpenseCategoriesPage() {
                             Nova Categoria
                         </Button>
                     </SheetTrigger>
-                    <SheetContent>
+                    <SheetContent className="flex flex-col">
                         <SheetHeader>
                             <SheetTitle>{'id' in currentCategory ? 'Editar Categoria' : 'Criar nova categoria'}</SheetTitle>
                             <SheetDescription>
                                 Defina o nome para a categoria de despesa.
                             </SheetDescription>
                         </SheetHeader>
-                        <div className="grid gap-4 py-4">
-                            <div className="grid grid-cols-4 items-center gap-4">
-                                <Label htmlFor="name" className="text-right">Nome</Label>
-                                <Input id="name" value={currentCategory.name} onChange={handleInputChange} className="col-span-3" />
+                        <div className="flex-1 overflow-y-auto -mx-6 px-6 py-4">
+                            <div className="grid gap-4">
+                                <div className="grid grid-cols-4 items-center gap-4">
+                                    <Label htmlFor="name" className="text-right">Nome</Label>
+                                    <Input id="name" value={currentCategory.name} onChange={handleInputChange} className="col-span-3" />
+                                </div>
                             </div>
                         </div>
                         <SheetFooter>
+                             <Button variant="outline" onClick={() => setIsSheetOpen(false)}>Cancelar</Button>
                             <Button onClick={handleSaveCategory}>Salvar Categoria</Button>
                         </SheetFooter>
                     </SheetContent>

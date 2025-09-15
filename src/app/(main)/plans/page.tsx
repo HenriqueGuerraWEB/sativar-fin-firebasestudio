@@ -137,62 +137,64 @@ export default function PlansPage() {
                             Novo Plano
                         </Button>
                     </SheetTrigger>
-                    <SheetContent>
+                    <SheetContent className="flex flex-col">
                         <SheetHeader>
                             <SheetTitle>{'id' in currentPlan ? 'Editar Plano' : 'Criar novo plano'}</SheetTitle>
                             <SheetDescription>
                                 Defina os detalhes do novo plano de serviço.
                             </SheetDescription>
                         </SheetHeader>
-                        <div className="grid gap-6 py-6">
-                            <div className="space-y-2">
-                                <Label htmlFor="name">Nome</Label>
-                                <Input id="name" value={currentPlan.name} onChange={handleInputChange} />
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="description">Descrição</Label>
-                                <Textarea id="description" value={currentPlan.description} onChange={handleInputChange} />
-                            </div>
-                            <div className="grid grid-cols-2 gap-4">
+                        <div className="flex-1 overflow-y-auto -mx-6 px-6 py-6">
+                            <div className="grid gap-6">
                                 <div className="space-y-2">
-                                    <Label htmlFor="price">Preço (R$)</Label>
-                                    <Input id="price" type="number" value={currentPlan.price} onChange={handleInputChange}/>
+                                    <Label htmlFor="name">Nome</Label>
+                                    <Input id="name" value={currentPlan.name} onChange={handleInputChange} />
                                 </div>
                                 <div className="space-y-2">
-                                    <Label htmlFor="type">Tipo</Label>
-                                    <Select value={currentPlan.type} onValueChange={(value) => handleSelectChange('type', value)}>
-                                        <SelectTrigger>
-                                            <SelectValue placeholder="Tipo de cobrança" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="recurring">Recorrente</SelectItem>
-                                            <SelectItem value="one-time">Único</SelectItem>
-                                        </SelectContent>
-                                    </Select>
+                                    <Label htmlFor="description">Descrição</Label>
+                                    <Textarea id="description" value={currentPlan.description} onChange={handleInputChange} />
                                 </div>
-                            </div>
-                           
-                            {currentPlan.type === 'recurring' && (
-                                <div className="p-4 border rounded-lg space-y-4">
-                                     <Label className="font-semibold">Configuração de Recorrência</Label>
-                                    <div className="grid grid-cols-2 gap-2">
-                                        <Input id="recurrenceValue" type="number" placeholder="Ex: 1" value={currentPlan.recurrenceValue ?? 1} onChange={handleInputChange} min="1" />
-                                        <Select value={currentPlan.recurrencePeriod ?? 'meses'} onValueChange={(value) => handleSelectChange('recurrencePeriod', value as any)}>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="space-y-2">
+                                        <Label htmlFor="price">Preço (R$)</Label>
+                                        <Input id="price" type="number" value={currentPlan.price} onChange={handleInputChange}/>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="type">Tipo</Label>
+                                        <Select value={currentPlan.type} onValueChange={(value) => handleSelectChange('type', value)}>
                                             <SelectTrigger>
-                                                <SelectValue placeholder="Período" />
+                                                <SelectValue placeholder="Tipo de cobrança" />
                                             </SelectTrigger>
                                             <SelectContent>
-                                                <SelectItem value="dias">Dias</SelectItem>
-                                                <SelectItem value="meses">Meses</SelectItem>
-                                                <SelectItem value="anos">Anos</SelectItem>
+                                                <SelectItem value="recurring">Recorrente</SelectItem>
+                                                <SelectItem value="one-time">Único</SelectItem>
                                             </SelectContent>
                                         </Select>
                                     </div>
                                 </div>
-                            )}
-
+                            
+                                {currentPlan.type === 'recurring' && (
+                                    <div className="p-4 border rounded-lg space-y-4">
+                                        <Label className="font-semibold">Configuração de Recorrência</Label>
+                                        <div className="grid grid-cols-2 gap-2">
+                                            <Input id="recurrenceValue" type="number" placeholder="Ex: 1" value={currentPlan.recurrenceValue ?? 1} onChange={handleInputChange} min="1" />
+                                            <Select value={currentPlan.recurrencePeriod ?? 'meses'} onValueChange={(value) => handleSelectChange('recurrencePeriod', value as any)}>
+                                                <SelectTrigger>
+                                                    <SelectValue placeholder="Período" />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="dias">Dias</SelectItem>
+                                                    <SelectItem value="meses">Meses</SelectItem>
+                                                    <SelectItem value="anos">Anos</SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
                         </div>
                         <SheetFooter>
+                            <Button variant="outline" onClick={() => setIsSheetOpen(false)}>Cancelar</Button>
                             <Button onClick={handleSavePlan}>Salvar Plano</Button>
                         </SheetFooter>
                     </SheetContent>

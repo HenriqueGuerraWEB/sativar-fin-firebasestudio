@@ -254,77 +254,80 @@ export default function FinancePage() {
                             Lançar Despesa
                         </Button>
                     </SheetTrigger>
-                    <SheetContent>
+                    <SheetContent className="flex flex-col">
                         <SheetHeader>
                             <SheetTitle>Lançar nova despesa</SheetTitle>
                             <SheetDescription>
                                 Preencha os detalhes da despesa. Você pode anexar um recibo.
                             </SheetDescription>
                         </SheetHeader>
-                        <div className="grid gap-4 py-4">
-                            <div className="grid grid-cols-4 items-center gap-4">
-                                <Label className="text-right">Recibo</Label>
-                                <div className='col-span-3 flex gap-2'>
-                                    <Input id="receipt" type="file" className="flex-grow" />
-                                    <Button onClick={handleAnalyze} disabled={isAnalyzing} size="icon" variant="outline" aria-label="Analisar com IA">
-                                        {isAnalyzing ? <Sparkles className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-                                    </Button>
+                        <div className="flex-1 overflow-y-auto -mx-6 px-6 py-4">
+                            <div className="grid gap-4">
+                                <div className="grid grid-cols-4 items-center gap-4">
+                                    <Label className="text-right">Recibo</Label>
+                                    <div className='col-span-3 flex gap-2'>
+                                        <Input id="receipt" type="file" className="flex-grow" />
+                                        <Button onClick={handleAnalyze} disabled={isAnalyzing} size="icon" variant="outline" aria-label="Analisar com IA">
+                                            {isAnalyzing ? <Sparkles className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                                        </Button>
+                                    </div>
                                 </div>
-                            </div>
-                            <div className="grid grid-cols-4 items-center gap-4">
-                                <Label htmlFor="description" className="text-right">Descrição</Label>
-                                <Input id="description" value={currentExpense.description} onChange={handleInputChange} className="col-span-3" />
-                            </div>
-                             <div className="grid grid-cols-4 items-center gap-4">
-                                <Label htmlFor="category" className="text-right">Categoria</Label>
-                                <div className="col-span-3 flex items-center gap-2">
-                                    <Select value={currentExpense.categoryId ?? ''} onValueChange={handleSelectChange}>
-                                        <SelectTrigger className="flex-grow">
-                                            <SelectValue placeholder="Selecione uma categoria" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            {categories.map(category => (
-                                                <SelectItem key={category.id} value={category.id}>{category.name}</SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                     <AlertDialog open={isCategoryDialogOpen} onOpenChange={setIsCategoryDialogOpen}>
-                                        <AlertDialogTrigger asChild>
-                                            <Button size="icon" variant="outline"><PlusCircle className="h-4 w-4" /></Button>
-                                        </AlertDialogTrigger>
-                                        <AlertDialogContent>
-                                            <AlertDialogHeader>
-                                                <AlertDialogTitle>Adicionar Nova Categoria</AlertDialogTitle>
-                                                <AlertDialogDescription>
-                                                    Digite o nome da nova categoria de despesa.
-                                                </AlertDialogDescription>
-                                            </AlertDialogHeader>
-                                            <div className="py-2">
-                                                <Input 
-                                                    id="newCategoryName" 
-                                                    value={newCategoryName} 
-                                                    onChange={(e) => setNewCategoryName(e.target.value)}
-                                                    placeholder="Ex: Marketing"
-                                                />
-                                            </div>
-                                            <AlertDialogFooter>
-                                                <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                                <AlertDialogAction onClick={handleSaveNewCategory}>Salvar</AlertDialogAction>
-                                            </AlertDialogFooter>
-                                        </AlertDialogContent>
-                                    </AlertDialog>
+                                <div className="grid grid-cols-4 items-center gap-4">
+                                    <Label htmlFor="description" className="text-right">Descrição</Label>
+                                    <Input id="description" value={currentExpense.description} onChange={handleInputChange} className="col-span-3" />
                                 </div>
-                            </div>
-                            <div className="grid grid-cols-4 items-center gap-4">
-                                <Label htmlFor="amount" className="text-right">Valor (R$)</Label>
-                                <Input id="amount" type="number" value={currentExpense.amount} onChange={handleInputChange} className="col-span-3" />
-                            </div>
-                            <div className="grid grid-cols-4 items-center gap-4">
-                                <Label htmlFor="dueDate" className="text-right">Vencimento</Label>
-                                <Input id="dueDate" type="date" onChange={handleInputChange} className="col-span-3" defaultValue={format(currentExpense.dueDate, 'yyyy-MM-dd')} />
+                                <div className="grid grid-cols-4 items-center gap-4">
+                                    <Label htmlFor="category" className="text-right">Categoria</Label>
+                                    <div className="col-span-3 flex items-center gap-2">
+                                        <Select value={currentExpense.categoryId ?? ''} onValueChange={handleSelectChange}>
+                                            <SelectTrigger className="flex-grow">
+                                                <SelectValue placeholder="Selecione uma categoria" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                {categories.map(category => (
+                                                    <SelectItem key={category.id} value={category.id}>{category.name}</SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                        <AlertDialog open={isCategoryDialogOpen} onOpenChange={setIsCategoryDialogOpen}>
+                                            <AlertDialogTrigger asChild>
+                                                <Button size="icon" variant="outline"><PlusCircle className="h-4 w-4" /></Button>
+                                            </AlertDialogTrigger>
+                                            <AlertDialogContent>
+                                                <AlertDialogHeader>
+                                                    <AlertDialogTitle>Adicionar Nova Categoria</AlertDialogTitle>
+                                                    <AlertDialogDescription>
+                                                        Digite o nome da nova categoria de despesa.
+                                                    </AlertDialogDescription>
+                                                </AlertDialogHeader>
+                                                <div className="py-2">
+                                                    <Input 
+                                                        id="newCategoryName" 
+                                                        value={newCategoryName} 
+                                                        onChange={(e) => setNewCategoryName(e.target.value)}
+                                                        placeholder="Ex: Marketing"
+                                                    />
+                                                </div>
+                                                <AlertDialogFooter>
+                                                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                                    <AlertDialogAction onClick={handleSaveNewCategory}>Salvar</AlertDialogAction>
+                                                </AlertDialogFooter>
+                                            </AlertDialogContent>
+                                        </AlertDialog>
+                                    </div>
+                                </div>
+                                <div className="grid grid-cols-4 items-center gap-4">
+                                    <Label htmlFor="amount" className="text-right">Valor (R$)</Label>
+                                    <Input id="amount" type="number" value={currentExpense.amount} onChange={handleInputChange} className="col-span-3" />
+                                </div>
+                                <div className="grid grid-cols-4 items-center gap-4">
+                                    <Label htmlFor="dueDate" className="text-right">Vencimento</Label>
+                                    <Input id="dueDate" type="date" onChange={handleInputChange} className="col-span-3" defaultValue={format(currentExpense.dueDate, 'yyyy-MM-dd')} />
+                                </div>
                             </div>
                         </div>
                         <SheetFooter>
+                            <Button variant="outline" onClick={() => setIsSheetOpen(false)}>Cancelar</Button>
                             <Button onClick={handleSaveExpense}>Salvar Despesa</Button>
                         </SheetFooter>
                     </SheetContent>

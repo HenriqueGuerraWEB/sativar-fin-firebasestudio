@@ -206,108 +206,110 @@ export default function ClientsPage() {
                             Novo Cliente
                         </Button>
                     </SheetTrigger>
-                    <SheetContent className="overflow-y-auto w-full max-w-2xl sm:max-w-2xl">
+                    <SheetContent className="flex flex-col w-full max-w-2xl sm:max-w-2xl">
                         <SheetHeader>
                             <SheetTitle>{'id' in currentClient ? 'Editar Cliente' : 'Adicionar novo cliente'}</SheetTitle>
                             <SheetDescription>
                                 Preencha os detalhes do cliente. Clique em salvar quando terminar.
                             </SheetDescription>
                         </SheetHeader>
-                        <div className="grid gap-6 py-6">
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                <div className="space-y-2">
-                                    <Label htmlFor="name">Nome/Razão Social</Label>
-                                    <Input id="name" value={currentClient.name} onChange={handleInputChange} />
+                        <div className="flex-1 overflow-y-auto -mx-6 px-6 py-6">
+                            <div className="grid gap-6">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    <div className="space-y-2">
+                                        <Label htmlFor="name">Nome/Razão Social</Label>
+                                        <Input id="name" value={currentClient.name} onChange={handleInputChange} />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="taxId">CPF/CNPJ</Label>
+                                        <Input id="taxId" value={currentClient.taxId ?? ''} onChange={handleInputChange} />
+                                    </div>
                                 </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="taxId">CPF/CNPJ</Label>
-                                    <Input id="taxId" value={currentClient.taxId ?? ''} onChange={handleInputChange} />
-                                </div>
-                            </div>
-                            
-                            <div className="space-y-4">
-                                <Label>Planos</Label>
-                                <div className="space-y-3">
-                                    {'plans' in currentClient && currentClient.plans?.map((clientPlan, index) => (
-                                        <div key={index} className="grid grid-cols-1 sm:grid-cols-6 gap-2 items-center p-3 border rounded-lg">
-                                            <div className="sm:col-span-3">
-                                                <Label className="text-xs text-muted-foreground">Plano</Label>
-                                                <Select onValueChange={(planId) => handlePlanChange(index, planId)} value={clientPlan.planId}>
-                                                    <SelectTrigger>
-                                                        <SelectValue placeholder="Selecione um plano" />
-                                                    </SelectTrigger>
-                                                    <SelectContent>
-                                                        {plans.map(plan => (
-                                                            <SelectItem key={plan.id} value={plan.id}>{plan.name}</SelectItem>
-                                                        ))}
-                                                    </SelectContent>
-                                                </Select>
-                                            </div>
-                                            <div className="sm:col-span-2">
-                                                <Label className="text-xs text-muted-foreground">Data de Ativação</Label>
-                                                 <Popover>
-                                                    <PopoverTrigger asChild>
-                                                    <Button
-                                                        variant={"outline"}
-                                                        className={cn(
-                                                        "w-full justify-start text-left font-normal",
-                                                        !clientPlan.planActivationDate && "text-muted-foreground"
-                                                        )}
-                                                    >
-                                                        <CalendarIcon className="mr-2 h-4 w-4" />
-                                                        {clientPlan.planActivationDate ? format(clientPlan.planActivationDate, "PPP", { locale: ptBR }) : <span>Escolha uma data</span>}
+                                
+                                <div className="space-y-4">
+                                    <Label>Planos</Label>
+                                    <div className="space-y-3">
+                                        {'plans' in currentClient && currentClient.plans?.map((clientPlan, index) => (
+                                            <div key={index} className="grid grid-cols-1 sm:grid-cols-6 gap-2 items-center p-3 border rounded-lg">
+                                                <div className="sm:col-span-3">
+                                                    <Label className="text-xs text-muted-foreground">Plano</Label>
+                                                    <Select onValueChange={(planId) => handlePlanChange(index, planId)} value={clientPlan.planId}>
+                                                        <SelectTrigger>
+                                                            <SelectValue placeholder="Selecione um plano" />
+                                                        </SelectTrigger>
+                                                        <SelectContent>
+                                                            {plans.map(plan => (
+                                                                <SelectItem key={plan.id} value={plan.id}>{plan.name}</SelectItem>
+                                                            ))}
+                                                        </SelectContent>
+                                                    </Select>
+                                                </div>
+                                                <div className="sm:col-span-2">
+                                                    <Label className="text-xs text-muted-foreground">Data de Ativação</Label>
+                                                    <Popover>
+                                                        <PopoverTrigger asChild>
+                                                        <Button
+                                                            variant={"outline"}
+                                                            className={cn(
+                                                            "w-full justify-start text-left font-normal",
+                                                            !clientPlan.planActivationDate && "text-muted-foreground"
+                                                            )}
+                                                        >
+                                                            <CalendarIcon className="mr-2 h-4 w-4" />
+                                                            {clientPlan.planActivationDate ? format(clientPlan.planActivationDate, "PPP", { locale: ptBR }) : <span>Escolha uma data</span>}
+                                                        </Button>
+                                                        </PopoverTrigger>
+                                                        <PopoverContent className="w-auto p-0">
+                                                        <Calendar
+                                                            mode="single"
+                                                            selected={clientPlan.planActivationDate}
+                                                            onSelect={(date) => handleDateChange(index, date)}
+                                                            initialFocus
+                                                        />
+                                                        </PopoverContent>
+                                                    </Popover>
+                                                </div>
+                                                <div className="sm:col-span-1 pt-5 flex justify-end">
+                                                    <Button variant="destructive" size="icon" onClick={() => removePlanFromClient(index)}>
+                                                        <Trash2 className="h-4 w-4" />
                                                     </Button>
-                                                    </PopoverTrigger>
-                                                    <PopoverContent className="w-auto p-0">
-                                                    <Calendar
-                                                        mode="single"
-                                                        selected={clientPlan.planActivationDate}
-                                                        onSelect={(date) => handleDateChange(index, date)}
-                                                        initialFocus
-                                                    />
-                                                    </PopoverContent>
-                                                </Popover>
+                                                </div>
                                             </div>
-                                            <div className="sm:col-span-1 pt-5 flex justify-end">
-                                                 <Button variant="destructive" size="icon" onClick={() => removePlanFromClient(index)}>
-                                                    <Trash2 className="h-4 w-4" />
-                                                </Button>
-                                            </div>
-                                        </div>
-                                    ))}
+                                        ))}
+                                    </div>
+                                    <Button variant="outline" size="sm" onClick={addPlanToClient}>
+                                        <PlusCircle className="mr-2 h-4 w-4" />
+                                        Adicionar Plano
+                                    </Button>
                                 </div>
-                                <Button variant="outline" size="sm" onClick={addPlanToClient}>
-                                    <PlusCircle className="mr-2 h-4 w-4" />
-                                    Adicionar Plano
-                                </Button>
-                            </div>
-                            
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                               <div className="space-y-2">
-                                    <Label htmlFor="contactName">Nome do Contato</Label>
-                                    <Input id="contactName" value={currentClient.contactName ?? ''} onChange={handleInputChange} />
-                                </div>
+                                
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 <div className="space-y-2">
-                                    <Label htmlFor="email">Email</Label>
-                                    <Input id="email" type="email" value={currentClient.email ?? ''} onChange={handleInputChange} />
+                                        <Label htmlFor="contactName">Nome do Contato</Label>
+                                        <Input id="contactName" value={currentClient.contactName ?? ''} onChange={handleInputChange} />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="email">Email</Label>
+                                        <Input id="email" type="email" value={currentClient.email ?? ''} onChange={handleInputChange} />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="phone">Telefone</Label>
+                                        <Input id="phone" value={currentClient.phone ?? ''} onChange={handleInputChange} />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="whatsapp">Whatsapp</Label>
+                                        <Input id="whatsapp" value={currentClient.whatsapp ?? ''} onChange={handleInputChange} />
+                                    </div>
                                 </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="phone">Telefone</Label>
-                                    <Input id="phone" value={currentClient.phone ?? ''} onChange={handleInputChange} />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="whatsapp">Whatsapp</Label>
-                                    <Input id="whatsapp" value={currentClient.whatsapp ?? ''} onChange={handleInputChange} />
-                                </div>
-                            </div>
 
-                            <div className="space-y-2">
-                                <Label htmlFor="notes">Observações</Label>
-                                <Textarea id="notes" value={currentClient.notes ?? ''} onChange={handleInputChange} />
+                                <div className="space-y-2">
+                                    <Label htmlFor="notes">Observações</Label>
+                                    <Textarea id="notes" value={currentClient.notes ?? ''} onChange={handleInputChange} />
+                                </div>
                             </div>
-
                         </div>
                         <SheetFooter>
+                             <Button variant="outline" onClick={() => setIsSheetOpen(false)}>Cancelar</Button>
                             <Button onClick={handleSaveClient}>Salvar</Button>
                         </SheetFooter>
                     </SheetContent>
