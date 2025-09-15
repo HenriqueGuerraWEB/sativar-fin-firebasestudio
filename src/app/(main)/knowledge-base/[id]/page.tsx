@@ -9,10 +9,10 @@ import { Input } from "@/components/ui/input";
 import { useKnowledgeBase } from "@/hooks/use-knowledge-base";
 import type { KnowledgeBaseArticle } from "@/lib/types/knowledge-base-types";
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, GripVertical, Trash2, Plus, Tag, Save, Smile, X, FileText, Check, ChevronsUpDown, ChevronRight } from 'lucide-react';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { ArrowLeft, GripVertical, Trash2, Plus, Save, Smile, X, FileText, Check, ChevronsUpDown, ChevronRight } from 'lucide-react';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import dynamic from 'next/dynamic';
-import { isEqual, debounce } from 'lodash';
+import { isEqual } from 'lodash';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
@@ -112,7 +112,7 @@ export default function ArticlePage() {
 
     // Save changes for the currently active article
     const handleSaveChanges = async () => {
-        if (!activeArticle) return;
+        if (!activeArticle || !hasChanges) return;
         
         setIsSaving(true);
         try {
@@ -136,24 +136,21 @@ export default function ArticlePage() {
         if (!activeTabId) return;
         try {
             const idToDelete = activeTabId;
+            const newTabs = openTabs.filter(tab => tab.id !== idToDelete);
+            
             await deleteArticle(idToDelete);
             toast({ title: "Sucesso", description: "Artigo excluído com sucesso." });
             
-            // Close the tab
-            const tabIndex = openTabs.findIndex(tab => tab.id === idToDelete);
-            const newTabs = openTabs.filter(tab => tab.id !== idToDelete);
-            
             setOpenTabs(newTabs);
 
-            // Clean up original state
             setOriginalArticles(prev => {
                 const newMap = new Map(prev);
                 newMap.delete(idToDelete);
                 return newMap;
             });
             
-            // Navigate away
             if (newTabs.length > 0) {
+                 const tabIndex = openTabs.findIndex(tab => tab.id === idToDelete);
                  const newActiveIndex = tabIndex >= newTabs.length ? newTabs.length - 1 : tabIndex;
                  const newActiveId = newTabs[newActiveIndex].id;
                  router.push(`/knowledge-base/${newActiveId}`, { scroll: false });
@@ -169,7 +166,6 @@ export default function ArticlePage() {
     // Switch active tab on click
     const handleTabClick = (tabId: string) => {
         if (activeTabId !== tabId) {
-            // Update URL without a full page reload
             router.push(`/knowledge-base/${tabId}`, { scroll: false });
         }
     };
@@ -182,14 +178,12 @@ export default function ArticlePage() {
         const newTabs = openTabs.filter(tab => tab.id !== tabId);
         setOpenTabs(newTabs);
         
-        // Clean up original article state
         setOriginalArticles(prev => {
             const newMap = new Map(prev);
             newMap.delete(tabId);
             return newMap;
         });
 
-        // If closing the active tab, switch to another one or go to main page
         if (activeTabId === tabId) {
             if (newTabs.length > 0) {
                 const newActiveIndex = tabIndex >= newTabs.length ? newTabs.length - 1 : tabIndex;
@@ -203,10 +197,8 @@ export default function ArticlePage() {
     
     const isLoading = articlesLoading && !activeArticle;
     
-    // Determines if the active article has unsaved changes
     const hasChanges = useMemo(() => {
         if (!activeArticle || !originalActiveArticle) return false;
-        // Deep comparison between the current and original states
         return !isEqual(activeArticle, originalActiveArticle);
     }, [activeArticle, originalActiveArticle]);
 
@@ -261,7 +253,6 @@ export default function ArticlePage() {
             
             <div className="flex flex-1 overflow-hidden">
                 <div className="flex flex-col flex-1 h-full">
-                    {/* Tabs Bar */}
                      <div className="flex border-b flex-shrink-0">
                          {openTabs.map(tab => (
                              <div
@@ -281,7 +272,6 @@ export default function ArticlePage() {
                         ))}
                     </div>
 
-                    {/* Article Content */}
                     <div className="flex-grow overflow-y-auto p-4 sm:p-8 md:p-12 w-full">
                         {isLoading ? (
                             <div className="space-y-8 max-w-4xl mx-auto">
@@ -315,8 +305,7 @@ export default function ArticlePage() {
                                         placeholder="Título do Artigo"
                                         className="text-4xl font-bold border-none shadow-none focus-visible:ring-0 p-0 h-auto"
                                     />
-                                    <div className="flex items-center gap-2 mt-4 text-muted-foreground">
-                                        <Tag className="h-4 w-4" />
+                                    <div className="flex items-center gap-2 mt-4">
                                         <Badge variant="outline">{activeArticle.category || "Sem categoria"}</Badge>
                                     </div>
                                 </div>
@@ -336,7 +325,7 @@ export default function ArticlePage() {
                                 </div>
 
                                 <Editor
-                                    key={activeArticle.id} // Re-mount editor on tab change
+                                    key={activeArticle.id}
                                     initialContent={activeArticle.content}
                                     onChange={(content) => handleArticleChange({ content })}
                                 />
@@ -350,7 +339,6 @@ export default function ArticlePage() {
                     </div>
                 </div>
 
-                {/* Right Sidebar */}
                 <aside className="w-64 border-l bg-background hidden lg:flex flex-col flex-shrink-0">
                    <div className="p-4 border-b">
                         <h3 className="font-semibold text-lg">{activeArticle?.category || 'Artigos'}</h3>
@@ -387,5 +375,3 @@ export default function ArticlePage() {
         </div>
     );
 }
-
-    
