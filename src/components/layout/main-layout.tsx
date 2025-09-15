@@ -13,6 +13,7 @@ import {
   SidebarMenuButton,
   SidebarFooter,
   useSidebar,
+  SidebarSeparator,
 } from '@/components/ui/sidebar';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { LayoutDashboard, Users, Package, Banknote, FileText, Settings, LogOut, Shapes, PanelLeft, CalendarCheck, BookText } from 'lucide-react';
@@ -121,13 +122,16 @@ function MainLayoutContent({ children }: { children: React.ReactNode }) {
 
     const menuItems = [
       { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-      { href: '/tasks', label: 'Tarefas', icon: CalendarCheck },
       { href: '/clients', label: 'Clientes', icon: Users },
       { href: '/plans', label: 'Planos', icon: Package },
       { href: '/invoices', label: 'Faturas', icon: FileText },
       { href: '/finance', label: 'Financeiro', icon: Banknote },
-      { href: '/knowledge-base', label: 'Base de Conhecimento', icon: BookText },
     ];
+    
+    const secondaryMenuItems = [
+        { href: '/tasks', label: 'Tarefas', icon: CalendarCheck },
+        { href: '/knowledge-base', label: 'Base de Conhecimento', icon: BookText },
+    ]
   
     const handleLinkClick = () => {
       if (isMobile) {
@@ -152,20 +156,35 @@ function MainLayoutContent({ children }: { children: React.ReactNode }) {
                     </Link>
                 </SidebarHeader>
                 <SidebarContent>
-                <SidebarMenu>
-                    {menuItems.map((item) => (
-                    <SidebarMenuItem key={item.href}>
-                        <Link href={item.href} passHref onClick={handleLinkClick}>
-                            <SidebarMenuButton
-                                isActive={isActive(item.href)}
-                                tooltip={item.label}
-                            >
-                                <item.icon />
-                            </SidebarMenuButton>
-                        </Link>
-                    </SidebarMenuItem>
-                    ))}
-                </SidebarMenu>
+                    <SidebarMenu>
+                        {menuItems.map((item) => (
+                        <SidebarMenuItem key={item.href}>
+                            <Link href={item.href} passHref onClick={handleLinkClick}>
+                                <SidebarMenuButton
+                                    isActive={isActive(item.href)}
+                                    tooltip={item.label}
+                                >
+                                    <item.icon />
+                                </SidebarMenuButton>
+                            </Link>
+                        </SidebarMenuItem>
+                        ))}
+                    </SidebarMenu>
+                    <SidebarSeparator />
+                     <SidebarMenu>
+                        {secondaryMenuItems.map((item) => (
+                        <SidebarMenuItem key={item.href}>
+                            <Link href={item.href} passHref onClick={handleLinkClick}>
+                                <SidebarMenuButton
+                                    isActive={isActive(item.href)}
+                                    tooltip={item.label}
+                                >
+                                    <item.icon />
+                                </SidebarMenuButton>
+                            </Link>
+                        </SidebarMenuItem>
+                        ))}
+                    </SidebarMenu>
                 </SidebarContent>
                 <SidebarFooter>
                 <SidebarMenu>
