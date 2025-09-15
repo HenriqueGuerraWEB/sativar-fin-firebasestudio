@@ -197,7 +197,7 @@ export default function KnowledgeBasePage() {
                             <Skeleton className="h-12 w-full" />
                         </div>
                      ) : articles.length > 0 ? (
-                        <Accordion type="multiple" defaultValue={groupedArticles.map(([category]) => category)} className="w-full space-y-2">
+                        <Accordion type="multiple" className="w-full space-y-2">
                            {groupedArticles.map(([category, items]) => {
                                 const categoryIcon = items.find(item => item.icon)?.icon || null;
                                 return (
@@ -324,5 +324,3 @@ export default function KnowledgeBasePage() {
         </div>
     );
 }
-
-    
