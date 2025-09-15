@@ -8,13 +8,17 @@ import { Input } from "@/components/ui/input";
 import { useKnowledgeBase } from "@/hooks/use-knowledge-base";
 import type { KnowledgeBaseArticle, ArticleMetadata } from "@/lib/types/knowledge-base-types";
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, GripVertical, Trash2, Plus, Tag, Save } from 'lucide-react';
+import { ArrowLeft, GripVertical, Trash2, Plus, Tag, Save, Smile } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import dynamic from 'next/dynamic';
 import { isEqual } from 'lodash';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 
 
 const Editor = dynamic(() => import('@/components/editor/editor'), { ssr: false });
+
+const emojis = ['💡', '📄', '📝', '✅', '🚀', '🔧', '⚙️', '📈', '📊', '🔗', '🧑‍💻', '🤔', '🗺️', '📌', '📖', '📚', '🔐', '🔑'];
+
 
 export default function ArticlePage() {
     const router = useRouter();
@@ -24,10 +28,7 @@ export default function ArticlePage() {
 
     const { getArticle, updateArticle, deleteArticle, loading } = useKnowledgeBase();
     
-    // State for the original article data to compare for changes
     const [originalArticle, setOriginalArticle] = useState<KnowledgeBaseArticle | null>(null);
-
-    // State for the current, editable article data
     const [article, setArticle] = useState<KnowledgeBaseArticle | null>(null);
     const [isSaving, setIsSaving] = useState(false);
 
@@ -48,6 +49,10 @@ export default function ArticlePage() {
 
     const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if(article) setArticle({ ...article, title: e.target.value });
+    };
+
+    const handleIconChange = (icon: string) => {
+        if (article) setArticle({ ...article, icon });
     };
     
     const handleCategoryChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -154,7 +159,36 @@ export default function ArticlePage() {
                     </div>
                 ) : (
                     <>
-                        <div className="mb-8">
+                        <div className="mb-8 group">
+                             <Popover>
+                                <PopoverTrigger asChild>
+                                    <Button
+                                        variant="ghost"
+                                        className="text-6xl h-auto w-auto p-0 mb-4 -ml-4 hover:bg-muted"
+                                    >
+                                        {article.icon ? (
+                                            <span>{article.icon}</span>
+                                        ) : (
+                                            <Smile className="h-12 w-12 text-muted-foreground opacity-25 group-hover:opacity-100" />
+                                        )}
+                                    </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-auto p-2">
+                                    <div className="grid grid-cols-6 gap-1">
+                                        {emojis.map((emoji) => (
+                                            <Button
+                                                key={emoji}
+                                                variant="ghost"
+                                                size="icon"
+                                                onClick={() => handleIconChange(emoji)}
+                                                className="text-2xl"
+                                            >
+                                                {emoji}
+                                            </Button>
+                                        ))}
+                                    </div>
+                                </PopoverContent>
+                            </Popover>
                             <Input
                                 value={article.title}
                                 onChange={handleTitleChange}
@@ -208,5 +242,3 @@ export default function ArticlePage() {
         </div>
     );
 }
-
-    

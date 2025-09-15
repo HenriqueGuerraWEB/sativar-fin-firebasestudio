@@ -148,6 +148,7 @@ CREATE TABLE IF NOT EXISTS `knowledge_base_articles` (
     `id` VARCHAR(255) PRIMARY KEY,
     `title` VARCHAR(255) NOT NULL,
     `category` VARCHAR(255),
+    `icon` VARCHAR(255),
     `content` JSON,
     `metadata` JSON,
     `authorId` VARCHAR(255),

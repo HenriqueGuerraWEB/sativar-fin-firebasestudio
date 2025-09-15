@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { PlusCircle, BookText, MoreHorizontal, Trash2, Folder } from "lucide-react";
+import { PlusCircle, BookText, MoreHorizontal, Trash2, Folder, FileText } from "lucide-react";
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { format } from 'date-fns';
@@ -82,74 +82,85 @@ export default function KnowledgeBasePage() {
                             <Skeleton className="h-12 w-full" />
                         </div>
                      ) : articles.length > 0 ? (
-                        <Accordion type="multiple" className="w-full space-y-2">
-                           {groupedArticles.map(([category, items]) => (
-                             <AccordionItem value={category} key={category} className="border rounded-lg">
-                               <AccordionTrigger className="p-4 hover:no-underline hover:bg-muted/50 rounded-t-lg">
-                                 <div className="flex items-center gap-3">
-                                   <Folder className="h-5 w-5 text-primary" />
-                                   <span className="font-semibold text-lg">{category}</span>
-                                   <span className="text-sm text-muted-foreground">({items.length} artigo{items.length > 1 ? 's' : ''})</span>
-                                 </div>
-                               </AccordionTrigger>
-                               <AccordionContent>
-                                <div className="overflow-x-auto border-t">
-                                    <Table>
-                                        <TableHeader>
-                                            <TableRow>
-                                                <TableHead>Título</TableHead>
-                                                <TableHead className="hidden sm:table-cell">Autor</TableHead>
-                                                <TableHead className="hidden sm:table-cell text-right">Última Atualização</TableHead>
-                                                <TableHead><span className="sr-only">Ações</span></TableHead>
-                                            </TableRow>
-                                        </TableHeader>
-                                        <TableBody>
-                                            {items.map(article => (
-                                                <TableRow key={article.id}>
-                                                    <TableCell className="font-medium cursor-pointer hover:underline" onClick={() => router.push(`/knowledge-base/${article.id}`)}>{article.title}</TableCell>
-                                                    <TableCell className="hidden sm:table-cell text-muted-foreground">{article.authorId}</TableCell>
-                                                    <TableCell className="hidden sm:table-cell text-right text-muted-foreground">{format(new Date(article.updatedAt), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}</TableCell>
-                                                    <TableCell>
-                                                        <div className="flex justify-end">
-                                                            <DropdownMenu>
-                                                                <DropdownMenuTrigger asChild>
-                                                                    <Button aria-haspopup="true" size="icon" variant="ghost">
-                                                                        <MoreHorizontal className="h-4 w-4" />
-                                                                        <span className="sr-only">Toggle menu</span>
-                                                                    </Button>
-                                                                </DropdownMenuTrigger>
-                                                                <DropdownMenuContent align="end">
-                                                                    <DropdownMenuLabel>Ações</DropdownMenuLabel>
-                                                                    <DropdownMenuItem onClick={() => router.push(`/knowledge-base/${article.id}`)}>Editar</DropdownMenuItem>
-                                                                    <AlertDialog>
-                                                                        <AlertDialogTrigger asChild>
-                                                                            <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive focus:text-destructive focus:bg-destructive/10">Excluir</DropdownMenuItem>
-                                                                        </AlertDialogTrigger>
-                                                                        <AlertDialogContent>
-                                                                            <AlertDialogHeader>
-                                                                                <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
-                                                                                <AlertDialogDescription>
-                                                                                    Essa ação não pode ser desfeita. Isso excluirá permanentemente o artigo.
-                                                                                </AlertDialogDescription>
-                                                                            </AlertDialogHeader>
-                                                                            <AlertDialogFooter>
-                                                                                <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                                                                <AlertDialogAction onClick={() => handleDeleteArticle(article.id)}>Excluir</AlertDialogAction>
-                                                                            </AlertDialogFooter>
-                                                                        </AlertDialogContent>
-                                                                    </AlertDialog>
-                                                                </DropdownMenuContent>
-                                                            </DropdownMenu>
-                                                        </div>
-                                                    </TableCell>
+                        <Accordion type="multiple" defaultValue={groupedArticles.map(([category]) => category)} className="w-full space-y-2">
+                           {groupedArticles.map(([category, items]) => {
+                                const categoryIcon = items.find(item => item.icon)?.icon || null;
+                                return (
+                                 <AccordionItem value={category} key={category} className="border rounded-lg">
+                                   <AccordionTrigger className="p-4 hover:no-underline hover:bg-muted/50 rounded-t-lg">
+                                     <div className="flex items-center gap-3">
+                                       {categoryIcon ? <span className="text-xl">{categoryIcon}</span> : <Folder className="h-5 w-5 text-primary" />}
+                                       <span className="font-semibold text-lg">{category}</span>
+                                       <span className="text-sm text-muted-foreground">({items.length} artigo{items.length > 1 ? 's' : ''})</span>
+                                     </div>
+                                   </AccordionTrigger>
+                                   <AccordionContent>
+                                    <div className="overflow-x-auto border-t">
+                                        <Table>
+                                            <TableHeader>
+                                                <TableRow>
+                                                    <TableHead>Título</TableHead>
+                                                    <TableHead className="hidden sm:table-cell">Autor</TableHead>
+                                                    <TableHead className="hidden sm:table-cell text-right">Última Atualização</TableHead>
+                                                    <TableHead><span className="sr-only">Ações</span></TableHead>
                                                 </TableRow>
-                                            ))}
-                                        </TableBody>
-                                    </Table>
-                                </div>
-                               </AccordionContent>
-                             </AccordionItem>
-                           ))}
+                                            </TableHeader>
+                                            <TableBody>
+                                                {items.map(article => (
+                                                    <TableRow key={article.id}>
+                                                        <TableCell 
+                                                            className="font-medium cursor-pointer hover:underline" 
+                                                            onClick={() => router.push(`/knowledge-base/${article.id}`)}
+                                                        >
+                                                            <div className="flex items-center gap-3">
+                                                                {article.icon ? <span className="text-lg">{article.icon}</span> : <FileText className="h-4 w-4 text-muted-foreground" />}
+                                                                <span>{article.title}</span>
+                                                            </div>
+                                                        </TableCell>
+                                                        <TableCell className="hidden sm:table-cell text-muted-foreground">{article.authorId}</TableCell>
+                                                        <TableCell className="hidden sm:table-cell text-right text-muted-foreground">{format(new Date(article.updatedAt), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}</TableCell>
+                                                        <TableCell>
+                                                            <div className="flex justify-end">
+                                                                <DropdownMenu>
+                                                                    <DropdownMenuTrigger asChild>
+                                                                        <Button aria-haspopup="true" size="icon" variant="ghost">
+                                                                            <MoreHorizontal className="h-4 w-4" />
+                                                                            <span className="sr-only">Toggle menu</span>
+                                                                        </Button>
+                                                                    </DropdownMenuTrigger>
+                                                                    <DropdownMenuContent align="end">
+                                                                        <DropdownMenuLabel>Ações</DropdownMenuLabel>
+                                                                        <DropdownMenuItem onClick={() => router.push(`/knowledge-base/${article.id}`)}>Editar</DropdownMenuItem>
+                                                                        <AlertDialog>
+                                                                            <AlertDialogTrigger asChild>
+                                                                                <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive focus:text-destructive focus:bg-destructive/10">Excluir</DropdownMenuItem>
+                                                                            </AlertDialogTrigger>
+                                                                            <AlertDialogContent>
+                                                                                <AlertDialogHeader>
+                                                                                    <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
+                                                                                    <AlertDialogDescription>
+                                                                                        Essa ação não pode ser desfeita. Isso excluirá permanentemente o artigo.
+                                                                                    </AlertDialogDescription>
+                                                                                </AlertDialogHeader>
+                                                                                <AlertDialogFooter>
+                                                                                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                                                                    <AlertDialogAction onClick={() => handleDeleteArticle(article.id)}>Excluir</AlertDialogAction>
+                                                                                </AlertDialogFooter>
+                                                                            </AlertDialogContent>
+                                                                        </AlertDialog>
+                                                                    </DropdownMenuContent>
+                                                                </DropdownMenu>
+                                                            </div>
+                                                        </TableCell>
+                                                    </TableRow>
+                                                ))}
+                                            </TableBody>
+                                        </Table>
+                                    </div>
+                                   </AccordionContent>
+                                 </AccordionItem>
+                               )
+                           })}
                         </Accordion>
                      ) : (
                         <div className="text-center py-16">

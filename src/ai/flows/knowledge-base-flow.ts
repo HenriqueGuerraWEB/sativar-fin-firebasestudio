@@ -33,15 +33,16 @@ export const getArticles = ai.defineFlow(
   async () => {
     console.log('[KB_FLOW] Fetching all articles from database...');
     const results = await executeQuery(
-        'SELECT id, title, category, metadata, authorId, createdAt, updatedAt FROM knowledge_base_articles ORDER BY updatedAt DESC'
+        'SELECT id, title, category, icon, metadata, authorId, createdAt, updatedAt FROM knowledge_base_articles ORDER BY updatedAt DESC'
     ) as RowDataPacket[];
 
     return results.map(article => ({
         id: article.id,
         title: article.title,
         category: article.category,
-        // Ensure metadata is always an array, even if DB returns null, an object, or a JSON string
-        metadata: Array.isArray(article.metadata) ? article.metadata : [],
+        icon: article.icon,
+        // Ensure metadata is always an array, even if DB returns null or a JSON string that is not an array
+        metadata: Array.isArray(article.metadata) ? article.metadata : (article.metadata && typeof article.metadata === 'string' ? JSON.parse(article.metadata) : []),
         authorId: article.authorId,
         createdAt: article.createdAt ? new Date(article.createdAt).toISOString() : '',
         updatedAt: article.updatedAt ? new Date(article.updatedAt).toISOString() : '',
@@ -69,6 +70,7 @@ export const getArticle = ai.defineFlow(
         id: article.id,
         title: article.title,
         category: article.category,
+        icon: article.icon,
         content: article.content, // mysql2 driver handles JSON parsing
         // Ensure metadata is always an array
         metadata: Array.isArray(article.metadata) ? article.metadata : [],
@@ -94,6 +96,7 @@ export const createArticle = ai.defineFlow(
       id: randomUUID(),
       title: articleData.title || "Artigo sem Título",
       category: articleData.category || "Rascunhos",
+      icon: articleData.icon || null,
       content: articleData.content || {},
       // Ensure metadata is created as an array
       metadata: articleData.metadata || [],
@@ -104,11 +107,12 @@ export const createArticle = ai.defineFlow(
     
     const formattedNow = format(now, 'yyyy-MM-dd HH:mm:ss');
     await executeQuery(
-      'INSERT INTO knowledge_base_articles (id, title, category, content, metadata, authorId, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      'INSERT INTO knowledge_base_articles (id, title, category, icon, content, metadata, authorId, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
       [
         newArticle.id, 
         newArticle.title,
         newArticle.category, 
+        newArticle.icon,
         JSON.stringify(newArticle.content), 
         // Always stringify an array for metadata
         JSON.stringify(newArticle.metadata),
