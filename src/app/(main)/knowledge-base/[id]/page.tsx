@@ -60,17 +60,23 @@ export default function ArticlePage() {
     // Effect to load the article from URL params and manage tabs
     useEffect(() => {
         const loadArticle = async (id: string) => {
-            // Check if article is already open
+            // If tab is already open, just switch to it.
             if (openTabs.some(tab => tab.id === id)) {
                 setActiveTabId(id);
                 return;
             }
 
-            // Fetch article data
+            // Fetch article data if it's not already open
             const data = await getArticle(id);
             if (data) {
-                setOpenTabs(prev => [...prev, data]);
                 setOriginalArticles(prev => new Map(prev).set(id, data));
+                setOpenTabs(prev => {
+                    // Final check to prevent race conditions
+                    if (prev.some(tab => tab.id === id)) {
+                        return prev;
+                    }
+                    return [...prev, data];
+                });
                 setActiveTabId(id);
             } else {
                 toast({ title: "Erro", description: "Artigo não encontrado.", variant: "destructive" });
@@ -81,7 +87,7 @@ export default function ArticlePage() {
         if (articleId) {
             loadArticle(articleId);
         }
-    }, [articleId]); // React to changes in the URL param
+    }, [articleId, getArticle, openTabs, router, toast]);
 
     // Callback to handle any change in the active article's data
     const handleArticleChange = (updates: Partial<KnowledgeBaseArticle>) => {
@@ -136,12 +142,14 @@ export default function ArticlePage() {
     const handleDeleteArticle = async () => {
         if (!activeTabId) return;
         try {
-            await deleteArticle(activeTabId);
+            const idToDelete = activeTabId;
+            await deleteArticle(idToDelete);
             toast({ title: "Sucesso", description: "Artigo excluído com sucesso." });
             
-            const idToDelete = activeTabId;
             // Close the tab
+            const tabIndex = openTabs.findIndex(tab => tab.id === idToDelete);
             const newTabs = openTabs.filter(tab => tab.id !== idToDelete);
+            
             setOpenTabs(newTabs);
 
             // Clean up original state
@@ -153,9 +161,9 @@ export default function ArticlePage() {
             
             // Navigate away
             if (newTabs.length > 0) {
-                 const currentIndex = openTabs.findIndex(tab => tab.id === idToDelete);
-                 const newActiveIndex = Math.max(0, currentIndex - 1);
-                 router.push(`/knowledge-base/${newTabs[newActiveIndex].id}`, { scroll: false });
+                 const newActiveIndex = tabIndex >= newTabs.length ? newTabs.length - 1 : tabIndex;
+                 const newActiveId = newTabs[newActiveIndex].id;
+                 router.push(`/knowledge-base/${newActiveId}`, { scroll: false });
             } else {
                 router.push('/knowledge-base');
             }
@@ -422,5 +430,3 @@ export default function ArticlePage() {
     );
 }
 
-
-    
