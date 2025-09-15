@@ -4,9 +4,9 @@
 import React, { useMemo, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Table, TableBody, TableCell, TableRow } from "@/components/ui/table";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger, DropdownMenuSeparator, DropdownMenuSub, DropdownMenuSubTrigger, DropdownMenuSubContent } from "@/components/ui/dropdown-menu";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
@@ -29,7 +29,7 @@ export default function KnowledgeBasePage() {
     const router = useRouter();
     const { toast } = useToast();
     const { user } = useAuth();
-    const { articles, createArticle, deleteArticle, loading, refreshArticles } = useKnowledgeBase();
+    const { articles, createArticle, deleteArticle, updateArticle, loading, refreshArticles } = useKnowledgeBase();
 
     const [isCreateArticleDialogOpen, setIsCreateArticleDialogOpen] = useState(false);
     const [isCategoryDialogOpen, setIsCategoryDialogOpen] = useState(false);
@@ -53,7 +53,7 @@ export default function KnowledgeBasePage() {
     }, [articles]);
 
     const uniqueCategories = useMemo(() => {
-        const categorySet = new Set(articles.map(a => a.category).filter(Boolean));
+        const categorySet = new Set(articles.map(a => a.category).filter(Boolean) as string[]);
         return Array.from(categorySet).sort();
     }, [articles]);
     
@@ -90,6 +90,16 @@ export default function KnowledgeBasePage() {
             toast({ title: "Sucesso", description: "Artigo excluído com sucesso." });
         } catch (error) {
             toast({ title: "Erro", description: "Não foi possível excluir o artigo.", variant: "destructive" });
+        }
+    };
+    
+    const handleMoveArticleCategory = async (articleId: string, newCategory: string) => {
+        try {
+            await updateArticle(articleId, { category: newCategory });
+            await refreshArticles();
+            toast({ title: "Sucesso", description: "Artigo movido para a nova categoria."});
+        } catch(error) {
+            toast({ title: "Erro", description: "Não foi possível mover o artigo.", variant: "destructive" });
         }
     };
 
@@ -194,18 +204,20 @@ export default function KnowledgeBasePage() {
                                                     <CommandInput placeholder="Buscar ou criar categoria..." />
                                                     <CommandList>
                                                         <CommandEmpty>
-                                                            <div className="p-2 text-sm">
-                                                                Nenhuma categoria encontrada.
+                                                            <div className="p-2 text-sm text-center">
+                                                                <p>Nenhuma categoria encontrada.</p>
                                                                 <Button 
                                                                     variant="link" 
-                                                                    className="p-0 h-auto ml-1"
+                                                                    className="p-0 h-auto"
                                                                     onClick={() => {
                                                                         const input = document.querySelector<HTMLInputElement>('[cmdk-input]');
-                                                                        if (input) setNewArticleCategory(input.value);
-                                                                        setCategoryPopoverOpen(false);
+                                                                        if (input && input.value) {
+                                                                            setNewArticleCategory(input.value);
+                                                                            setCategoryPopoverOpen(false);
+                                                                        }
                                                                     }}
                                                                 >
-                                                                    Criar nova.
+                                                                    Criar &quot;{document.querySelector<HTMLInputElement>('[cmdk-input]')?.value}&quot;
                                                                 </Button>
                                                             </div>
                                                         </CommandEmpty>
@@ -296,11 +308,31 @@ export default function KnowledgeBasePage() {
                                                                         </Button>
                                                                     </DropdownMenuTrigger>
                                                                     <DropdownMenuContent align="end">
-                                                                        <DropdownMenuLabel>Ações</DropdownMenuLabel>
+                                                                        <DropdownMenuLabel>Ações do Artigo</DropdownMenuLabel>
                                                                         <DropdownMenuItem onClick={() => router.push(`/knowledge-base/${article.id}`)}>Editar</DropdownMenuItem>
+                                                                        <DropdownMenuSub>
+                                                                            <DropdownMenuSubTrigger>Mover para...</DropdownMenuSubTrigger>
+                                                                            <DropdownMenuSubContent>
+                                                                                <Command>
+                                                                                    <CommandInput placeholder="Buscar ou criar..." />
+                                                                                    <CommandList>
+                                                                                        <CommandEmpty>Nenhuma categoria encontrada.</CommandEmpty>
+                                                                                        <CommandGroup>
+                                                                                            {uniqueCategories.map((cat) => (
+                                                                                                <CommandItem key={cat} onSelect={() => handleMoveArticleCategory(article.id, cat)}>
+                                                                                                    <Check className={cn("mr-2 h-4 w-4", article.category === cat ? "opacity-100" : "opacity-0")} />
+                                                                                                    {cat}
+                                                                                                </CommandItem>
+                                                                                            ))}
+                                                                                        </CommandGroup>
+                                                                                    </CommandList>
+                                                                                </Command>
+                                                                            </DropdownMenuSubContent>
+                                                                        </DropdownMenuSub>
+                                                                        <DropdownMenuSeparator />
                                                                         <AlertDialog>
                                                                             <AlertDialogTrigger asChild>
-                                                                                <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive focus:text-destructive focus:bg-destructive/10">Excluir</DropdownMenuItem>
+                                                                                <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive focus:text-destructive focus:bg-destructive/10">Excluir Artigo</DropdownMenuItem>
                                                                             </AlertDialogTrigger>
                                                                             <AlertDialogContent>
                                                                                 <AlertDialogHeader>

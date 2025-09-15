@@ -7,14 +7,14 @@ import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Input } from "@/components/ui/input";
 import { useKnowledgeBase } from "@/hooks/use-knowledge-base";
-import type { KnowledgeBaseArticle, ArticleListItem } from "@/lib/types/knowledge-base-types";
+import type { KnowledgeBaseArticle } from "@/lib/types/knowledge-base-types";
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, GripVertical, Trash2, Plus, Tag, Save, Smile, X, FileText, Check, ChevronsUpDown, ChevronRight } from 'lucide-react';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import dynamic from 'next/dynamic';
-import { isEqual } from 'lodash';
+import { isEqual, debounce } from 'lodash';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
+import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
 
@@ -39,8 +39,7 @@ export default function ArticlePage() {
     const [activeTabId, setActiveTabId] = useState<string | null>(articleId);
     
     const [isSaving, setIsSaving] = useState(false);
-    const [isCategoryPopoverOpen, setCategoryPopoverOpen] = useState(false);
-
+    
     // Derived state for the currently active article based on activeTabId
     const activeArticle = useMemo(() => openTabs.find(tab => tab.id === activeTabId), [openTabs, activeTabId]);
     const originalActiveArticle = useMemo(() => originalArticles.get(activeTabId || ''), [originalArticles, activeTabId]);
@@ -51,12 +50,6 @@ export default function ArticlePage() {
         return allArticles.filter(a => a.category === activeArticle.category && a.id !== activeArticle.id);
     }, [activeArticle, allArticles]);
     
-    const uniqueCategories = useMemo(() => {
-        const categorySet = new Set(allArticles.map(a => a.category).filter(Boolean) as string[]);
-        return Array.from(categorySet).sort();
-    }, [allArticles]);
-
-
     // Effect to load the article from URL params and manage tabs
     useEffect(() => {
         const loadArticle = async (id: string) => {
@@ -89,14 +82,13 @@ export default function ArticlePage() {
         }
     }, [articleId, getArticle, openTabs, router, toast]);
 
-    // Callback to handle any change in the active article's data
-    const handleArticleChange = (updates: Partial<KnowledgeBaseArticle>) => {
+    const handleArticleChange = useCallback((updates: Partial<KnowledgeBaseArticle>) => {
         setOpenTabs(prevTabs =>
             prevTabs.map(tab =>
                 tab.id === activeTabId ? { ...tab, ...updates } : tab
             )
         );
-    };
+    }, [activeTabId]);
     
     const handleMetadataChange = (index: number, key: 'key' | 'value', value: string) => {
         if (!activeArticle) return;
@@ -168,7 +160,7 @@ export default function ArticlePage() {
                 router.push('/knowledge-base');
             }
 
-        } catch (error) {
+        } catch (error) => {
             toast({ title: "Erro", description: "Não foi possível excluir o artigo.", variant: "destructive" });
         }
     };
@@ -178,7 +170,6 @@ export default function ArticlePage() {
         if (activeTabId !== tabId) {
             // Update URL without a full page reload
             router.push(`/knowledge-base/${tabId}`, { scroll: false });
-            setActiveTabId(tabId);
         }
     };
 
@@ -203,7 +194,6 @@ export default function ArticlePage() {
                 const newActiveIndex = tabIndex >= newTabs.length ? newTabs.length - 1 : tabIndex;
                 const newActiveId = newTabs[newActiveIndex].id;
                 router.push(`/knowledge-base/${newActiveId}`, { scroll: false });
-                setActiveTabId(newActiveId);
             } else {
                 router.push('/knowledge-base');
             }
@@ -227,8 +217,12 @@ export default function ArticlePage() {
                     <Button variant="ghost" size="icon" onClick={() => router.push('/knowledge-base')} className="h-8 w-8">
                         <ArrowLeft className="h-4 w-4" />
                     </Button>
-                    <ChevronRight className="h-4 w-4" />
-                    <span className="font-medium text-foreground">{activeArticle?.category || 'Artigo'}</span>
+                    {activeArticle?.category && (
+                        <>
+                         <ChevronRight className="h-4 w-4" />
+                         <span className="font-medium text-foreground">{activeArticle.category}</span>
+                        </>
+                    )}
                 </div>
                  <div className="flex items-center gap-2">
                      <Button onClick={handleSaveChanges} disabled={!hasChanges || isSaving} size="sm">
@@ -316,54 +310,7 @@ export default function ArticlePage() {
                                     />
                                     <div className="flex items-center gap-2 mt-4 text-muted-foreground">
                                         <Tag className="h-4 w-4" />
-                                        <Popover open={isCategoryPopoverOpen} onOpenChange={setCategoryPopoverOpen}>
-                                            <PopoverTrigger asChild>
-                                                <Button
-                                                    variant="ghost"
-                                                    role="combobox"
-                                                    aria-expanded={isCategoryPopoverOpen}
-                                                    className="w-auto justify-between p-1 h-auto text-sm hover:bg-muted"
-                                                >
-                                                    {activeArticle.category || "Sem categoria"}
-                                                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                                                </Button>
-                                            </PopoverTrigger>
-                                            <PopoverContent className="w-[200px] p-0">
-                                                <Command onValueChange={(value) => handleArticleChange({ category: value })}>
-                                                    <CommandInput placeholder="Buscar ou criar categoria..." />
-                                                    <CommandList>
-                                                        <CommandEmpty>
-                                                             <Button 
-                                                                variant="ghost" 
-                                                                className="w-full text-left justify-start"
-                                                                onClick={() => {
-                                                                    const input = document.querySelector<HTMLInputElement>('[cmdk-input]');
-                                                                    if (input) handleArticleChange({ category: input.value });
-                                                                    setCategoryPopoverOpen(false);
-                                                                }}
-                                                            >
-                                                                <Plus className="mr-2 h-4 w-4" /> Criar nova categoria
-                                                            </Button>
-                                                        </CommandEmpty>
-                                                        <CommandGroup>
-                                                            {uniqueCategories.map((category) => (
-                                                                <CommandItem
-                                                                    key={category}
-                                                                    value={category}
-                                                                    onSelect={(currentValue) => {
-                                                                        handleArticleChange({ category: currentValue === activeArticle.category ? "" : currentValue });
-                                                                        setCategoryPopoverOpen(false);
-                                                                    }}
-                                                                >
-                                                                    <Check className={cn("mr-2 h-4 w-4", activeArticle.category === category ? "opacity-100" : "opacity-0")} />
-                                                                    {category}
-                                                                </CommandItem>
-                                                            ))}
-                                                        </CommandGroup>
-                                                    </CommandList>
-                                                </Command>
-                                            </PopoverContent>
-                                        </Popover>
+                                        <Badge variant="outline">{activeArticle.category || "Sem categoria"}</Badge>
                                     </div>
                                 </div>
                                 
@@ -413,6 +360,10 @@ export default function ArticlePage() {
                                                 "w-full justify-start gap-2",
                                                 article.id === activeTabId && "bg-muted"
                                             )}
+                                            onClick={(e) => {
+                                                e.preventDefault();
+                                                handleTabClick(article.id);
+                                            }}
                                         >
                                             {article.icon ? <span>{article.icon}</span> : <FileText className="h-4 w-4" />}
                                             <span className="truncate">{article.title}</span>
