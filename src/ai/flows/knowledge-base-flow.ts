@@ -40,7 +40,8 @@ export const getArticles = ai.defineFlow(
     return results.map(article => ({
         id: article.id,
         title: article.title,
-        metadata: article.metadata || {}, // mysql2 driver handles JSON parsing
+        // Ensure metadata is always an array, even if DB returns null or {}
+        metadata: Array.isArray(article.metadata) ? article.metadata : [],
         authorId: article.authorId,
         createdAt: article.createdAt ? new Date(article.createdAt).toISOString() : '',
         updatedAt: article.updatedAt ? new Date(article.updatedAt).toISOString() : '',
@@ -68,7 +69,8 @@ export const getArticle = ai.defineFlow(
         id: article.id,
         title: article.title,
         content: article.content, // mysql2 driver handles JSON parsing
-        metadata: article.metadata,
+        // Ensure metadata is always an array
+        metadata: Array.isArray(article.metadata) ? article.metadata : [],
         authorId: article.authorId,
         createdAt: new Date(article.createdAt).toISOString(),
         updatedAt: new Date(article.updatedAt).toISOString(),
@@ -91,7 +93,8 @@ export const createArticle = ai.defineFlow(
       id: randomUUID(),
       title: articleData.title || "Artigo sem Título",
       content: articleData.content || {},
-      metadata: articleData.metadata || {},
+      // Ensure metadata is created as an array
+      metadata: articleData.metadata || [],
       authorId: articleData.authorId,
       createdAt: now.toISOString(),
       updatedAt: now.toISOString(),
@@ -119,7 +122,10 @@ export const createArticle = ai.defineFlow(
 export const updateArticle = ai.defineFlow(
   {
     name: 'updateArticle',
-    inputSchema: UpdateArticleInputSchema,
+    inputSchema: z.object({
+        articleId: z.string(),
+        updates: UpdateArticleInputSchema
+    }),
     outputSchema: KnowledgeBaseArticleSchema.nullable(),
   },
   async ({ articleId, updates }) => {

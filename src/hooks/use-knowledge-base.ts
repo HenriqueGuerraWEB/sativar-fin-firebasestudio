@@ -4,12 +4,17 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from './use-auth';
-import { StorageService } from '@/lib/storage-service';
 import type { KnowledgeBaseArticle, ArticleListItem, CreateArticleInput, UpdateArticleInput } from '@/lib/types/knowledge-base-types';
+import { 
+    getArticles as getArticlesFlow,
+    getArticle as getArticleFlow,
+    createArticle as createArticleFlow,
+    updateArticle as updateArticleFlow,
+    deleteArticle as deleteArticleFlow,
+} from '@/ai/flows/knowledge-base-flow';
 
 export type { KnowledgeBaseArticle };
 
-const COLLECTION_KEY = 'knowledge-base-articles';
 
 export function useKnowledgeBase() {
     const { toast } = useToast();
@@ -25,7 +30,7 @@ export function useKnowledgeBase() {
         }
         setLoading(true);
         try {
-            const data = await StorageService.getCollection<ArticleListItem>(COLLECTION_KEY);
+            const data = await getArticlesFlow();
             setArticles(data);
         } catch (error) {
             console.error("Failed to load articles:", error);
@@ -48,33 +53,47 @@ export function useKnowledgeBase() {
 
     const getArticle = useCallback(async (articleId: string): Promise<KnowledgeBaseArticle | null> => {
         if (!user) return null;
+        setLoading(true);
         try {
-            return await StorageService.getItem<KnowledgeBaseArticle>(COLLECTION_KEY, articleId);
+            return await getArticleFlow(articleId);
         } catch (error) {
             console.error(`Failed to get article ${articleId}:`, error);
             toast({ title: 'Erro', description: 'Não foi possível carregar o artigo.', variant: 'destructive'});
             return null;
+        } finally {
+            setLoading(false);
         }
     }, [user, toast]);
 
     const createArticle = async (articleData: CreateArticleInput): Promise<KnowledgeBaseArticle> => {
         if (!user) throw new Error("User not authenticated");
-        const newArticle = await StorageService.addItem<KnowledgeBaseArticle>(COLLECTION_KEY, articleData);
-        await loadArticles();
-        return newArticle;
+        setLoading(true);
+        try {
+            const newArticle = await createArticleFlow(articleData);
+            await loadArticles();
+            return newArticle;
+        } finally {
+            setLoading(false);
+        }
     };
 
     const updateArticle = async (articleId: string, updates: UpdateArticleInput): Promise<KnowledgeBaseArticle | null> => {
         if (!user) throw new Error("User not authenticated");
-        const updatedArticle = await StorageService.updateItem<KnowledgeBaseArticle>(COLLECTION_KEY, articleId, updates);
-        await loadArticles();
+        // No loading state change here for smoother UX on debounced updates
+        const updatedArticle = await updateArticleFlow({ articleId, updates });
+        await loadArticles(); // Refresh the list in the background
         return updatedArticle;
     };
 
     const deleteArticle = async (articleId: string) => {
         if (!user) throw new Error("User not authenticated");
-        await StorageService.deleteItem(COLLECTION_KEY, articleId);
-        await loadArticles();
+        setLoading(true);
+        try {
+            await deleteArticleFlow(articleId);
+            await loadArticles();
+        } finally {
+            setLoading(false);
+        }
     };
 
     return { articles, loading, getArticle, createArticle, updateArticle, deleteArticle, refreshArticles: loadArticles };
