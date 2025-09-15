@@ -1,10 +1,9 @@
-
 "use client";
 
 import React, { useState, useMemo } from 'react';
 import { Button } from "@/components/ui/button";
-import { PlusCircle, ChevronRight, Check } from "lucide-react";
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger, SheetFooter } from "@/components/ui/sheet";
+import { PlusCircle, ChevronRight, Check, List, Calendar as CalendarIconLucide } from "lucide-react";
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetFooter } from "@/components/ui/sheet";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from '@/components/ui/textarea';
@@ -22,6 +21,8 @@ import { Calendar } from '@/components/ui/calendar';
 import { Calendar as CalendarIcon } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Trash2 } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { CalendarView } from './calendar-view';
 
 
 const emptyTask: Omit<Task, 'id' | 'status' | 'userId' | 'subtasks'> & { dueDate: Date } = {
@@ -100,6 +101,8 @@ export default function TasksPage() {
 
     const [isSheetOpen, setIsSheetOpen] = useState(false);
     const [currentTask, setCurrentTask] = useState<Omit<Task, 'id' | 'subtasks'> | Task>(emptyTask as Omit<Task, 'id' | 'subtasks'>);
+    const [view, setView] = useState<'list' | 'calendar'>('list');
+
 
     const handleDueDateChange = (date: Date | undefined) => {
         if (date) {
@@ -194,7 +197,7 @@ export default function TasksPage() {
 
     return (
         <div className="flex flex-col gap-8">
-            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div>
                     <h1 className="text-3xl font-bold tracking-tight">Tarefas</h1>
                     <p className="text-muted-foreground">Gerencie suas tarefas e visualize-as no calendário.</p>
@@ -205,35 +208,54 @@ export default function TasksPage() {
                 </Button>
             </div>
             
-             <div className="p-4 sm:p-6 border rounded-lg">
-                {isLoading ? (
-                    <div className="space-y-4">
-                        <Skeleton className="h-8 w-1/3" />
-                        <Skeleton className="h-8 w-full" />
-                        <Skeleton className="h-8 w-full" />
-                        <Skeleton className="h-8 w-2/3" />
+             <Tabs value={view} onValueChange={(value) => setView(value as 'list' | 'calendar')}>
+                <TabsList className="grid w-full grid-cols-2 max-w-[400px]">
+                    <TabsTrigger value="list">
+                        <List className="mr-2 h-4 w-4" />
+                        Lista
+                    </TabsTrigger>
+                    <TabsTrigger value="calendar">
+                        <CalendarIconLucide className="mr-2 h-4 w-4" />
+                        Calendário
+                    </TabsTrigger>
+                </TabsList>
+                <TabsContent value="list">
+                     <div className="p-4 sm:p-6 border rounded-lg mt-4">
+                        {isLoading ? (
+                            <div className="space-y-4">
+                                <Skeleton className="h-8 w-1/3" />
+                                <Skeleton className="h-8 w-full" />
+                                <Skeleton className="h-8 w-full" />
+                                <Skeleton className="h-8 w-2/3" />
+                            </div>
+                        ) : rootTasks.length > 0 ? (
+                             rootTasks.map(task => (
+                                <TaskItem 
+                                    key={task.id} 
+                                    task={task} 
+                                    onEdit={handleEditTask} 
+                                    onAddSubtask={handleAddSubtask}
+                                    onToggleComplete={handleToggleComplete}
+                                    onDelete={handleDeleteTask}
+                                />
+                            ))
+                        ) : (
+                            <div className="text-center py-10">
+                                <p className="text-muted-foreground">Nenhuma tarefa encontrada.</p>
+                                <Button variant="ghost" className="mt-4" onClick={handleAddNew}>
+                                    <PlusCircle className="mr-2 h-4 w-4" />
+                                    Crie sua primeira tarefa
+                                </Button>
+                            </div>
+                        )}
                     </div>
-                ) : rootTasks.length > 0 ? (
-                     rootTasks.map(task => (
-                        <TaskItem 
-                            key={task.id} 
-                            task={task} 
-                            onEdit={handleEditTask} 
-                            onAddSubtask={handleAddSubtask}
-                            onToggleComplete={handleToggleComplete}
-                            onDelete={handleDeleteTask}
-                        />
-                    ))
-                ) : (
-                    <div className="text-center py-10">
-                        <p className="text-muted-foreground">Nenhuma tarefa encontrada.</p>
-                        <Button variant="ghost" className="mt-4" onClick={handleAddNew}>
-                            <PlusCircle className="mr-2 h-4 w-4" />
-                            Crie sua primeira tarefa
-                        </Button>
+                </TabsContent>
+                <TabsContent value="calendar">
+                     <div className="mt-4">
+                        <CalendarView tasks={tasks} onTaskClick={handleEditTask} onNewTask={handleAddNew} />
                     </div>
-                )}
-            </div>
+                </TabsContent>
+            </Tabs>
 
             {/* Sheet for Adding/Editing Task */}
             <Sheet open={isSheetOpen} onOpenChange={(isOpen) => {
