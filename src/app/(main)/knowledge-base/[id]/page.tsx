@@ -9,10 +9,10 @@ import { Input } from "@/components/ui/input";
 import { useKnowledgeBase } from "@/hooks/use-knowledge-base";
 import type { KnowledgeBaseArticle, ArticleMetadata } from "@/lib/types/knowledge-base-types";
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, GripVertical, Trash2, Plus, Tag, Save, Smile, X, FileText, Folder } from 'lucide-react';
+import { ArrowLeft, GripVertical, Trash2, Plus, Tag, Save, Smile, X, FileText } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import dynamic from 'next/dynamic';
-import { isEqual, debounce } from 'lodash';
+import { isEqual } from 'lodash';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
 
@@ -33,22 +33,26 @@ export default function ArticlePage() {
     const [activeTabId, setActiveTabId] = useState<string | null>(articleId);
     
     const [isSaving, setIsSaving] = useState(false);
-    const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-
+    
+    // Find the full article data in the openTabs state
     const activeArticle = useMemo(() => openTabs.find(tab => tab.id === activeTabId), [openTabs, activeTabId]);
+    
+    // Find the original pristine article data from the main hook
     const originalActiveArticle = useMemo(() => {
-        const foundArticle = allArticles.find(a => a.id === activeTabId);
-        if (!foundArticle) return null;
-        // Find the full article data in openTabs, which has the content
-        const fullArticleData = openTabs.find(a => a.id === activeTabId);
-        return fullArticleData || null; // Return the full data if found
-    }, [activeTabId, allArticles, openTabs]);
+        if (!activeTabId) return null;
+        return allArticles.find(a => a.id === activeTabId);
+    }, [activeTabId, allArticles]);
 
+    // A version of the active article that includes full content for comparison
+    const originalActiveArticleWithContent = useMemo(() => {
+        if (!originalActiveArticle || !activeArticle) return null;
+        return {
+            ...originalActiveArticle,
+            content: activeArticle.content,
+            metadata: activeArticle.metadata,
+        }
+    }, [originalActiveArticle, activeArticle]);
 
-    const articlesInCategory = useMemo(() => {
-        if (!activeArticle?.category) return [];
-        return allArticles.filter(a => a.category === activeArticle.category && a.id !== activeTabId);
-    }, [allArticles, activeArticle, activeTabId]);
 
 
     // Load initial article and handle direct navigation
@@ -60,7 +64,6 @@ export default function ArticlePage() {
                 getArticle(articleId).then(data => {
                     if (data) {
                         setOpenTabs(prev => {
-                            // Double-check to prevent race conditions
                             if (prev.some(tab => tab.id === articleId)) {
                                 return prev;
                             }
@@ -117,14 +120,23 @@ export default function ArticlePage() {
         }
     };
 
-    const handleDeleteArticle = async (idToDelete: string) => {
+    const handleDeleteArticle = async () => {
+        if (!activeArticle) return;
         try {
-            await deleteArticle(idToDelete);
+            await deleteArticle(activeArticle.id);
             toast({ title: "Sucesso", description: "Artigo excluído com sucesso." });
-            handleCloseTab(idToDelete);
-            if(openTabs.length <= 1) {
-                 router.push('/knowledge-base');
+            
+            const idToDelete = activeArticle.id;
+            const newTabs = openTabs.filter(tab => tab.id !== idToDelete);
+            setOpenTabs(newTabs);
+
+            if (newTabs.length > 0) {
+                const newActiveId = newTabs[0].id;
+                router.push(`/knowledge-base/${newActiveId}`, { scroll: false });
+            } else {
+                router.push('/knowledge-base');
             }
+
         } catch (error) {
             toast({ title: "Erro", description: "Não foi possível excluir o artigo.", variant: "destructive" });
         }
@@ -136,14 +148,18 @@ export default function ArticlePage() {
         }
     };
 
-    const handleCloseTab = (tabId: string) => {
+    const handleCloseTab = (e: React.MouseEvent, tabId: string) => {
+        e.stopPropagation(); // Prevent handleTabClick from firing
+
         const tabIndex = openTabs.findIndex(tab => tab.id === tabId);
         const newTabs = openTabs.filter(tab => tab.id !== tabId);
         setOpenTabs(newTabs);
 
         if (activeTabId === tabId) {
             if (newTabs.length > 0) {
-                const newActiveId = newTabs[tabIndex] ? newTabs[tabIndex].id : newTabs[newTabs.length - 1].id;
+                // Activate the next tab, or the previous one if the closed tab was the last one
+                const newActiveIndex = tabIndex >= newTabs.length ? newTabs.length - 1 : tabIndex;
+                const newActiveId = newTabs[newActiveIndex].id;
                 router.push(`/knowledge-base/${newActiveId}`, { scroll: false });
             } else {
                 router.push('/knowledge-base');
@@ -151,17 +167,17 @@ export default function ArticlePage() {
         }
     };
     
-    const isLoading = loading && !activeArticle;
+    const isLoadingArticle = loading && !activeArticle;
     const hasChanges = useMemo(() => {
-        if (!activeArticle || !originalActiveArticle) return false;
+        if (!activeArticle || !originalActiveArticleWithContent) return false;
         // Use lodash isEqual for deep comparison of objects
-        return !isEqual(activeArticle, originalActiveArticle);
-    }, [activeArticle, originalActiveArticle]);
+        return !isEqual(activeArticle, originalActiveArticleWithContent);
+    }, [activeArticle, originalActiveArticleWithContent]);
 
 
     return (
         <div className="flex flex-col h-full bg-background">
-             <div className="flex items-center justify-between p-2 border-b gap-4">
+             <div className="flex items-center justify-between p-2 border-b gap-4 flex-shrink-0">
                 <Button variant="ghost" size="icon" onClick={() => router.push('/knowledge-base')} className="h-8 w-8">
                     <ArrowLeft className="h-4 w-4" />
                 </Button>
@@ -186,7 +202,7 @@ export default function ArticlePage() {
                             </AlertDialogHeader>
                             <AlertDialogFooter>
                                 <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                <AlertDialogAction onClick={() => handleDeleteArticle(activeArticle!.id)}>Excluir</AlertDialogAction>
+                                <AlertDialogAction onClick={handleDeleteArticle}>Excluir</AlertDialogAction>
                             </AlertDialogFooter>
                         </AlertDialogContent>
                     </AlertDialog>
@@ -196,7 +212,7 @@ export default function ArticlePage() {
             <div className="flex flex-1 overflow-hidden">
                 <div className="flex flex-col flex-1 h-full">
                     {/* Tabs Bar */}
-                     <div className="flex border-b">
+                     <div className="flex border-b flex-shrink-0">
                          {openTabs.map(tab => (
                              <div
                                 key={tab.id}
@@ -208,7 +224,7 @@ export default function ArticlePage() {
                             >
                                 {tab.icon ? <span>{tab.icon}</span> : <FileText className="h-4 w-4"/>}
                                 <span className="whitespace-nowrap">{tab.title}</span>
-                                 <Button variant="ghost" size="icon" className="h-5 w-5 ml-2" onClick={(e) => { e.stopPropagation(); handleCloseTab(tab.id); }}>
+                                 <Button variant="ghost" size="icon" className="h-5 w-5 ml-2" onClick={(e) => handleCloseTab(e, tab.id)}>
                                     <X className="h-3 w-3"/>
                                 </Button>
                             </div>
@@ -217,7 +233,7 @@ export default function ArticlePage() {
 
                     {/* Article Content */}
                     <div className="flex-grow overflow-y-auto p-4 sm:p-8 md:p-12 w-full">
-                        {isLoading ? (
+                        {isLoadingArticle ? (
                             <div className="space-y-8 max-w-4xl mx-auto">
                                 <Skeleton className="h-12 w-3/4" />
                                 <div className="space-y-4">
@@ -281,38 +297,16 @@ export default function ArticlePage() {
                                 />
                             </div>
                         ) : (
-                             <div className="text-center py-20">
-                                <p className="text-muted-foreground">Selecione ou abra um artigo.</p>
+                             <div className="text-center py-20 text-muted-foreground">
+                                <p>Selecione um artigo para começar.</p>
+                                <Button variant="link" onClick={() => router.push('/knowledge-base')}>Voltar para a lista de artigos</Button>
                             </div>
                         )}
                     </div>
                 </div>
-
-                {/* Right Sidebar */}
-                 <aside className="w-64 border-l overflow-y-auto p-4 flex-shrink-0">
-                     {activeArticle?.category && (
-                         <>
-                            <div className="flex items-center gap-2 mb-4 text-sm font-semibold">
-                                <Folder className="h-4 w-4 text-primary" />
-                                <span>{activeArticle.category}</span>
-                            </div>
-                            <nav className="flex flex-col gap-1">
-                                {articlesInCategory.map(article => (
-                                     <Button
-                                        key={article.id}
-                                        variant="ghost"
-                                        className="justify-start gap-2 h-auto py-1 px-2 text-sm"
-                                        onClick={() => handleTabClick(article.id)}
-                                    >
-                                        {article.icon ? <span>{article.icon}</span> : <FileText className="h-4 w-4 flex-shrink-0" />}
-                                        <span className="truncate flex-1 text-left">{article.title}</span>
-                                    </Button>
-                                ))}
-                            </nav>
-                         </>
-                     )}
-                 </aside>
             </div>
         </div>
     );
 }
+
+    
