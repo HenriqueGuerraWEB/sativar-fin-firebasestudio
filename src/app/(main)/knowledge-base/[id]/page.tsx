@@ -17,6 +17,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 
 
 const Editor = dynamic(() => import('@/components/editor/editor'), { ssr: false });
@@ -160,7 +161,7 @@ export default function ArticlePage() {
                 router.push('/knowledge-base');
             }
 
-        } catch (error) => {
+        } catch (error) {
             toast({ title: "Erro", description: "Não foi possível excluir o artigo.", variant: "destructive" });
         }
     };
@@ -239,9 +240,15 @@ export default function ArticlePage() {
                         <AlertDialogContent>
                             <AlertDialogHeader>
                                 <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                    Essa ação não pode ser desfeita. Isso excluirá permanentemente o artigo &quot;{activeArticle?.title}&quot;.
-                                </AlertDialogDescription>
+                                {openTabs.length > 1 ? (
+                                    <AlertDialogDescription>
+                                        Essa ação não pode ser desfeita. Isso excluirá permanentemente o artigo &quot;{activeArticle?.title}&quot; e fechará esta aba.
+                                    </AlertDialogDescription>
+                                ) : (
+                                     <AlertDialogDescription>
+                                        Essa ação não pode ser desfeita. Isso excluirá permanentemente o artigo &quot;{activeArticle?.title}&quot; e você retornará à listagem.
+                                    </AlertDialogDescription>
+                                )}
                             </AlertDialogHeader>
                             <AlertDialogFooter>
                                 <AlertDialogCancel>Cancelar</AlertDialogCancel>
@@ -381,3 +388,4 @@ export default function ArticlePage() {
     );
 }
 
+    
