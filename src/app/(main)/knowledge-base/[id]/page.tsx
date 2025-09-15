@@ -9,13 +9,14 @@ import { Input } from "@/components/ui/input";
 import { useKnowledgeBase } from "@/hooks/use-knowledge-base";
 import type { KnowledgeBaseArticle, ArticleListItem } from "@/lib/types/knowledge-base-types";
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, GripVertical, Trash2, Plus, Tag, Save, Smile, X, FileText, Check, ChevronsUpDown } from 'lucide-react';
+import { ArrowLeft, GripVertical, Trash2, Plus, Tag, Save, Smile, X, FileText, Check, ChevronsUpDown, ChevronRight } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import dynamic from 'next/dynamic';
 import { isEqual } from 'lodash';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { cn } from '@/lib/utils';
+import Link from 'next/link';
 
 
 const Editor = dynamic(() => import('@/components/editor/editor'), { ssr: false });
@@ -28,58 +29,61 @@ export default function ArticlePage() {
     const { toast } = useToast();
     const articleId = Array.isArray(params.id) ? params.id[0] : params.id;
 
-    const { getArticle, updateArticle, deleteArticle, loading, articles: allArticles } = useKnowledgeBase();
+    const { getArticle, updateArticle, deleteArticle, loading: articlesLoading, articles: allArticles, refreshArticles } = useKnowledgeBase();
     
+    // State for all article data loaded into tabs
     const [openTabs, setOpenTabs] = useState<KnowledgeBaseArticle[]>([]);
+    // Stores the original state of articles as they are loaded
+    const [originalArticles, setOriginalArticles] = useState<Map<string, KnowledgeBaseArticle>>(new Map());
+
     const [activeTabId, setActiveTabId] = useState<string | null>(articleId);
     
     const [isSaving, setIsSaving] = useState(false);
     const [isCategoryPopoverOpen, setCategoryPopoverOpen] = useState(false);
-    
-    const activeArticle = useMemo(() => openTabs.find(tab => tab.id === activeTabId), [openTabs, activeTabId]);
-    const originalActiveArticle = useMemo(() => {
-        if (!activeTabId) return null;
-        const original = allArticles.find(a => a.id === activeTabId);
-        const current = openTabs.find(tab => tab.id === activeTabId);
-        if (!original || !current) return null;
-        
-        return {
-            ...original,
-            content: current.content,
-            metadata: current.metadata,
-        };
-    }, [activeTabId, allArticles, openTabs]);
-    
 
+    // Derived state for the currently active article based on activeTabId
+    const activeArticle = useMemo(() => openTabs.find(tab => tab.id === activeTabId), [openTabs, activeTabId]);
+    const originalActiveArticle = useMemo(() => originalArticles.get(activeTabId || ''), [originalArticles, activeTabId]);
+    
+    // Derived list of articles belonging to the same category as the active one
+    const relatedArticles = useMemo(() => {
+        if (!activeArticle) return [];
+        return allArticles.filter(a => a.category === activeArticle.category && a.id !== activeArticle.id);
+    }, [activeArticle, allArticles]);
+    
     const uniqueCategories = useMemo(() => {
         const categorySet = new Set(allArticles.map(a => a.category).filter(Boolean) as string[]);
         return Array.from(categorySet).sort();
     }, [allArticles]);
 
 
-    // Load initial article and handle direct navigation
+    // Effect to load the article from URL params and manage tabs
     useEffect(() => {
-        if (articleId) {
-            setActiveTabId(articleId);
-            const isAlreadyOpen = openTabs.some(tab => tab.id === articleId);
-            if (!isAlreadyOpen) {
-                getArticle(articleId).then(data => {
-                    if (data) {
-                        setOpenTabs(prev => {
-                            if (prev.some(tab => tab.id === articleId)) {
-                                return prev;
-                            }
-                            return [...prev, data];
-                        });
-                    } else {
-                        toast({ title: "Erro", description: "Artigo não encontrado.", variant: "destructive" });
-                        router.push('/knowledge-base');
-                    }
-                });
+        const loadArticle = async (id: string) => {
+            // Check if article is already open
+            if (openTabs.some(tab => tab.id === id)) {
+                setActiveTabId(id);
+                return;
             }
-        }
-    }, [articleId, getArticle, router, toast]);
 
+            // Fetch article data
+            const data = await getArticle(id);
+            if (data) {
+                setOpenTabs(prev => [...prev, data]);
+                setOriginalArticles(prev => new Map(prev).set(id, data));
+                setActiveTabId(id);
+            } else {
+                toast({ title: "Erro", description: "Artigo não encontrado.", variant: "destructive" });
+                router.push('/knowledge-base');
+            }
+        };
+
+        if (articleId) {
+            loadArticle(articleId);
+        }
+    }, [articleId]); // React to changes in the URL param
+
+    // Callback to handle any change in the active article's data
     const handleArticleChange = (updates: Partial<KnowledgeBaseArticle>) => {
         setOpenTabs(prevTabs =>
             prevTabs.map(tab =>
@@ -107,14 +111,20 @@ export default function ArticlePage() {
         handleArticleChange({ metadata: newMetadata });
     };
 
+    // Save changes for the currently active article
     const handleSaveChanges = async () => {
         if (!activeArticle) return;
         
         setIsSaving(true);
         try {
             const { id, createdAt, authorId, ...updates } = activeArticle;
-            await updateArticle(id, updates);
-            toast({ title: "Sucesso", description: `Artigo "${activeArticle.title}" salvo.` });
+            const updatedArticle = await updateArticle(id, updates);
+            if(updatedArticle) {
+                // Update the original state to reflect the new saved state
+                setOriginalArticles(prev => new Map(prev).set(id, updatedArticle));
+                await refreshArticles(); // Refresh the main list to update sidebar, etc.
+                toast({ title: "Sucesso", description: `Artigo "${activeArticle.title}" salvo.` });
+            }
         } catch (error) {
             toast({ title: "Erro ao Salvar", description: "Não foi possível salvar as alterações.", variant: "destructive" });
         } finally {
@@ -122,19 +132,30 @@ export default function ArticlePage() {
         }
     };
 
+    // Delete the currently active article
     const handleDeleteArticle = async () => {
-        if (!activeArticle) return;
+        if (!activeTabId) return;
         try {
-            await deleteArticle(activeArticle.id);
+            await deleteArticle(activeTabId);
             toast({ title: "Sucesso", description: "Artigo excluído com sucesso." });
             
-            const idToDelete = activeArticle.id;
+            const idToDelete = activeTabId;
+            // Close the tab
             const newTabs = openTabs.filter(tab => tab.id !== idToDelete);
             setOpenTabs(newTabs);
 
+            // Clean up original state
+            setOriginalArticles(prev => {
+                const newMap = new Map(prev);
+                newMap.delete(idToDelete);
+                return newMap;
+            });
+            
+            // Navigate away
             if (newTabs.length > 0) {
-                const newActiveId = newTabs[0].id;
-                router.push(`/knowledge-base/${newActiveId}`, { scroll: false });
+                 const currentIndex = openTabs.findIndex(tab => tab.id === idToDelete);
+                 const newActiveIndex = Math.max(0, currentIndex - 1);
+                 router.push(`/knowledge-base/${newTabs[newActiveIndex].id}`, { scroll: false });
             } else {
                 router.push('/knowledge-base');
             }
@@ -144,34 +165,49 @@ export default function ArticlePage() {
         }
     };
     
+    // Switch active tab on click
     const handleTabClick = (tabId: string) => {
         if (activeTabId !== tabId) {
+            // Update URL without a full page reload
             router.push(`/knowledge-base/${tabId}`, { scroll: false });
+            setActiveTabId(tabId);
         }
     };
 
+    // Close a tab
     const handleCloseTab = (e: React.MouseEvent, tabId: string) => {
         e.stopPropagation(); // Prevent handleTabClick from firing
 
         const tabIndex = openTabs.findIndex(tab => tab.id === tabId);
         const newTabs = openTabs.filter(tab => tab.id !== tabId);
         setOpenTabs(newTabs);
+        
+        // Clean up original article state
+        setOriginalArticles(prev => {
+            const newMap = new Map(prev);
+            newMap.delete(tabId);
+            return newMap;
+        });
 
+        // If closing the active tab, switch to another one or go to main page
         if (activeTabId === tabId) {
             if (newTabs.length > 0) {
-                // Activate the next tab, or the previous one if the closed tab was the last one
                 const newActiveIndex = tabIndex >= newTabs.length ? newTabs.length - 1 : tabIndex;
                 const newActiveId = newTabs[newActiveIndex].id;
                 router.push(`/knowledge-base/${newActiveId}`, { scroll: false });
+                setActiveTabId(newActiveId);
             } else {
                 router.push('/knowledge-base');
             }
         }
     };
     
-    const isLoadingArticle = loading && !activeArticle;
+    const isLoading = articlesLoading && !activeArticle;
+    
+    // Determines if the active article has unsaved changes
     const hasChanges = useMemo(() => {
         if (!activeArticle || !originalActiveArticle) return false;
+        // Deep comparison between the current and original states
         return !isEqual(activeArticle, originalActiveArticle);
     }, [activeArticle, originalActiveArticle]);
 
@@ -179,9 +215,13 @@ export default function ArticlePage() {
     return (
         <div className="flex flex-col h-full bg-background">
              <div className="flex items-center justify-between p-2 border-b gap-4 flex-shrink-0">
-                <Button variant="ghost" size="icon" onClick={() => router.push('/knowledge-base')} className="h-8 w-8">
-                    <ArrowLeft className="h-4 w-4" />
-                </Button>
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Button variant="ghost" size="icon" onClick={() => router.push('/knowledge-base')} className="h-8 w-8">
+                        <ArrowLeft className="h-4 w-4" />
+                    </Button>
+                    <ChevronRight className="h-4 w-4" />
+                    <span className="font-medium text-foreground">{activeArticle?.category || 'Artigo'}</span>
+                </div>
                  <div className="flex items-center gap-2">
                      <Button onClick={handleSaveChanges} disabled={!hasChanges || isSaving} size="sm">
                          <Save className="mr-2 h-4 w-4" />
@@ -234,7 +274,7 @@ export default function ArticlePage() {
 
                     {/* Article Content */}
                     <div className="flex-grow overflow-y-auto p-4 sm:p-8 md:p-12 w-full">
-                        {isLoadingArticle ? (
+                        {isLoading ? (
                             <div className="space-y-8 max-w-4xl mx-auto">
                                 <Skeleton className="h-12 w-3/4" />
                                 <div className="space-y-4">
@@ -347,7 +387,40 @@ export default function ArticlePage() {
                         )}
                     </div>
                 </div>
+
+                {/* Right Sidebar */}
+                <aside className="w-64 border-l bg-background hidden lg:flex flex-col flex-shrink-0">
+                   <div className="p-4 border-b">
+                        <h3 className="font-semibold text-lg">{activeArticle?.category || 'Artigos'}</h3>
+                        <p className="text-sm text-muted-foreground">Artigos nesta categoria</p>
+                   </div>
+                   <div className="flex-1 overflow-y-auto">
+                        {relatedArticles.length > 0 ? (
+                            <div className="p-2 space-y-1">
+                                {relatedArticles.map(article => (
+                                    <Link href={`/knowledge-base/${article.id}`} key={article.id} scroll={false}>
+                                        <Button 
+                                            variant="ghost"
+                                            className={cn(
+                                                "w-full justify-start gap-2",
+                                                article.id === activeTabId && "bg-muted"
+                                            )}
+                                        >
+                                            {article.icon ? <span>{article.icon}</span> : <FileText className="h-4 w-4" />}
+                                            <span className="truncate">{article.title}</span>
+                                        </Button>
+                                    </Link>
+                                ))}
+                            </div>
+                        ) : (
+                            <p className="p-4 text-sm text-muted-foreground text-center">Nenhum outro artigo nesta categoria.</p>
+                        )}
+                   </div>
+                </aside>
             </div>
         </div>
     );
 }
+
+
+    

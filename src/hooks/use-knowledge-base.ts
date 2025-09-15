@@ -13,7 +13,7 @@ import {
     deleteArticle as deleteArticleFlow,
 } from '@/ai/flows/knowledge-base-flow';
 
-export type { KnowledgeBaseArticle };
+export type { KnowledgeBaseArticle, ArticleListItem };
 
 
 export function useKnowledgeBase() {
@@ -79,14 +79,14 @@ export function useKnowledgeBase() {
 
     const updateArticle = async (articleId: string, updates: UpdateArticleInput): Promise<KnowledgeBaseArticle | null> => {
         if (!user) throw new Error("User not authenticated");
-        // No loading state change here for smoother UX on debounced updates
         try {
             const updatedArticle = await updateArticleFlow({ articleId, updates });
-            await loadArticles(); // Refresh the list in the background
+            // Don't need to reload full list here, as the component state will handle it.
+            // await loadArticles(); // This can be uncommented if background refresh is desired.
             return updatedArticle;
         } catch (error) {
             console.error('Failed to update article', error);
-            // Don't toast on every debounced update failure to avoid spam
+            toast({ title: "Erro ao Salvar", description: "Não foi possível salvar as alterações.", variant: "destructive" });
             throw error;
         }
     };
@@ -96,7 +96,7 @@ export function useKnowledgeBase() {
         setLoading(true);
         try {
             await deleteArticleFlow(articleId);
-            await loadArticles();
+            await loadArticles(); // Refresh the list after deletion
         } finally {
             setLoading(false);
         }
@@ -104,3 +104,5 @@ export function useKnowledgeBase() {
 
     return { articles, loading, getArticle, createArticle, updateArticle, deleteArticle, refreshArticles: loadArticles };
 }
+
+    
