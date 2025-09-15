@@ -9,8 +9,10 @@ import { Input } from "@/components/ui/input";
 import { useKnowledgeBase } from "@/hooks/use-knowledge-base";
 import type { KnowledgeBaseArticle } from "@/lib/types/knowledge-base-types";
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, GripVertical, Trash2, Plus, Save, Smile, X, FileText, Check, ChevronsUpDown, ChevronRight } from 'lucide-react';
+import { ArrowLeft, GripVertical, Trash2, Plus, Save, Smile, X, FileText, Check, ChevronsUpDown, ChevronRight, PlusCircle, Shapes } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
 import dynamic from 'next/dynamic';
 import { isEqual } from 'lodash';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -18,7 +20,7 @@ import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
-
+import { useAuth } from '@/hooks/use-auth';
 
 const Editor = dynamic(() => import('@/components/editor/editor'), { ssr: false });
 
@@ -28,9 +30,10 @@ export default function ArticlePage() {
     const router = useRouter();
     const params = useParams();
     const { toast } = useToast();
+    const { user } = useAuth();
     const articleId = Array.isArray(params.id) ? params.id[0] : params.id;
 
-    const { getArticle, updateArticle, deleteArticle, loading: articlesLoading, articles: allArticles, refreshArticles } = useKnowledgeBase();
+    const { getArticle, updateArticle, deleteArticle, articles: allArticles, refreshArticles, createArticle } = useKnowledgeBase();
     
     // State for all article data loaded into tabs
     const [openTabs, setOpenTabs] = useState<KnowledgeBaseArticle[]>([]);
@@ -41,6 +44,13 @@ export default function ArticlePage() {
     
     const [isSaving, setIsSaving] = useState(false);
     
+    // State for the new article modal
+    const [isCreateArticleDialogOpen, setIsCreateArticleDialogOpen] = useState(false);
+    const [newArticleTitle, setNewArticleTitle] = useState("");
+    const [newArticleCategory, setNewArticleCategory] = useState("");
+    const [isCategoryPopoverOpen, setCategoryPopoverOpen] = useState(false);
+
+
     // Derived state for the currently active article based on activeTabId
     const activeArticle = useMemo(() => openTabs.find(tab => tab.id === activeTabId), [openTabs, activeTabId]);
     const originalActiveArticle = useMemo(() => originalArticles.get(activeTabId || ''), [originalArticles, activeTabId]);
@@ -50,6 +60,11 @@ export default function ArticlePage() {
         if (!activeArticle) return [];
         return allArticles.filter(a => a.category === activeArticle.category && a.id !== activeArticle.id);
     }, [activeArticle, allArticles]);
+
+    const uniqueCategories = useMemo(() => {
+        const categorySet = new Set(allArticles.map(a => a.category).filter(Boolean) as string[]);
+        return Array.from(categorySet).sort();
+    }, [allArticles]);
     
     // Effect to load the article from URL params and manage tabs
     useEffect(() => {
@@ -195,10 +210,38 @@ export default function ArticlePage() {
         }
     };
     
-    const isLoading = articlesLoading && !activeArticle;
+    const handleCreateArticle = async () => {
+        if (!user || !user.email) {
+            toast({ title: "Erro de Autenticação", description: "Você precisa estar logado para criar um artigo.", variant: "destructive" });
+            return;
+        }
+        if (!newArticleTitle.trim()) {
+            toast({ title: "Erro", description: "O título do artigo é obrigatório.", variant: "destructive" });
+            return;
+        }
+        try {
+            const newArticle = await createArticle({ 
+                authorId: user.email, 
+                title: newArticleTitle,
+                category: newArticleCategory || "Rascunhos"
+            });
+            toast({ title: "Sucesso!", description: `Artigo "${newArticleTitle}" criado.` });
+            router.push(`/knowledge-base/${newArticle.id}`);
+        } catch (error) {
+            console.error("Error creating article:", error);
+            toast({ title: "Erro", description: "Não foi possível criar o artigo.", variant: "destructive" });
+        } finally {
+            setIsCreateArticleDialogOpen(false);
+            setNewArticleTitle("");
+            setNewArticleCategory("");
+        }
+    };
+    
+    const isLoading = !activeArticle;
     
     const hasChanges = useMemo(() => {
         if (!activeArticle || !originalActiveArticle) return false;
+        // Use lodash's isEqual for a deep comparison
         return !isEqual(activeArticle, originalActiveArticle);
     }, [activeArticle, originalActiveArticle]);
 
@@ -340,9 +383,103 @@ export default function ArticlePage() {
                 </div>
 
                 <aside className="w-64 border-l bg-background hidden lg:flex flex-col flex-shrink-0">
-                   <div className="p-4 border-b">
-                        <h3 className="font-semibold text-lg">{activeArticle?.category || 'Artigos'}</h3>
-                        <p className="text-sm text-muted-foreground">Artigos nesta categoria</p>
+                   <div className="p-4 border-b flex items-center justify-between">
+                        <div>
+                            <h3 className="font-semibold text-lg">{activeArticle?.category || 'Artigos'}</h3>
+                            <p className="text-sm text-muted-foreground">Artigos nesta categoria</p>
+                        </div>
+                        <Dialog open={isCreateArticleDialogOpen} onOpenChange={setIsCreateArticleDialogOpen}>
+                            <DialogTrigger asChild>
+                                 <Button variant="ghost" size="icon" className="h-8 w-8">
+                                    <PlusCircle className="h-5 w-5" />
+                                 </Button>
+                            </DialogTrigger>
+                             <DialogContent>
+                                 <DialogHeader>
+                                    <DialogTitle>Criar Novo Artigo</DialogTitle>
+                                    <DialogDescription>
+                                        Forneça um título e uma categoria para o seu novo artigo.
+                                    </DialogDescription>
+                                </DialogHeader>
+                                <div className="grid gap-4 py-4">
+                                    <div className="grid grid-cols-4 items-center gap-4">
+                                        <Label htmlFor="title" className="text-right">
+                                            Título
+                                        </Label>
+                                        <Input
+                                            id="title"
+                                            value={newArticleTitle}
+                                            onChange={(e) => setNewArticleTitle(e.target.value)}
+                                            className="col-span-3"
+                                            placeholder="Título do Artigo"
+                                        />
+                                    </div>
+                                    <div className="grid grid-cols-4 items-center gap-4">
+                                        <Label htmlFor="category" className="text-right">
+                                            Categoria
+                                        </Label>
+                                        <div className="col-span-3">
+                                        <Popover open={isCategoryPopoverOpen} onOpenChange={setCategoryPopoverOpen}>
+                                                <PopoverTrigger asChild>
+                                                    <Button
+                                                        variant="outline"
+                                                        role="combobox"
+                                                        aria-expanded={isCategoryPopoverOpen}
+                                                        className="w-full justify-between"
+                                                    >
+                                                        {newArticleCategory || "Selecione uma categoria"}
+                                                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                                    </Button>
+                                                </PopoverTrigger>
+                                                <PopoverContent className="w-[300px] p-0">
+                                                    <Command onValueChange={setNewArticleCategory}>
+                                                        <CommandInput placeholder="Buscar ou criar categoria..." />
+                                                        <CommandList>
+                                                            <CommandEmpty>
+                                                                <div className="p-2 text-sm text-center">
+                                                                    <p>Nenhuma categoria encontrada.</p>
+                                                                    <Button 
+                                                                        variant="link" 
+                                                                        className="p-0 h-auto"
+                                                                        onClick={() => {
+                                                                            const input = document.querySelector<HTMLInputElement>('[cmdk-input]');
+                                                                            if (input && input.value) {
+                                                                                setNewArticleCategory(input.value);
+                                                                                setCategoryPopoverOpen(false);
+                                                                            }
+                                                                        }}
+                                                                    >
+                                                                        Criar &quot;{document.querySelector<HTMLInputElement>('[cmdk-input]')?.value}&quot;
+                                                                    </Button>
+                                                                </div>
+                                                            </CommandEmpty>
+                                                            <CommandGroup>
+                                                                {uniqueCategories.map((category) => (
+                                                                    <CommandItem
+                                                                        key={category}
+                                                                        value={category}
+                                                                        onSelect={(currentValue) => {
+                                                                            setNewArticleCategory(currentValue === newArticleCategory ? "" : currentValue);
+                                                                            setCategoryPopoverOpen(false);
+                                                                        }}
+                                                                    >
+                                                                        <Check className={cn("mr-2 h-4 w-4", newArticleCategory === category ? "opacity-100" : "opacity-0")} />
+                                                                        {category}
+                                                                    </CommandItem>
+                                                                ))}
+                                                            </CommandGroup>
+                                                        </CommandList>
+                                                    </Command>
+                                                </PopoverContent>
+                                            </Popover>
+                                        </div>
+                                    </div>
+                                </div>
+                                <DialogFooter>
+                                    <Button type="submit" onClick={handleCreateArticle}>Criar Artigo</Button>
+                                </DialogFooter>
+                            </DialogContent>
+                        </Dialog>
                    </div>
                    <div className="flex-1 overflow-y-auto">
                         {relatedArticles.length > 0 ? (
