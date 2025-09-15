@@ -40,8 +40,8 @@ export const getArticles = ai.defineFlow(
     return results.map(article => ({
         id: article.id,
         title: article.title,
-        // Ensure metadata is always an array, even if DB returns null or {}
-        metadata: Array.isArray(article.metadata) ? article.metadata : (article.metadata ? JSON.parse(article.metadata) : []),
+        // Ensure metadata is always an array, even if DB returns null, an object, or a JSON string
+        metadata: Array.isArray(article.metadata) ? article.metadata : [],
         authorId: article.authorId,
         createdAt: article.createdAt ? new Date(article.createdAt).toISOString() : '',
         updatedAt: article.updatedAt ? new Date(article.updatedAt).toISOString() : '',
@@ -70,7 +70,7 @@ export const getArticle = ai.defineFlow(
         title: article.title,
         content: article.content, // mysql2 driver handles JSON parsing
         // Ensure metadata is always an array
-        metadata: Array.isArray(article.metadata) ? article.metadata : (article.metadata ? JSON.parse(article.metadata) : []),
+        metadata: Array.isArray(article.metadata) ? article.metadata : [],
         authorId: article.authorId,
         createdAt: new Date(article.createdAt).toISOString(),
         updatedAt: new Date(article.updatedAt).toISOString(),
@@ -107,6 +107,7 @@ export const createArticle = ai.defineFlow(
         newArticle.id, 
         newArticle.title, 
         JSON.stringify(newArticle.content), 
+        // Always stringify an array for metadata
         JSON.stringify(newArticle.metadata),
         newArticle.authorId,
         formattedNow,
@@ -134,20 +135,19 @@ export const updateArticle = ai.defineFlow(
     // Add updatedAt timestamp to the updates
     const updatesWithTimestamp: Record<string, any> = {
         ...updates,
-        updatedAt: new Date().toISOString(),
+        updatedAt: new Date(), // Use Date object, format later
     };
 
     const dbUpdates: { [key: string]: any } = {};
     for (const key in updatesWithTimestamp) {
       if (Object.prototype.hasOwnProperty.call(updatesWithTimestamp, key)) {
-          // No snake_case conversion, use field names as they are in the schema/DB
           const dbKey = key;
           if (key === 'content' || key === 'metadata') {
-             dbUpdates[dbKey] = JSON.stringify(updatesWithTimestamp[key]);
+             dbUpdates[dbKey] = JSON.stringify(updatesWithTimestamp[key] || []); // Default to empty array for JSON fields
           } else if (key === 'createdAt' || key === 'updatedAt') {
+             // Format date fields for MySQL
              dbUpdates[dbKey] = format(new Date(updatesWithTimestamp[key]), 'yyyy-MM-dd HH:mm:ss');
-          }
-          else {
+          } else {
               dbUpdates[dbKey] = updatesWithTimestamp[key];
           }
       }
