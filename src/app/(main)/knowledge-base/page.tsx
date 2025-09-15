@@ -1,20 +1,20 @@
-
 "use client";
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { PlusCircle, BookText, MoreHorizontal, Trash2 } from "lucide-react";
+import { PlusCircle, BookText, MoreHorizontal, Trash2, Folder } from "lucide-react";
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { useKnowledgeBase } from '@/hooks/use-knowledge-base';
+import { useKnowledgeBase, KnowledgeBaseArticle } from '@/hooks/use-knowledge-base';
 import { useAuth } from '@/hooks/use-auth';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 
 export default function KnowledgeBasePage() {
     const router = useRouter();
@@ -28,8 +28,8 @@ export default function KnowledgeBasePage() {
             return;
         }
         try {
-            const newArticle = await createArticle({ authorId: user.email });
-            toast({ title: "Sucesso!", description: "Novo artigo criado." });
+            const newArticle = await createArticle({ authorId: user.email, category: 'Rascunhos' });
+            toast({ title: "Sucesso!", description: "Novo artigo criado em 'Rascunhos'." });
             router.push(`/knowledge-base/${newArticle.id}`);
         } catch (error) {
             console.error("Error creating article:", error);
@@ -46,6 +46,18 @@ export default function KnowledgeBasePage() {
         }
     };
 
+    const groupedArticles = useMemo(() => {
+        const groups: { [key: string]: KnowledgeBaseArticle[] } = {};
+        articles.forEach(article => {
+            const category = article.category || 'Não categorizados';
+            if (!groups[category]) {
+                groups[category] = [];
+            }
+            groups[category].push(article);
+        });
+        return Object.entries(groups).sort(([a], [b]) => a.localeCompare(b));
+    }, [articles]);
+
     return (
         <div className="flex flex-col gap-8">
             <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
@@ -60,87 +72,85 @@ export default function KnowledgeBasePage() {
             </div>
             <Card>
                 <CardHeader>
-                    <CardTitle>Artigos Recentes</CardTitle>
+                    <CardTitle>Artigos e Categorias</CardTitle>
                 </CardHeader>
                 <CardContent>
                      {loading && articles.length === 0 ? (
-                        <div className="overflow-x-auto">
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead>Título</TableHead>
-                                        <TableHead className="hidden sm:table-cell">Autor</TableHead>
-                                        <TableHead className="hidden sm:table-cell text-right">Última Atualização</TableHead>
-                                        <TableHead><span className="sr-only">Ações</span></TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {Array.from({ length: 5 }).map((_, index) => (
-                                        <TableRow key={index}>
-                                            <TableCell><Skeleton className="h-5 w-48" /></TableCell>
-                                            <TableCell className="hidden sm:table-cell"><Skeleton className="h-5 w-32" /></TableCell>
-                                            <TableCell className="hidden sm:table-cell text-right"><Skeleton className="h-5 w-24 ml-auto" /></TableCell>
-                                            <TableCell><Skeleton className="h-8 w-8 ml-auto" /></TableCell>
-                                        </TableRow>
-                                    ))}
-                                </TableBody>
-                            </Table>
+                        <div className="space-y-4">
+                            <Skeleton className="h-12 w-full" />
+                            <Skeleton className="h-12 w-full" />
+                            <Skeleton className="h-12 w-full" />
                         </div>
                      ) : articles.length > 0 ? (
-                        <div className="overflow-x-auto">
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead>Título</TableHead>
-                                        <TableHead className="hidden sm:table-cell">Autor</TableHead>
-                                        <TableHead className="hidden sm:table-cell text-right">Última Atualização</TableHead>
-                                        <TableHead><span className="sr-only">Ações</span></TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {articles.map(article => (
-                                        <TableRow key={article.id}>
-                                            <TableCell className="font-medium cursor-pointer" onClick={() => router.push(`/knowledge-base/${article.id}`)}>{article.title}</TableCell>
-                                            <TableCell className="hidden sm:table-cell text-muted-foreground">{article.authorId}</TableCell>
-                                            <TableCell className="hidden sm:table-cell text-right text-muted-foreground">{format(new Date(article.updatedAt), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}</TableCell>
-                                            <TableCell>
-                                                <div className="flex justify-end">
-                                                    <DropdownMenu>
-                                                        <DropdownMenuTrigger asChild>
-                                                            <Button aria-haspopup="true" size="icon" variant="ghost">
-                                                                <MoreHorizontal className="h-4 w-4" />
-                                                                <span className="sr-only">Toggle menu</span>
-                                                            </Button>
-                                                        </DropdownMenuTrigger>
-                                                        <DropdownMenuContent align="end">
-                                                            <DropdownMenuLabel>Ações</DropdownMenuLabel>
-                                                            <DropdownMenuItem onClick={() => router.push(`/knowledge-base/${article.id}`)}>Editar</DropdownMenuItem>
-                                                            <AlertDialog>
-                                                                <AlertDialogTrigger asChild>
-                                                                    <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive focus:text-destructive focus:bg-destructive/10">Excluir</DropdownMenuItem>
-                                                                </AlertDialogTrigger>
-                                                                <AlertDialogContent>
-                                                                    <AlertDialogHeader>
-                                                                        <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
-                                                                        <AlertDialogDescription>
-                                                                            Essa ação não pode ser desfeita. Isso excluirá permanentemente o artigo.
-                                                                        </AlertDialogDescription>
-                                                                    </AlertDialogHeader>
-                                                                    <AlertDialogFooter>
-                                                                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                                                        <AlertDialogAction onClick={() => handleDeleteArticle(article.id)}>Excluir</AlertDialogAction>
-                                                                    </AlertDialogFooter>
-                                                                </AlertDialogContent>
-                                                            </AlertDialog>
-                                                        </DropdownMenuContent>
-                                                    </DropdownMenu>
-                                                </div>
-                                            </TableCell>
-                                        </TableRow>
-                                    ))}
-                                </TableBody>
-                            </Table>
-                        </div>
+                        <Accordion type="multiple" className="w-full space-y-2">
+                           {groupedArticles.map(([category, items]) => (
+                             <AccordionItem value={category} key={category} className="border rounded-lg">
+                               <AccordionTrigger className="p-4 hover:no-underline hover:bg-muted/50 rounded-t-lg">
+                                 <div className="flex items-center gap-3">
+                                   <Folder className="h-5 w-5 text-primary" />
+                                   <span className="font-semibold text-lg">{category}</span>
+                                   <span className="text-sm text-muted-foreground">({items.length} artigo{items.length > 1 ? 's' : ''})</span>
+                                 </div>
+                               </AccordionTrigger>
+                               <AccordionContent>
+                                <div className="overflow-x-auto border-t">
+                                    <Table>
+                                        <TableHeader>
+                                            <TableRow>
+                                                <TableHead>Título</TableHead>
+                                                <TableHead className="hidden sm:table-cell">Autor</TableHead>
+                                                <TableHead className="hidden sm:table-cell text-right">Última Atualização</TableHead>
+                                                <TableHead><span className="sr-only">Ações</span></TableHead>
+                                            </TableRow>
+                                        </TableHeader>
+                                        <TableBody>
+                                            {items.map(article => (
+                                                <TableRow key={article.id}>
+                                                    <TableCell className="font-medium cursor-pointer hover:underline" onClick={() => router.push(`/knowledge-base/${article.id}`)}>{article.title}</TableCell>
+                                                    <TableCell className="hidden sm:table-cell text-muted-foreground">{article.authorId}</TableCell>
+                                                    <TableCell className="hidden sm:table-cell text-right text-muted-foreground">{format(new Date(article.updatedAt), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}</TableCell>
+                                                    <TableCell>
+                                                        <div className="flex justify-end">
+                                                            <DropdownMenu>
+                                                                <DropdownMenuTrigger asChild>
+                                                                    <Button aria-haspopup="true" size="icon" variant="ghost">
+                                                                        <MoreHorizontal className="h-4 w-4" />
+                                                                        <span className="sr-only">Toggle menu</span>
+                                                                    </Button>
+                                                                </DropdownMenuTrigger>
+                                                                <DropdownMenuContent align="end">
+                                                                    <DropdownMenuLabel>Ações</DropdownMenuLabel>
+                                                                    <DropdownMenuItem onClick={() => router.push(`/knowledge-base/${article.id}`)}>Editar</DropdownMenuItem>
+                                                                    <AlertDialog>
+                                                                        <AlertDialogTrigger asChild>
+                                                                            <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive focus:text-destructive focus:bg-destructive/10">Excluir</DropdownMenuItem>
+                                                                        </AlertDialogTrigger>
+                                                                        <AlertDialogContent>
+                                                                            <AlertDialogHeader>
+                                                                                <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
+                                                                                <AlertDialogDescription>
+                                                                                    Essa ação não pode ser desfeita. Isso excluirá permanentemente o artigo.
+                                                                                </AlertDialogDescription>
+                                                                            </AlertDialogHeader>
+                                                                            <AlertDialogFooter>
+                                                                                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                                                                <AlertDialogAction onClick={() => handleDeleteArticle(article.id)}>Excluir</AlertDialogAction>
+                                                                            </AlertDialogFooter>
+                                                                        </AlertDialogContent>
+                                                                    </AlertDialog>
+                                                                </DropdownMenuContent>
+                                                            </DropdownMenu>
+                                                        </div>
+                                                    </TableCell>
+                                                </TableRow>
+                                            ))}
+                                        </TableBody>
+                                    </Table>
+                                </div>
+                               </AccordionContent>
+                             </AccordionItem>
+                           ))}
+                        </Accordion>
                      ) : (
                         <div className="text-center py-16">
                             <BookText className="mx-auto h-12 w-12 text-muted-foreground" />

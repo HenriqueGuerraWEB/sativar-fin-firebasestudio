@@ -1,4 +1,3 @@
-
 import { z } from 'zod';
 
 export const ArticleMetadataSchema = z.object({
@@ -10,6 +9,7 @@ export type ArticleMetadata = z.infer<typeof ArticleMetadataSchema>;
 export const KnowledgeBaseArticleSchema = z.object({
   id: z.string(),
   title: z.string(),
+  category: z.string().nullable().optional(),
   content: z.any().optional(), // Stores TipTap JSON content
   metadata: z.array(ArticleMetadataSchema).optional(),
   authorId: z.string(),
@@ -23,6 +23,7 @@ export type KnowledgeBaseArticle = z.infer<typeof KnowledgeBaseArticleSchema>;
 export const ArticleListItemSchema = KnowledgeBaseArticleSchema.pick({
     id: true,
     title: true,
+    category: true,
     authorId: true,
     createdAt: true,
     updatedAt: true,
@@ -33,6 +34,7 @@ export type ArticleListItem = z.infer<typeof ArticleListItemSchema>;
 
 export const CreateArticleInputSchema = z.object({
     title: z.string().optional(),
+    category: z.string().optional(),
     content: z.any().optional(),
     metadata: z.array(ArticleMetadataSchema).optional(),
     authorId: z.string(),

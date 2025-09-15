@@ -80,9 +80,15 @@ export function useKnowledgeBase() {
     const updateArticle = async (articleId: string, updates: UpdateArticleInput): Promise<KnowledgeBaseArticle | null> => {
         if (!user) throw new Error("User not authenticated");
         // No loading state change here for smoother UX on debounced updates
-        const updatedArticle = await updateArticleFlow({ articleId, updates });
-        await loadArticles(); // Refresh the list in the background
-        return updatedArticle;
+        try {
+            const updatedArticle = await updateArticleFlow({ articleId, updates });
+            await loadArticles(); // Refresh the list in the background
+            return updatedArticle;
+        } catch (error) {
+            console.error('Failed to update article', error);
+            // Don't toast on every debounced update failure to avoid spam
+            throw error;
+        }
     };
 
     const deleteArticle = async (articleId: string) => {

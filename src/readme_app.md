@@ -1,4 +1,3 @@
-
 # Guia de Instalação e Configuração Local
 
 Este guia descreve os passos necessários para configurar e executar a aplicação Sativar Manager em seu ambiente de desenvolvimento local.
@@ -148,6 +147,7 @@ CREATE TABLE IF NOT EXISTS `tasks` (
 CREATE TABLE IF NOT EXISTS `knowledge_base_articles` (
     `id` VARCHAR(255) PRIMARY KEY,
     `title` VARCHAR(255) NOT NULL,
+    `category` VARCHAR(255),
     `content` JSON,
     `metadata` JSON,
     `authorId` VARCHAR(255),
@@ -184,4 +184,3 @@ npm run genkit:dev
     *   Se o teste for bem-sucedido, o botão **"Iniciar Migração de Dados"** será habilitado.
     *   Clique nele para enviar todos os dados que estavam no `localStorage` para o seu banco de dados MySQL.
     *   A partir deste ponto, a aplicação usará o MySQL como sua fonte de dados principal.
-

@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
@@ -9,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { useKnowledgeBase } from "@/hooks/use-knowledge-base";
 import type { KnowledgeBaseArticle, ArticleMetadata } from "@/lib/types/knowledge-base-types";
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, GripVertical, Trash2 } from 'lucide-react';
+import { ArrowLeft, GripVertical, Trash2, Plus, Tag } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import dynamic from 'next/dynamic';
 
@@ -24,15 +23,37 @@ export default function ArticlePage() {
     const { getArticle, updateArticle, deleteArticle, loading } = useKnowledgeBase();
     const [article, setArticle] = useState<KnowledgeBaseArticle | null>(null);
     const [title, setTitle] = useState('');
+    const [category, setCategory] = useState('');
     const [content, setContent] = useState<any>(null);
     const [metadata, setMetadata] = useState<ArticleMetadata[]>([]);
     
+    // Debounce state
+    const [debounceTimeout, setDebounceTimeout] = useState<NodeJS.Timeout | null>(null);
+
+    const handleDebouncedUpdate = useCallback((updates: Partial<KnowledgeBaseArticle>) => {
+        if (debounceTimeout) {
+            clearTimeout(debounceTimeout);
+        }
+        
+        const newTimeout = setTimeout(() => {
+            if (articleId && article) {
+                updateArticle(articleId, updates)
+                    .catch(() => toast({ title: "Erro de Salvamento", description: "Não foi possível salvar as alterações.", variant: "destructive" }));
+            }
+        }, 1500); // 1.5 second debounce
+
+        setDebounceTimeout(newTimeout);
+
+    }, [articleId, article, updateArticle, toast, debounceTimeout]);
+
+
     useEffect(() => {
         if (articleId) {
             getArticle(articleId).then(data => {
                 if (data) {
                     setArticle(data);
                     setTitle(data.title);
+                    setCategory(data.category || '');
                     setContent(data.content || {});
                     setMetadata(Array.isArray(data.metadata) ? data.metadata : []);
                 } else {
@@ -41,19 +62,23 @@ export default function ArticlePage() {
                 }
             });
         }
+         // Clear timeout on unmount
+        return () => {
+            if (debounceTimeout) {
+                clearTimeout(debounceTimeout);
+            }
+        };
     }, [articleId, getArticle, router, toast]);
-
-    const handleDebouncedUpdate = useCallback((updates: Partial<KnowledgeBaseArticle>) => {
-        if (articleId && article) {
-            updateArticle(articleId, updates)
-                .catch(() => toast({ title: "Erro de Salvamento", description: "Não foi possível salvar as alterações.", variant: "destructive" }));
-        }
-    }, [articleId, article, updateArticle, toast]);
 
     const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         setTitle(e.target.value);
         handleDebouncedUpdate({ title: e.target.value });
     };
+    
+    const handleCategoryChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        setCategory(e.target.value);
+        handleDebouncedUpdate({ category: e.target.value });
+    }
 
     const handleContentChange = (newContent: any) => {
         setContent(newContent);
@@ -139,6 +164,15 @@ export default function ArticlePage() {
                                 placeholder="Título do Artigo"
                                 className="text-4xl font-bold border-none shadow-none focus-visible:ring-0 p-0 h-auto"
                             />
+                             <div className="flex items-center gap-2 mt-4 text-muted-foreground">
+                                <Tag className="h-4 w-4" />
+                                <Input 
+                                    value={category}
+                                    onChange={handleCategoryChange}
+                                    placeholder="Sem categoria"
+                                    className="border-none shadow-none focus-visible:ring-0 p-1 h-auto text-sm w-auto"
+                                />
+                            </div>
                         </div>
                         
                         <div className="space-y-2 mb-8">
@@ -163,7 +197,7 @@ export default function ArticlePage() {
                                 </div>
                             ))}
                              <Button variant="ghost" size="sm" onClick={addMetadataProperty}>
-                                + Adicionar propriedade
+                                <Plus className="mr-2 h-4 w-4" /> Adicionar propriedade
                             </Button>
                         </div>
 
