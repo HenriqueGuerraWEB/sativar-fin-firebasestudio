@@ -5,8 +5,7 @@ import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight';
 import { lowlight } from 'lowlight/lib/common';
-import { useEffect } from 'react';
-import { useDebouncedCallback } from 'use-debounce';
+import { useEffect, useRef } from 'react';
 
 interface EditorProps {
     initialContent: any;
@@ -17,7 +16,7 @@ const Editor = ({ initialContent, onChange }: EditorProps) => {
     const editor = useEditor({
         extensions: [
             StarterKit,
-            CodeBlockLowlight({
+            CodeBlockLowlight.configure({
                 lowlight,
             }),
         ],
@@ -29,9 +28,7 @@ const Editor = ({ initialContent, onChange }: EditorProps) => {
         },
     });
 
-    const debouncedOnChange = useDebouncedCallback((newContent) => {
-        onChange(newContent);
-    }, 1000);
+    const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
     useEffect(() => {
         if (!editor) {
@@ -39,15 +36,23 @@ const Editor = ({ initialContent, onChange }: EditorProps) => {
         }
 
         const handleUpdate = () => {
-            debouncedOnChange(editor.getJSON());
+            if (timeoutRef.current) {
+                clearTimeout(timeoutRef.current);
+            }
+            timeoutRef.current = setTimeout(() => {
+                onChange(editor.getJSON());
+            }, 1000); // 1 second debounce
         };
 
         editor.on('update', handleUpdate);
 
         return () => {
             editor.off('update', handleUpdate);
+            if (timeoutRef.current) {
+                clearTimeout(timeoutRef.current);
+            }
         };
-    }, [editor, debouncedOnChange]);
+    }, [editor, onChange]);
 
 
     useEffect(() => {
