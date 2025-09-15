@@ -4,7 +4,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from './use-auth';
-import { StorageService } from '@/lib/storage-service';
 import type { Task, AddTaskInput } from '@/lib/types/task-types';
 import { 
     getTasks as getTasksFlow,
@@ -17,7 +16,6 @@ import {
 
 export type { Task, AddTaskInput };
 
-const COLLECTION_KEY = 'tasks';
 
 export function useTasks() {
     const { toast } = useToast();
@@ -33,8 +31,7 @@ export function useTasks() {
         }
         setIsLoading(true);
         try {
-            // Using StorageService to abstract away the source
-            const data = await StorageService.getCollection<Task>(COLLECTION_KEY);
+            const data = await getTasksFlow();
             setTasks(data);
         } catch (error) {
             console.error("Failed to load tasks:", error);
@@ -57,27 +54,26 @@ export function useTasks() {
 
     const addTask = async (taskData: AddTaskInput): Promise<Task> => {
         if (!user) throw new Error("User not authenticated");
-        const newTask = await StorageService.addItem(COLLECTION_KEY, taskData);
+        const newTask = await addTaskFlow(taskData);
         await loadTasks();
         return newTask;
     };
 
     const updateTask = async (taskId: string, updates: Partial<Omit<Task, 'id'>>): Promise<Task | null> => {
         if (!user) throw new Error("User not authenticated");
-        const updatedTask = await StorageService.updateItem(COLLECTION_KEY, taskId, updates);
+        const updatedTask = await updateTaskFlow({ taskId, updates });
         await loadTasks();
         return updatedTask;
     };
 
     const deleteTask = async (taskId: string) => {
         if (!user) throw new Error("User not authenticated");
-        await StorageService.deleteItem(COLLECTION_KEY, taskId);
+        await deleteTaskFlow(taskId);
         await loadTasks();
     };
 
     const getNotificationTasks = useCallback(async (): Promise<Task[]> => {
         if (!user) return [];
-        // This should always call the flow directly, as it's a specific check
         return await getNotificationTasksFlow();
     }, [user]);
 
