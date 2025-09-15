@@ -41,7 +41,7 @@ export const getArticles = ai.defineFlow(
         id: article.id,
         title: article.title,
         // Ensure metadata is always an array, even if DB returns null or {}
-        metadata: Array.isArray(article.metadata) ? article.metadata : [],
+        metadata: Array.isArray(article.metadata) ? article.metadata : (article.metadata ? JSON.parse(article.metadata) : []),
         authorId: article.authorId,
         createdAt: article.createdAt ? new Date(article.createdAt).toISOString() : '',
         updatedAt: article.updatedAt ? new Date(article.updatedAt).toISOString() : '',
@@ -70,7 +70,7 @@ export const getArticle = ai.defineFlow(
         title: article.title,
         content: article.content, // mysql2 driver handles JSON parsing
         // Ensure metadata is always an array
-        metadata: Array.isArray(article.metadata) ? article.metadata : [],
+        metadata: Array.isArray(article.metadata) ? article.metadata : (article.metadata ? JSON.parse(article.metadata) : []),
         authorId: article.authorId,
         createdAt: new Date(article.createdAt).toISOString(),
         updatedAt: new Date(article.updatedAt).toISOString(),
@@ -132,7 +132,7 @@ export const updateArticle = ai.defineFlow(
     console.log(`[KB_FLOW] Updating article ${articleId} in database...`);
     
     // Add updatedAt timestamp to the updates
-    const updatesWithTimestamp = {
+    const updatesWithTimestamp: Record<string, any> = {
         ...updates,
         updatedAt: new Date().toISOString(),
     };
@@ -140,14 +140,15 @@ export const updateArticle = ai.defineFlow(
     const dbUpdates: { [key: string]: any } = {};
     for (const key in updatesWithTimestamp) {
       if (Object.prototype.hasOwnProperty.call(updatesWithTimestamp, key)) {
-          const dbKey = key.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
+          // No snake_case conversion, use field names as they are in the schema/DB
+          const dbKey = key;
           if (key === 'content' || key === 'metadata') {
-             (dbUpdates as any)[dbKey] = JSON.stringify((updatesWithTimestamp as any)[key]);
+             dbUpdates[dbKey] = JSON.stringify(updatesWithTimestamp[key]);
           } else if (key === 'createdAt' || key === 'updatedAt') {
-             (dbUpdates as any)[dbKey] = format(new Date((updatesWithTimestamp as any)[key]), 'yyyy-MM-dd HH:mm:ss');
+             dbUpdates[dbKey] = format(new Date(updatesWithTimestamp[key]), 'yyyy-MM-dd HH:mm:ss');
           }
           else {
-              (dbUpdates as any)[dbKey] = (updatesWithTimestamp as any)[key];
+              dbUpdates[dbKey] = updatesWithTimestamp[key];
           }
       }
     }

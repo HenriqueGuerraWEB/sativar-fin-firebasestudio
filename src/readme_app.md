@@ -184,3 +184,4 @@ npm run genkit:dev
     *   Se o teste for bem-sucedido, o botão **"Iniciar Migração de Dados"** será habilitado.
     *   Clique nele para enviar todos os dados que estavam no `localStorage` para o seu banco de dados MySQL.
     *   A partir deste ponto, a aplicação usará o MySQL como sua fonte de dados principal.
+
