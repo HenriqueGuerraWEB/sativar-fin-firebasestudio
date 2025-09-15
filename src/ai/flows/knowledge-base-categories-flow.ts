@@ -10,6 +10,7 @@
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
 import { executeQuery } from '@/lib/db';
+import { RowDataPacket } from 'mysql2';
 
 // Input schema for updating a category name
 const UpdateCategorySchema = z.object({

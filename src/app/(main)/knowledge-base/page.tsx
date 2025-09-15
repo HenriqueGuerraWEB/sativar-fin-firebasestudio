@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -20,26 +20,16 @@ import { useKnowledgeBase, KnowledgeBaseArticle } from '@/hooks/use-knowledge-ba
 import { useAuth } from '@/hooks/use-auth';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { updateCategory, deleteCategory } from '@/ai/flows/knowledge-base-categories-flow';
-import { addExpenseCategory } from '@/ai/flows/expense-categories-flow';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
-import { useExpenseCategories } from '@/hooks/use-expense-categories';
 
 
 export default function KnowledgeBasePage() {
     const router = useRouter();
     const { toast } = useToast();
     const { user } = useAuth();
-    const { articles, createArticle, deleteArticle, loading: articlesLoading, refreshArticles } = useKnowledgeBase();
-    const { 
-        categories: articleCategories, 
-        addExpenseCategory: addArticleCategory, 
-        updateExpenseCategory: updateArticleCategory,
-        deleteExpenseCategory: deleteArticleCategory,
-        refreshCategories: refreshArticleCategories,
-        isLoading: categoriesLoading 
-    } = useExpenseCategories();
+    const { articles, createArticle, deleteArticle, loading, refreshArticles } = useKnowledgeBase();
 
     const [isCreateArticleDialogOpen, setIsCreateArticleDialogOpen] = useState(false);
     const [isCategoryDialogOpen, setIsCategoryDialogOpen] = useState(false);
@@ -48,10 +38,25 @@ export default function KnowledgeBasePage() {
     const [newArticleCategory, setNewArticleCategory] = useState("");
     const [isCategoryPopoverOpen, setCategoryPopoverOpen] = useState(false);
 
-    const [categoryForm, setCategoryForm] = useState<{id: string | null, name: string}>({ id: null, name: ''});
+    const [categoryForm, setCategoryForm] = useState<{ originalName: string | null, newName: string }>({ originalName: null, newName: '' });
 
-    const loading = articlesLoading || categoriesLoading;
+    const groupedArticles = useMemo(() => {
+        const groups: { [key: string]: KnowledgeBaseArticle[] } = {};
+        articles.forEach(article => {
+            const category = article.category || 'Não categorizados';
+            if (!groups[category]) {
+                groups[category] = [];
+            }
+            groups[category].push(article);
+        });
+        return Object.entries(groups).sort(([a], [b]) => a.localeCompare(b));
+    }, [articles]);
 
+    const uniqueCategories = useMemo(() => {
+        const categorySet = new Set(articles.map(a => a.category).filter(Boolean));
+        return Array.from(categorySet).sort();
+    }, [articles]);
+    
     const handleCreateArticle = async () => {
         if (!user || !user.email) {
             toast({ title: "Erro de Autenticação", description: "Você precisa estar logado para criar um artigo.", variant: "destructive" });
@@ -65,7 +70,7 @@ export default function KnowledgeBasePage() {
             const newArticle = await createArticle({ 
                 authorId: user.email, 
                 title: newArticleTitle,
-                category: newArticleCategory || "Rascunhos" // Default to "Rascunhos" if empty
+                category: newArticleCategory || "Rascunhos"
             });
             toast({ title: "Sucesso!", description: `Artigo "${newArticleTitle}" criado.` });
             router.push(`/knowledge-base/${newArticle.id}`);
@@ -88,63 +93,48 @@ export default function KnowledgeBasePage() {
         }
     };
 
-    const groupedArticles = useMemo(() => {
-        const groups: { [key: string]: KnowledgeBaseArticle[] } = {};
-        articles.forEach(article => {
-            const category = article.category || 'Não categorizados';
-            if (!groups[category]) {
-                groups[category] = [];
-            }
-            groups[category].push(article);
-        });
-        return Object.entries(groups).sort(([a], [b]) => a.localeCompare(b));
-    }, [articles]);
-
-    const uniqueCategories = useMemo(() => {
-        return articleCategories.map(c => c.name).sort();
-    }, [articleCategories]);
-
-    const handleSelectCategoryForEdit = (category: {id: string, name: string}) => {
-        setCategoryForm(category);
-    }
+    const handleSelectCategoryForEdit = (categoryName: string) => {
+        setCategoryForm({ originalName: categoryName, newName: categoryName });
+    };
     
     const resetCategoryForm = () => {
-        setCategoryForm({ id: null, name: '' });
-    }
+        setCategoryForm({ originalName: null, newName: '' });
+    };
 
     const handleSaveCategory = async () => {
-        if (!categoryForm.name.trim()) {
+        const { originalName, newName } = categoryForm;
+
+        if (!newName.trim()) {
             toast({ title: "Erro", description: "O nome da categoria não pode ser vazio.", variant: "destructive" });
             return;
         }
-
-        try {
-            if (categoryForm.id) {
-                await updateArticleCategory(categoryForm.id, { name: categoryForm.name });
-                toast({ title: "Sucesso", description: `Categoria atualizada.` });
-            } else {
-                 await addArticleCategory({ name: categoryForm.name });
-                 toast({ title: "Sucesso", description: `Categoria "${categoryForm.name}" criada.` });
+        
+        // This is a rename operation
+        if (originalName && originalName !== newName) {
+            try {
+                await updateCategory({ oldName: originalName, newName });
+                toast({ title: "Sucesso", description: `Categoria "${originalName}" renomeada para "${newName}".` });
+                await refreshArticles(); // Refresh data to show changes
+            } catch (error) {
+                console.error("Error renaming category:", error);
+                toast({ title: "Erro", description: "Não foi possível renomear a categoria.", variant: "destructive" });
             }
-            await refreshArticleCategories();
-            resetCategoryForm();
-        } catch (error) {
-             console.error("Error saving category:", error);
-             toast({ title: "Erro", description: "Não foi possível salvar a categoria.", variant: "destructive" });
         }
+        
+        resetCategoryForm();
     };
     
-    const handleDeleteCategory = async (categoryId: string) => {
+    const handleDeleteCategory = async (categoryName: string) => {
          try {
-            await deleteArticleCategory(categoryId);
-            toast({ title: "Sucesso", description: "Categoria excluída com sucesso."});
-            await refreshArticleCategories();
+            await deleteCategory(categoryName);
+            toast({ title: "Sucesso", description: `Categoria "${categoryName}" e todos os seus artigos foram excluídos.`});
+            await refreshArticles();
             resetCategoryForm();
         } catch (error) {
             console.error("Error deleting category:", error);
             toast({ title: "Erro", description: "Não foi possível excluir a categoria.", variant: "destructive" });
         }
-    }
+    };
 
 
     return (
@@ -201,9 +191,24 @@ export default function KnowledgeBasePage() {
                                             </PopoverTrigger>
                                             <PopoverContent className="w-[300px] p-0">
                                                 <Command onValueChange={setNewArticleCategory}>
-                                                    <CommandInput placeholder="Buscar categoria..." />
+                                                    <CommandInput placeholder="Buscar ou criar categoria..." />
                                                     <CommandList>
-                                                        <CommandEmpty>Nenhuma categoria encontrada.</CommandEmpty>
+                                                        <CommandEmpty>
+                                                            <div className="p-2 text-sm">
+                                                                Nenhuma categoria encontrada.
+                                                                <Button 
+                                                                    variant="link" 
+                                                                    className="p-0 h-auto ml-1"
+                                                                    onClick={() => {
+                                                                        const input = document.querySelector<HTMLInputElement>('[cmdk-input]');
+                                                                        if (input) setNewArticleCategory(input.value);
+                                                                        setCategoryPopoverOpen(false);
+                                                                    }}
+                                                                >
+                                                                    Criar nova.
+                                                                </Button>
+                                                            </div>
+                                                        </CommandEmpty>
                                                         <CommandGroup>
                                                              <CommandItem onSelect={() => {
                                                                 setIsCategoryDialogOpen(true);
@@ -212,17 +217,17 @@ export default function KnowledgeBasePage() {
                                                                 <Shapes className="mr-2 h-4 w-4" />
                                                                 Gerenciar Categorias
                                                             </CommandItem>
-                                                            {articleCategories.map((category) => (
+                                                            {uniqueCategories.map((category) => (
                                                                 <CommandItem
-                                                                    key={category.id}
-                                                                    value={category.name}
+                                                                    key={category}
+                                                                    value={category}
                                                                     onSelect={(currentValue) => {
                                                                         setNewArticleCategory(currentValue === newArticleCategory ? "" : currentValue);
                                                                         setCategoryPopoverOpen(false);
                                                                     }}
                                                                 >
-                                                                    <Check className={cn("mr-2 h-4 w-4", newArticleCategory === category.name ? "opacity-100" : "opacity-0")} />
-                                                                    {category.name}
+                                                                    <Check className={cn("mr-2 h-4 w-4", newArticleCategory === category ? "opacity-100" : "opacity-0")} />
+                                                                    {category}
                                                                 </CommandItem>
                                                             ))}
                                                         </CommandGroup>
@@ -375,7 +380,7 @@ export default function KnowledgeBasePage() {
                                                     </PopoverTrigger>
                                                     <PopoverContent className="w-[300px] p-0">
                                                         <Command onValueChange={setNewArticleCategory}>
-                                                            <CommandInput placeholder="Buscar categoria..." />
+                                                            <CommandInput placeholder="Buscar ou criar categoria..." />
                                                             <CommandList>
                                                                 <CommandEmpty>Nenhuma categoria encontrada.</CommandEmpty>
                                                                 <CommandGroup>
@@ -386,17 +391,17 @@ export default function KnowledgeBasePage() {
                                                                         <Shapes className="mr-2 h-4 w-4" />
                                                                         Gerenciar Categorias
                                                                     </CommandItem>
-                                                                    {articleCategories.map((category) => (
+                                                                    {uniqueCategories.map((category) => (
                                                                         <CommandItem
-                                                                            key={category.id}
-                                                                            value={category.name}
+                                                                            key={category}
+                                                                            value={category}
                                                                             onSelect={(currentValue) => {
                                                                                 setNewArticleCategory(currentValue === newArticleCategory ? "" : currentValue);
                                                                                 setCategoryPopoverOpen(false);
                                                                             }}
                                                                         >
-                                                                            <Check className={cn("mr-2 h-4 w-4", newArticleCategory === category.name ? "opacity-100" : "opacity-0")} />
-                                                                            {category.name}
+                                                                            <Check className={cn("mr-2 h-4 w-4", newArticleCategory === category ? "opacity-100" : "opacity-0")} />
+                                                                            {category}
                                                                         </CommandItem>
                                                                     ))}
                                                                 </CommandGroup>
@@ -420,44 +425,48 @@ export default function KnowledgeBasePage() {
             <Dialog open={isCategoryDialogOpen} onOpenChange={setIsCategoryDialogOpen}>
                 <DialogContent className="sm:max-w-3xl">
                     <DialogHeader>
-                        <DialogTitle>Gerenciar Categorias</DialogTitle>
+                        <DialogTitle>Gerenciar Categorias da Base de Conhecimento</DialogTitle>
                         <DialogDescription>
-                            Adicione, edite ou exclua as categorias da sua base de conhecimento.
+                            Renomeie ou exclua categorias. A exclusão de uma categoria apaga todos os artigos associados a ela.
                         </DialogDescription>
                     </DialogHeader>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-8 py-4">
-                        {/* Coluna da Esquerda: Lista de Categorias */}
                         <div className="flex flex-col gap-4">
                              <h3 className="font-semibold">Categorias Existentes</h3>
                              <div className="border rounded-md max-h-80 overflow-y-auto">
-                                {articleCategories.length > 0 ? (
-                                    articleCategories.map(cat => (
-                                        <div key={cat.id} className="flex items-center justify-between p-2 border-b last:border-b-0 hover:bg-muted/50">
+                                {uniqueCategories.length > 0 ? (
+                                    uniqueCategories.map(cat => (
+                                        <div key={cat} className="flex items-center justify-between p-2 border-b last:border-b-0 hover:bg-muted/50">
                                             <span 
                                                 className="cursor-pointer flex-1"
                                                 onClick={() => handleSelectCategoryForEdit(cat)}
                                             >
-                                                {cat.name}
+                                                {cat}
                                             </span>
-                                            <AlertDialog>
-                                                <AlertDialogTrigger asChild>
-                                                    <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive">
-                                                        <Trash2 className="h-4 w-4" />
-                                                    </Button>
-                                                </AlertDialogTrigger>
-                                                <AlertDialogContent>
-                                                    <AlertDialogHeader>
-                                                        <AlertDialogTitle>Excluir a categoria &quot;{cat.name}&quot;?</AlertDialogTitle>
-                                                        <AlertDialogDescription>
-                                                           Atenção! Esta ação não pode ser desfeita. As despesas associadas a esta categoria não serão excluídas, mas ficarão sem categoria.
-                                                        </AlertDialogDescription>
-                                                    </AlertDialogHeader>
-                                                    <AlertDialogFooter>
-                                                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                                        <AlertDialogAction onClick={() => handleDeleteCategory(cat.id)}>Sim, Excluir</AlertDialogAction>
-                                                    </AlertDialogFooter>
-                                                </AlertDialogContent>
-                                            </AlertDialog>
+                                             <div className="flex items-center">
+                                                <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-primary" onClick={() => handleSelectCategoryForEdit(cat)}>
+                                                    <Pencil className="h-4 w-4" />
+                                                </Button>
+                                                <AlertDialog>
+                                                    <AlertDialogTrigger asChild>
+                                                        <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive">
+                                                            <Trash2 className="h-4 w-4" />
+                                                        </Button>
+                                                    </AlertDialogTrigger>
+                                                    <AlertDialogContent>
+                                                        <AlertDialogHeader>
+                                                            <AlertDialogTitle>Excluir a categoria &quot;{cat}&quot;?</AlertDialogTitle>
+                                                            <AlertDialogDescription>
+                                                            Atenção! Esta ação não pode ser desfeita. Todos os artigos associados a esta categoria serão **permanentemente excluídos**.
+                                                            </AlertDialogDescription>
+                                                        </AlertDialogHeader>
+                                                        <AlertDialogFooter>
+                                                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                                            <AlertDialogAction onClick={() => handleDeleteCategory(cat)}>Sim, Excluir</AlertDialogAction>
+                                                        </AlertDialogFooter>
+                                                    </AlertDialogContent>
+                                                </AlertDialog>
+                                             </div>
                                         </div>
                                     ))
                                 ) : (
@@ -465,25 +474,25 @@ export default function KnowledgeBasePage() {
                                 )}
                              </div>
                         </div>
-                        {/* Coluna da Direita: Formulário */}
                         <div className="flex flex-col gap-4">
-                             <h3 className="font-semibold">{categoryForm.id ? 'Editar Categoria' : 'Adicionar Nova Categoria'}</h3>
+                             <h3 className="font-semibold">{categoryForm.originalName ? 'Renomear Categoria' : 'Criar Nova Categoria'}</h3>
                              <div className="space-y-4 p-4 border rounded-lg bg-muted/50">
                                 <div className="space-y-2">
                                      <Label htmlFor="category-name">Nome da Categoria</Label>
                                      <Input 
                                         id="category-name"
-                                        placeholder="Ex: Tutoriais"
-                                        value={categoryForm.name}
-                                        onChange={(e) => setCategoryForm({...categoryForm, name: e.target.value})}
+                                        placeholder="Ex: Tutoriais de API"
+                                        value={categoryForm.newName}
+                                        onChange={(e) => setCategoryForm({...categoryForm, newName: e.target.value})}
                                      />
+                                      {!categoryForm.originalName && <p className="text-xs text-muted-foreground">Para criar uma nova categoria, basta usá-la em um artigo novo ou existente.</p>}
                                 </div>
                                 <div className="flex justify-end gap-2">
-                                    {categoryForm.id && (
+                                    {categoryForm.originalName && (
                                         <Button variant="outline" onClick={resetCategoryForm}>Cancelar Edição</Button>
                                     )}
-                                    <Button onClick={handleSaveCategory}>
-                                        {categoryForm.id ? 'Salvar Alterações' : 'Adicionar Categoria'}
+                                    <Button onClick={handleSaveCategory} disabled={!categoryForm.originalName}>
+                                        {'Renomear Categoria'}
                                     </Button>
                                 </div>
                              </div>
@@ -494,9 +503,6 @@ export default function KnowledgeBasePage() {
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
-
         </div>
     );
 }
-
-    
