@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
@@ -413,7 +414,7 @@ export default function InvoicesPage() {
                                     </div>
                                     <div class="text-left sm:text-right">
                                         <h3 class="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-2">Detalhes da Fatura</h3>
-                                        <p class="text-gray-600"><span class="font-medium">Data de Emissão:</span> ${format(new Date(invoice.issueDate), 'dd/MM/yyyy')}</p>
+                                        <p class="text-gray-600"><span class="font-medium">Data de Emissão:</span> ${invoice.paymentDate ? format(new Date(invoice.paymentDate), 'dd/MM/yyyy') : format(new Date(invoice.issueDate), 'dd/MM/yyyy')}</p>
                                         <p class="text-gray-600"><span class="font-medium">Data de Vencimento:</span> ${format(new Date(invoice.dueDate), 'dd/MM/yyyy')}</p>
                                         <div class="mt-2">
                                             <span class="px-3 py-1 text-sm font-semibold rounded-full status-${invoice.status}">${invoice.status}</span>
@@ -731,5 +732,3 @@ export default function InvoicesPage() {
         </div>
     );
 }
-
-    
