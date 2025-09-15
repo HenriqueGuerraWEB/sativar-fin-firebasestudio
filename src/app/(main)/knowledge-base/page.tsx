@@ -1,13 +1,17 @@
+
 "use client";
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger, DropdownMenuSeparator, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger } from "@/components/ui/dropdown-menu";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { PlusCircle, BookText, MoreHorizontal, Trash2, Folder, FileText } from "lucide-react";
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger, SheetFooter } from "@/components/ui/sheet";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { PlusCircle, BookText, MoreHorizontal, Trash2, Folder, FileText, Shapes, Pencil } from "lucide-react";
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { format } from 'date-fns';
@@ -15,12 +19,19 @@ import { ptBR } from 'date-fns/locale';
 import { useKnowledgeBase, KnowledgeBaseArticle } from '@/hooks/use-knowledge-base';
 import { useAuth } from '@/hooks/use-auth';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { updateCategory, deleteCategory } from '@/ai/flows/knowledge-base-categories-flow';
+
 
 export default function KnowledgeBasePage() {
     const router = useRouter();
     const { toast } = useToast();
     const { user } = useAuth();
-    const { articles, createArticle, deleteArticle, loading } = useKnowledgeBase();
+    const { articles, createArticle, deleteArticle, loading, refreshArticles } = useKnowledgeBase();
+    
+    const [isSheetOpen, setIsSheetOpen] = useState(false);
+    const [sheetMode, setSheetMode] = useState<'add' | 'edit'>('add');
+    const [currentCategory, setCurrentCategory] = useState('');
+    const [originalCategoryName, setOriginalCategoryName] = useState('');
 
     const handleCreateArticle = async () => {
         if (!user || !user.email) {
@@ -58,6 +69,57 @@ export default function KnowledgeBasePage() {
         return Object.entries(groups).sort(([a], [b]) => a.localeCompare(b));
     }, [articles]);
 
+    const uniqueCategories = useMemo(() => {
+        const categorySet = new Set(articles.map(a => a.category).filter(Boolean) as string[]);
+        return Array.from(categorySet).sort();
+    }, [articles]);
+
+    const handleOpenSheet = (mode: 'add' | 'edit', categoryName = '') => {
+        setSheetMode(mode);
+        setCurrentCategory(categoryName);
+        if (mode === 'edit') {
+            setOriginalCategoryName(categoryName);
+        }
+        setIsSheetOpen(true);
+    };
+
+    const handleSaveCategory = async () => {
+        if (!currentCategory.trim()) {
+            toast({ title: "Erro", description: "O nome da categoria não pode ser vazio.", variant: "destructive" });
+            return;
+        }
+
+        try {
+            if (sheetMode === 'add') {
+                // To add a category, we create a dummy article and then delete it.
+                // This is a workaround as we don't have a direct "add category" flow yet.
+                const tempArticle = await createArticle({ authorId: user.email!, category: currentCategory });
+                await deleteArticle(tempArticle.id);
+                toast({ title: "Sucesso", description: `Categoria "${currentCategory}" criada.` });
+            } else { // 'edit'
+                await updateCategory({ oldName: originalCategoryName, newName: currentCategory });
+                toast({ title: "Sucesso", description: `Categoria "${originalCategoryName}" renomeada para "${currentCategory}".` });
+            }
+            await refreshArticles();
+            setIsSheetOpen(false);
+        } catch (error) {
+            console.error("Error saving category:", error);
+            toast({ title: "Erro", description: "Não foi possível salvar a categoria.", variant: "destructive" });
+        }
+    };
+
+    const handleDeleteCategory = async (categoryName: string) => {
+        try {
+            await deleteCategory(categoryName);
+            toast({ title: "Sucesso", description: `Categoria "${categoryName}" e todos os seus artigos foram excluídos.` });
+            await refreshArticles();
+        } catch(error) {
+             console.error("Error deleting category:", error);
+             toast({ title: "Erro", description: "Não foi possível excluir a categoria.", variant: "destructive" });
+        }
+    }
+
+
     return (
         <div className="flex flex-col gap-8">
             <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
@@ -65,10 +127,63 @@ export default function KnowledgeBasePage() {
                     <h1 className="text-3xl font-bold tracking-tight">Base de Conhecimento</h1>
                     <p className="text-muted-foreground">Crie e gerencie tutoriais, documentações e anotações.</p>
                 </div>
-                <Button size="sm" className="gap-1 w-full sm:w-auto" onClick={handleCreateArticle} disabled={loading}>
-                    <PlusCircle className="h-4 w-4" />
-                    Novo Artigo
-                </Button>
+                <div className="flex items-center gap-2">
+                    <Button size="sm" className="gap-1 w-full sm:w-auto" onClick={handleCreateArticle} disabled={loading}>
+                        <PlusCircle className="h-4 w-4" />
+                        Novo Artigo
+                    </Button>
+                     <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button size="sm" variant="outline" className="gap-1 w-full sm:w-auto">
+                                <Shapes className="h-4 w-4" />
+                                Categorias
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                            <DropdownMenuLabel>Gerenciar Categorias</DropdownMenuLabel>
+                            <DropdownMenuSeparator />
+                            {uniqueCategories.map(category => (
+                                <DropdownMenuSub key={category}>
+                                    <DropdownMenuSubTrigger>{category}</DropdownMenuSubTrigger>
+                                    <DropdownMenuSubContent>
+                                        <DropdownMenuItem onClick={() => handleOpenSheet('edit', category)}>
+                                            <Pencil className="mr-2 h-4 w-4" />
+                                            Editar
+                                        </DropdownMenuItem>
+                                        <AlertDialog>
+                                             <AlertDialogTrigger asChild>
+                                                 <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive focus:text-destructive focus:bg-destructive/10">
+                                                    <Trash2 className="mr-2 h-4 w-4" />
+                                                    Excluir
+                                                </DropdownMenuItem>
+                                             </AlertDialogTrigger>
+                                             <AlertDialogContent>
+                                                 <AlertDialogHeader>
+                                                     <AlertDialogTitle>Excluir a categoria &quot;{category}&quot;?</AlertDialogTitle>
+                                                     <AlertDialogDescription>
+                                                         Atenção! Esta ação não pode ser desfeita. Isso excluirá permanentemente a categoria e **todos os artigos dentro dela**.
+                                                     </AlertDialogDescription>
+                                                 </AlertDialogHeader>
+                                                 <AlertDialogFooter>
+                                                     <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                                     <AlertDialogAction onClick={() => handleDeleteCategory(category)}>Sim, Excluir Tudo</AlertDialogAction>
+                                                 </AlertDialogFooter>
+                                             </AlertDialogContent>
+                                         </AlertDialog>
+                                    </DropdownMenuSubContent>
+                                </DropdownMenuSub>
+                            ))}
+                            {uniqueCategories.length === 0 && (
+                                <DropdownMenuItem disabled>Nenhuma categoria encontrada</DropdownMenuItem>
+                            )}
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem onClick={() => handleOpenSheet('add')}>
+                                <PlusCircle className="mr-2 h-4 w-4" />
+                                Nova Categoria
+                            </DropdownMenuItem>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
+                </div>
             </div>
             <Card>
                 <CardHeader>
@@ -102,7 +217,7 @@ export default function KnowledgeBasePage() {
                                                     <TableHead>Título</TableHead>
                                                     <TableHead className="hidden sm:table-cell">Autor</TableHead>
                                                     <TableHead className="hidden sm:table-cell text-right">Última Atualização</TableHead>
-                                                    <TableHead><span className="sr-only">Ações</span></TableHead>
+                                                    <TableHead className="text-right">Ações</TableHead>
                                                 </TableRow>
                                             </TableHeader>
                                             <TableBody>
@@ -119,7 +234,7 @@ export default function KnowledgeBasePage() {
                                                         </TableCell>
                                                         <TableCell className="hidden sm:table-cell text-muted-foreground">{article.authorId}</TableCell>
                                                         <TableCell className="hidden sm:table-cell text-right text-muted-foreground">{format(new Date(article.updatedAt), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}</TableCell>
-                                                        <TableCell>
+                                                        <TableCell className="text-right">
                                                             <div className="flex justify-end">
                                                                 <DropdownMenu>
                                                                     <DropdownMenuTrigger asChild>
@@ -175,6 +290,35 @@ export default function KnowledgeBasePage() {
                      )}
                 </CardContent>
             </Card>
+
+             <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
+                <SheetContent>
+                    <SheetHeader>
+                        <SheetTitle>{sheetMode === 'add' ? 'Nova Categoria' : 'Editar Categoria'}</SheetTitle>
+                        <SheetDescription>
+                           {sheetMode === 'add' ? 'Digite o nome da nova categoria.' : `Renomear a categoria "${originalCategoryName}".`}
+                        </SheetDescription>
+                    </SheetHeader>
+                    <div className="grid gap-4 py-4">
+                        <div className="grid grid-cols-4 items-center gap-4">
+                            <Label htmlFor="category-name" className="text-right">
+                                Nome
+                            </Label>
+                            <Input
+                                id="category-name"
+                                value={currentCategory}
+                                onChange={(e) => setCurrentCategory(e.target.value)}
+                                className="col-span-3"
+                                placeholder="Ex: Documentação"
+                            />
+                        </div>
+                    </div>
+                    <SheetFooter>
+                         <Button variant="outline" onClick={() => setIsSheetOpen(false)}>Cancelar</Button>
+                        <Button onClick={handleSaveCategory}>Salvar</Button>
+                    </SheetFooter>
+                </SheetContent>
+            </Sheet>
         </div>
     );
 }
