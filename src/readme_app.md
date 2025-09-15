@@ -139,7 +139,9 @@ CREATE TABLE IF NOT EXISTS `tasks` (
     `status` VARCHAR(50) NOT NULL,
     `user_id` VARCHAR(255),
     `related_client_id` VARCHAR(255),
-    FOREIGN KEY (`related_client_id`) REFERENCES `clients`(`id`) ON DELETE SET NULL
+    `parent_id` VARCHAR(255),
+    FOREIGN KEY (`related_client_id`) REFERENCES `clients`(`id`) ON DELETE SET NULL,
+    FOREIGN KEY (`parent_id`) REFERENCES `tasks`(`id`) ON DELETE CASCADE
 );
 
 -- Tabela da Base de Conhecimento
