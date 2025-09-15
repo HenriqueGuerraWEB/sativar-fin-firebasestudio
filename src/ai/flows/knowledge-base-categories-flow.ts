@@ -12,19 +12,17 @@ import { z } from 'genkit';
 import { executeQuery } from '@/lib/db';
 
 // Input schema for updating a category name
-export const UpdateCategorySchema = z.object({
+const UpdateCategorySchema = z.object({
   oldName: z.string(),
   newName: z.string(),
 });
+type UpdateCategoryInput = z.infer<typeof UpdateCategorySchema>;
 
 // Input schema for deleting a category
-export const DeleteCategorySchema = z.string();
+const DeleteCategorySchema = z.string();
 
 
-/**
- * Renames a category for all articles that use it.
- */
-export const updateCategory = ai.defineFlow(
+const updateCategoryFlow = ai.defineFlow(
   {
     name: 'updateKnowledgeBaseCategory',
     inputSchema: UpdateCategorySchema,
@@ -48,9 +46,14 @@ export const updateCategory = ai.defineFlow(
 );
 
 /**
- * Deletes all articles associated with a specific category.
+ * Renames a category for all articles that use it.
  */
-export const deleteCategory = ai.defineFlow(
+export async function updateCategory(input: UpdateCategoryInput): Promise<{ updated: number }> {
+    return updateCategoryFlow(input);
+}
+
+
+const deleteCategoryFlow = ai.defineFlow(
   {
     name: 'deleteKnowledgeBaseCategory',
     inputSchema: DeleteCategorySchema,
@@ -68,3 +71,10 @@ export const deleteCategory = ai.defineFlow(
     return { deleted: result.affectedRows };
   }
 );
+
+/**
+ * Deletes all articles associated with a specific category.
+ */
+export async function deleteCategory(categoryName: string): Promise<{ deleted: number }> {
+    return deleteCategoryFlow(categoryName);
+}
