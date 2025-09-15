@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
@@ -35,7 +36,14 @@ export default function ArticlePage() {
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
 
     const activeArticle = useMemo(() => openTabs.find(tab => tab.id === activeTabId), [openTabs, activeTabId]);
-    const originalActiveArticle = useMemo(() => JSON.parse(JSON.stringify(activeArticle || null)), [activeArticle]);
+    const originalActiveArticle = useMemo(() => {
+        const foundArticle = allArticles.find(a => a.id === activeTabId);
+        if (!foundArticle) return null;
+        // Find the full article data in openTabs, which has the content
+        const fullArticleData = openTabs.find(a => a.id === activeTabId);
+        return fullArticleData || null; // Return the full data if found
+    }, [activeTabId, allArticles, openTabs]);
+
 
     const articlesInCategory = useMemo(() => {
         if (!activeArticle?.category) return [];
@@ -43,22 +51,29 @@ export default function ArticlePage() {
     }, [allArticles, activeArticle, activeTabId]);
 
 
-    // Load initial article
+    // Load initial article and handle direct navigation
     useEffect(() => {
-        if (articleId && !openTabs.some(tab => tab.id === articleId)) {
-            getArticle(articleId).then(data => {
-                if (data) {
-                    setOpenTabs(prev => [...prev, data]);
-                    setActiveTabId(articleId);
-                } else {
-                    toast({ title: "Erro", description: "Artigo não encontrado.", variant: "destructive" });
-                    router.push('/knowledge-base');
-                }
-            });
-        } else {
+        if (articleId) {
             setActiveTabId(articleId);
+            const isAlreadyOpen = openTabs.some(tab => tab.id === articleId);
+            if (!isAlreadyOpen) {
+                getArticle(articleId).then(data => {
+                    if (data) {
+                        setOpenTabs(prev => {
+                            // Double-check to prevent race conditions
+                            if (prev.some(tab => tab.id === articleId)) {
+                                return prev;
+                            }
+                            return [...prev, data];
+                        });
+                    } else {
+                        toast({ title: "Erro", description: "Artigo não encontrado.", variant: "destructive" });
+                        router.push('/knowledge-base');
+                    }
+                });
+            }
         }
-    }, [articleId, getArticle, router, toast]);
+    }, [articleId, getArticle, router, toast, openTabs]);
 
     const handleArticleChange = (updates: Partial<KnowledgeBaseArticle>) => {
         setOpenTabs(prevTabs =>
@@ -88,7 +103,7 @@ export default function ArticlePage() {
     };
 
     const handleSaveChanges = async () => {
-        if (!activeArticle || !originalActiveArticle) return;
+        if (!activeArticle) return;
         
         setIsSaving(true);
         try {
@@ -116,8 +131,9 @@ export default function ArticlePage() {
     };
     
     const handleTabClick = (tabId: string) => {
-        router.push(`/knowledge-base/${tabId}`, { scroll: false });
-        setActiveTabId(tabId);
+        if (activeTabId !== tabId) {
+            router.push(`/knowledge-base/${tabId}`, { scroll: false });
+        }
     };
 
     const handleCloseTab = (tabId: string) => {
@@ -129,7 +145,6 @@ export default function ArticlePage() {
             if (newTabs.length > 0) {
                 const newActiveId = newTabs[tabIndex] ? newTabs[tabIndex].id : newTabs[newTabs.length - 1].id;
                 router.push(`/knowledge-base/${newActiveId}`, { scroll: false });
-                setActiveTabId(newActiveId);
             } else {
                 router.push('/knowledge-base');
             }
@@ -137,7 +152,12 @@ export default function ArticlePage() {
     };
     
     const isLoading = loading && !activeArticle;
-    const hasChanges = activeArticle ? !isEqual(originalActiveArticle, activeArticle) : false;
+    const hasChanges = useMemo(() => {
+        if (!activeArticle || !originalActiveArticle) return false;
+        // Use lodash isEqual for deep comparison of objects
+        return !isEqual(activeArticle, originalActiveArticle);
+    }, [activeArticle, originalActiveArticle]);
+
 
     return (
         <div className="flex flex-col h-full bg-background">
