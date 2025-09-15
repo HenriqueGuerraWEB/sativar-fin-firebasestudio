@@ -18,7 +18,7 @@ import {
 import { ptBR } from 'date-fns/locale';
 import { Task } from '@/hooks/use-tasks';
 import { Button } from '@/components/ui/button';
-import { ChevronLeft, ChevronRight, PlusCircle } from 'lucide-react';
+import { ChevronLeft, ChevronRight, CornerDownRight } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -77,7 +77,6 @@ export function CalendarView({ tasks, onTaskClick, onNewTask }: CalendarViewProp
         formattedDate = format(day, "d");
         const dateKey = format(day, 'yyyy-MM-dd');
         const tasksForDay = tasksByDate[dateKey] || [];
-        const isPast = isBefore(day, today);
         const isCurrentMonth = isSameMonth(day, monthStart);
 
         days.push(
@@ -106,11 +105,12 @@ export function CalendarView({ tasks, onTaskClick, onNewTask }: CalendarViewProp
                         onClick={() => onTaskClick(task)}
                         variant={task.status === 'Concluída' ? 'secondary' : 'default'}
                         className={cn(
-                            "w-full text-left justify-start truncate cursor-pointer",
+                            "w-full text-left justify-start truncate cursor-pointer flex items-center gap-1.5",
                             task.status !== 'Concluída' && isBefore(new Date(task.dueDate), today) && "bg-destructive text-destructive-foreground",
                         )}
                         >
-                        {task.title}
+                        {task.subtasks && task.subtasks.length > 0 && <CornerDownRight className="h-3 w-3 flex-shrink-0" />}
+                        <span className="truncate">{task.title}</span>
                     </Badge>
                     ))}
                 </div>

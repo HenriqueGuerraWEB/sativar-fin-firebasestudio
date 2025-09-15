@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { Button } from "@/components/ui/button";
-import { PlusCircle, ChevronRight, Check, List, Calendar as CalendarIconLucide } from "lucide-react";
+import { PlusCircle, ChevronRight, Check, List, Calendar as CalendarIconLucide, GitFork, CornerDownRight } from "lucide-react";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetFooter } from "@/components/ui/sheet";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -23,6 +23,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Trash2 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CalendarView } from './calendar-view';
+import { Separator } from '@/components/ui/separator';
 
 
 const emptyTask: Omit<Task, 'id' | 'status' | 'userId' | 'subtasks'> & { dueDate: Date } = {
@@ -103,6 +104,16 @@ export default function TasksPage() {
     const [currentTask, setCurrentTask] = useState<Omit<Task, 'id' | 'subtasks'> | Task>(emptyTask as Omit<Task, 'id' | 'subtasks'>);
     const [view, setView] = useState<'list' | 'calendar'>('list');
 
+    const tasksMap = useMemo(() => {
+        const map = new Map<string, Task>();
+        const addTaskToMap = (task: Task) => {
+            map.set(task.id, task);
+            task.subtasks.forEach(addTaskToMap);
+        };
+        tasks.forEach(addTaskToMap);
+        return map;
+    }, [tasks]);
+
 
     const handleDueDateChange = (date: Date | undefined) => {
         if (date) {
@@ -167,6 +178,12 @@ export default function TasksPage() {
         try {
             await deleteTask(taskId);
             toast({ title: "Sucesso", description: "Tarefa excluída com sucesso." });
+            
+            // If the deleted task was being edited, close the sheet
+            if ('id' in currentTask && currentTask.id === taskId) {
+                setIsSheetOpen(false);
+            }
+
         } catch (error) {
             console.error("Error deleting task:", error);
             toast({ title: "Erro", description: "Não foi possível excluir a tarefa.", variant: "destructive" });
@@ -174,8 +191,11 @@ export default function TasksPage() {
     };
 
     const handleEditTask = (task: Task) => {
-        setCurrentTask({ ...task, dueDate: new Date(task.dueDate) });
-        setIsSheetOpen(true);
+        const fullTask = tasksMap.get(task.id);
+        if (fullTask) {
+            setCurrentTask({ ...fullTask, dueDate: new Date(fullTask.dueDate) });
+            setIsSheetOpen(true);
+        }
     };
 
     const handleAddSubtask = (parentId: string) => {
@@ -262,7 +282,7 @@ export default function TasksPage() {
                 setIsSheetOpen(isOpen);
                 if (!isOpen) setCurrentTask(emptyTask as Omit<Task, 'id' | 'subtasks'>);
             }}>
-                <SheetContent>
+                <SheetContent className="sm:max-w-lg">
                     <SheetHeader>
                         <SheetTitle>{'id' in currentTask ? 'Editar Tarefa' : 'Adicionar Nova Tarefa'}</SheetTitle>
                         <SheetDescription>
@@ -327,10 +347,58 @@ export default function TasksPage() {
                                 </SelectContent>
                             </Select>
                         </div>
+                        
+                        {'id' in currentTask && currentTask.subtasks && currentTask.subtasks.length > 0 && (
+                            <>
+                                <Separator />
+                                <div className="space-y-2">
+                                    <Label>Subtarefas</Label>
+                                    <div className="space-y-2 rounded-md border p-2">
+                                    {currentTask.subtasks.map(subtask => (
+                                        <div key={subtask.id} className="flex items-center gap-2 group">
+                                             <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleToggleComplete(subtask)}>
+                                                <div className={cn("h-4 w-4 rounded-sm border border-primary flex items-center justify-center", subtask.status === 'Concluída' && "bg-primary")}>
+                                                    {subtask.status === 'Concluída' && <Check className="h-3 w-3 text-primary-foreground" />}
+                                                </div>
+                                            </Button>
+                                            <span className={cn("flex-1 cursor-pointer text-sm", subtask.status === 'Concluída' && "line-through text-muted-foreground")} onClick={() => handleEditTask(subtask)}>
+                                                {subtask.title}
+                                            </span>
+                                             <AlertDialog>
+                                                <AlertDialogTrigger asChild>
+                                                    <Button variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover:opacity-100">
+                                                        <Trash2 className="h-4 w-4 text-destructive" />
+                                                    </Button>
+                                                </AlertDialogTrigger>
+                                                <AlertDialogContent>
+                                                    <AlertDialogHeader>
+                                                        <AlertDialogTitle>Excluir subtarefa?</AlertDialogTitle>
+                                                        <AlertDialogDescription>
+                                                            A ação de excluir a subtarefa "{subtask.title}" não poderá ser desfeita.
+                                                        </AlertDialogDescription>
+                                                    </AlertDialogHeader>
+                                                    <AlertDialogFooter>
+                                                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                                        <AlertDialogAction onClick={() => handleDeleteTask(subtask.id)}>Excluir</AlertDialogAction>
+                                                    </AlertDialogFooter>
+                                                </AlertDialogContent>
+                                            </AlertDialog>
+                                        </div>
+                                    ))}
+                                    </div>
+                                </div>
+                            </>
+                        )}
                     </div>
-                    <SheetFooter>
-                        <Button variant="outline" onClick={() => setIsSheetOpen(false)}>Cancelar</Button>
-                        <Button onClick={handleSaveTask}>Salvar Tarefa</Button>
+                    <SheetFooter className="flex-col sm:flex-row sm:justify-between w-full">
+                        <Button variant="outline" className="w-full sm:w-auto" onClick={() => 'id' in currentTask && handleAddSubtask(currentTask.id)}>
+                            <PlusCircle className="mr-2 h-4 w-4" />
+                            Adicionar Subtarefa
+                        </Button>
+                        <div className="flex gap-2 w-full sm:w-auto">
+                            <Button variant="outline" className="flex-1 sm:flex-auto" onClick={() => setIsSheetOpen(false)}>Cancelar</Button>
+                            <Button className="flex-1 sm:flex-auto" onClick={handleSaveTask}>Salvar Tarefa</Button>
+                        </div>
                     </SheetFooter>
                 </SheetContent>
             </Sheet>
