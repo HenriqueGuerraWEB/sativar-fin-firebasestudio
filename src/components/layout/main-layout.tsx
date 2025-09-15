@@ -124,10 +124,9 @@ function MainLayoutContent({ children }: { children: React.ReactNode }) {
       { href: '/tasks', label: 'Tarefas', icon: CalendarCheck },
       { href: '/clients', label: 'Clientes', icon: Users },
       { href: '/plans', label: 'Planos', icon: Package },
-      { href: '/knowledge-base', label: 'Base de Conhecimento', icon: BookText },
-      { href: '/settings/categories', label: 'Categorias', icon: Shapes },
-      { href: '/finance', label: 'Financeiro', icon: Banknote },
       { href: '/invoices', label: 'Faturas', icon: FileText },
+      { href: '/finance', label: 'Financeiro', icon: Banknote },
+      { href: '/knowledge-base', label: 'Base de Conhecimento', icon: BookText },
     ];
   
     const handleLinkClick = () => {
@@ -137,16 +136,7 @@ function MainLayoutContent({ children }: { children: React.ReactNode }) {
     };
   
     const isActive = (href: string) => {
-      if (href === '/dashboard') {
-          return pathname === href;
-      }
-      if (['/clients', '/plans', '/finance', '/invoices', '/settings', '/tasks', '/knowledge-base'].includes(href)) {
-          return pathname.startsWith(href);
-      }
-       if (href === '/settings/categories') {
-          return pathname === href;
-      }
-      return false;
+        return pathname.startsWith(href);
     }
   
     if (!user) {
