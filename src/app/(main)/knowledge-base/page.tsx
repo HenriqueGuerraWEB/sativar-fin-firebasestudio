@@ -11,7 +11,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { PlusCircle, BookText, MoreHorizontal, Trash2, Folder, FileText, Shapes, Pencil, Check, ChevronsUpDown, Settings } from "lucide-react";
+import { PlusCircle, BookText, MoreHorizontal, Trash2, Folder, FileText, Shapes, Pencil, Check, ChevronsUpDown } from "lucide-react";
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { format } from 'date-fns';
@@ -155,6 +155,93 @@ export default function KnowledgeBasePage() {
                     <p className="text-muted-foreground">Crie e gerencie tutoriais, documentações e anotações.</p>
                 </div>
                 <div className="flex items-center gap-2">
+                     <Dialog open={isCategoryDialogOpen} onOpenChange={setIsCategoryDialogOpen}>
+                        <DialogTrigger asChild>
+                            <Button variant="outline" size="sm" className="gap-1 w-full sm:w-auto" disabled={loading}>
+                                <Shapes className="h-4 w-4" />
+                                Gerenciar Categorias
+                            </Button>
+                        </DialogTrigger>
+                        <DialogContent className="sm:max-w-3xl">
+                            <DialogHeader>
+                                <DialogTitle>Gerenciar Categorias</DialogTitle>
+                                <DialogDescription>
+                                    Renomeie ou exclua categorias. A exclusão de uma categoria apaga todos os artigos associados a ela.
+                                </DialogDescription>
+                            </DialogHeader>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 py-4">
+                                <div className="flex flex-col gap-4">
+                                    <h3 className="font-semibold">Categorias Existentes</h3>
+                                    <div className="border rounded-md max-h-80 overflow-y-auto">
+                                        {uniqueCategories.length > 0 ? (
+                                            uniqueCategories.map(cat => (
+                                                <div key={cat} className="flex items-center justify-between p-2 border-b last:border-b-0 hover:bg-muted/50">
+                                                    <span 
+                                                        className="cursor-pointer flex-1 flex items-center gap-2"
+                                                        onClick={() => handleSelectCategoryForEdit(cat)}
+                                                    >
+                                                        <Folder className="h-4 w-4 text-primary" /> {cat}
+                                                    </span>
+                                                    <div className="flex items-center">
+                                                        <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-primary" onClick={() => handleSelectCategoryForEdit(cat)}>
+                                                            <Pencil className="h-4 w-4" />
+                                                        </Button>
+                                                        <AlertDialog>
+                                                            <AlertDialogTrigger asChild>
+                                                                <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive">
+                                                                    <Trash2 className="h-4 w-4" />
+                                                                </Button>
+                                                            </AlertDialogTrigger>
+                                                            <AlertDialogContent>
+                                                                <AlertDialogHeader>
+                                                                    <AlertDialogTitle>Excluir a categoria &quot;{cat}&quot;?</AlertDialogTitle>
+                                                                    <AlertDialogDescription>
+                                                                    Atenção! Esta ação não pode ser desfeita. Todos os artigos associados a esta categoria serão **permanentemente excluídos**.
+                                                                    </AlertDialogDescription>
+                                                                </AlertDialogHeader>
+                                                                <AlertDialogFooter>
+                                                                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                                                    <AlertDialogAction onClick={() => handleDeleteCategory(cat)}>Sim, Excluir</AlertDialogAction>
+                                                                </AlertDialogFooter>
+                                                            </AlertDialogContent>
+                                                        </AlertDialog>
+                                                    </div>
+                                                </div>
+                                            ))
+                                        ) : (
+                                            <p className="p-4 text-center text-sm text-muted-foreground">Nenhuma categoria encontrada.</p>
+                                        )}
+                                    </div>
+                                </div>
+                                <div className="flex flex-col gap-4">
+                                    <h3 className="font-semibold">{categoryForm.originalName ? 'Renomear Categoria' : 'Criar Nova Categoria'}</h3>
+                                    <div className="space-y-4 p-4 border rounded-lg bg-muted/50">
+                                        <div className="space-y-2">
+                                            <Label htmlFor="category-name">Nome da Categoria</Label>
+                                            <Input 
+                                                id="category-name"
+                                                placeholder="Ex: Tutoriais de API"
+                                                value={categoryForm.newName}
+                                                onChange={(e) => setCategoryForm({...categoryForm, newName: e.target.value})}
+                                            />
+                                            {!categoryForm.originalName && <p className="text-xs text-muted-foreground">Para criar uma nova categoria, basta usá-la em um artigo novo ou existente.</p>}
+                                        </div>
+                                        <div className="flex justify-end gap-2">
+                                            {categoryForm.originalName && (
+                                                <Button variant="outline" onClick={resetCategoryForm}>Cancelar Edição</Button>
+                                            )}
+                                            <Button onClick={handleSaveCategory} disabled={!categoryForm.originalName}>
+                                                {'Renomear Categoria'}
+                                            </Button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <DialogFooter>
+                                <Button variant="outline" onClick={() => setIsCategoryDialogOpen(false)}>Fechar</Button>
+                            </DialogFooter>
+                        </DialogContent>
+                    </Dialog>
                     <Dialog open={isCreateArticleDialogOpen} onOpenChange={setIsCreateArticleDialogOpen}>
                         <DialogTrigger asChild>
                              <Button size="sm" className="gap-1 w-full sm:w-auto" disabled={loading}>
@@ -269,14 +356,13 @@ export default function KnowledgeBasePage() {
                             <Skeleton className="h-12 w-full" />
                         </div>
                      ) : articles.length > 0 ? (
-                        <Accordion type="multiple" className="w-full space-y-2">
+                        <Accordion type="single" collapsible className="w-full space-y-2">
                            {groupedArticles.map(([category, items]) => {
-                                const categoryIcon = items.find(item => item.icon)?.icon || null;
                                 return (
                                  <AccordionItem value={category} key={category} className="border-b-0">
                                    <AccordionTrigger className="p-4 hover:no-underline hover:bg-muted/50 rounded-lg">
                                      <div className="flex items-center gap-3">
-                                       {categoryIcon ? <span className="text-xl">{categoryIcon}</span> : <Folder className="h-5 w-5 text-primary" />}
+                                       <Folder className="h-5 w-5 text-primary" />
                                        <span className="font-semibold text-lg">{category}</span>
                                        <span className="text-sm text-muted-foreground">({items.length} artigo{items.length > 1 ? 's' : ''})</span>
                                      </div>
@@ -453,88 +539,8 @@ export default function KnowledgeBasePage() {
                      )}
                 </CardContent>
             </Card>
-
-            <Dialog open={isCategoryDialogOpen} onOpenChange={setIsCategoryDialogOpen}>
-                <DialogContent className="sm:max-w-3xl">
-                    <DialogHeader>
-                        <DialogTitle>Gerenciar Categorias da Base de Conhecimento</DialogTitle>
-                        <DialogDescription>
-                            Renomeie ou exclua categorias. A exclusão de uma categoria apaga todos os artigos associados a ela.
-                        </DialogDescription>
-                    </DialogHeader>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8 py-4">
-                        <div className="flex flex-col gap-4">
-                             <h3 className="font-semibold">Categorias Existentes</h3>
-                             <div className="border rounded-md max-h-80 overflow-y-auto">
-                                {uniqueCategories.length > 0 ? (
-                                    uniqueCategories.map(cat => (
-                                        <div key={cat} className="flex items-center justify-between p-2 border-b last:border-b-0 hover:bg-muted/50">
-                                            <span 
-                                                className="cursor-pointer flex-1"
-                                                onClick={() => handleSelectCategoryForEdit(cat)}
-                                            >
-                                                {cat}
-                                            </span>
-                                             <div className="flex items-center">
-                                                <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-primary" onClick={() => handleSelectCategoryForEdit(cat)}>
-                                                    <Pencil className="h-4 w-4" />
-                                                </Button>
-                                                <AlertDialog>
-                                                    <AlertDialogTrigger asChild>
-                                                        <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive">
-                                                            <Trash2 className="h-4 w-4" />
-                                                        </Button>
-                                                    </AlertDialogTrigger>
-                                                    <AlertDialogContent>
-                                                        <AlertDialogHeader>
-                                                            <AlertDialogTitle>Excluir a categoria &quot;{cat}&quot;?</AlertDialogTitle>
-                                                            <AlertDialogDescription>
-                                                            Atenção! Esta ação não pode ser desfeita. Todos os artigos associados a esta categoria serão **permanentemente excluídos**.
-                                                            </AlertDialogDescription>
-                                                        </AlertDialogHeader>
-                                                        <AlertDialogFooter>
-                                                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                                            <AlertDialogAction onClick={() => handleDeleteCategory(cat)}>Sim, Excluir</AlertDialogAction>
-                                                        </AlertDialogFooter>
-                                                    </AlertDialogContent>
-                                                </AlertDialog>
-                                             </div>
-                                        </div>
-                                    ))
-                                ) : (
-                                    <p className="p-4 text-center text-sm text-muted-foreground">Nenhuma categoria encontrada.</p>
-                                )}
-                             </div>
-                        </div>
-                        <div className="flex flex-col gap-4">
-                             <h3 className="font-semibold">{categoryForm.originalName ? 'Renomear Categoria' : 'Criar Nova Categoria'}</h3>
-                             <div className="space-y-4 p-4 border rounded-lg bg-muted/50">
-                                <div className="space-y-2">
-                                     <Label htmlFor="category-name">Nome da Categoria</Label>
-                                     <Input 
-                                        id="category-name"
-                                        placeholder="Ex: Tutoriais de API"
-                                        value={categoryForm.newName}
-                                        onChange={(e) => setCategoryForm({...categoryForm, newName: e.target.value})}
-                                     />
-                                      {!categoryForm.originalName && <p className="text-xs text-muted-foreground">Para criar uma nova categoria, basta usá-la em um artigo novo ou existente.</p>}
-                                </div>
-                                <div className="flex justify-end gap-2">
-                                    {categoryForm.originalName && (
-                                        <Button variant="outline" onClick={resetCategoryForm}>Cancelar Edição</Button>
-                                    )}
-                                    <Button onClick={handleSaveCategory} disabled={!categoryForm.originalName}>
-                                        {'Renomear Categoria'}
-                                    </Button>
-                                </div>
-                             </div>
-                        </div>
-                    </div>
-                     <DialogFooter>
-                        <Button variant="outline" onClick={() => setIsCategoryDialogOpen(false)}>Fechar</Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
         </div>
     );
 }
+
+    
