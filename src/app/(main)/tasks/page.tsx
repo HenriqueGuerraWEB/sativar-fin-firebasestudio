@@ -25,6 +25,7 @@ import { Trash2 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CalendarView } from './calendar-view';
 import { Separator } from '@/components/ui/separator';
+import { Progress } from '@/components/ui/progress';
 
 
 const emptyTask: Omit<Task, 'id' | 'status' | 'userId' | 'subtasks'> & { dueDate: Date } = {
@@ -35,33 +36,52 @@ const emptyTask: Omit<Task, 'id' | 'status' | 'userId' | 'subtasks'> & { dueDate
     parentId: null,
 };
 
+const getTaskProgress = (task: Task): number => {
+    if (!task.subtasks || task.subtasks.length === 0) {
+        return task.status === 'Concluída' ? 100 : 0;
+    }
+    const totalProgress = task.subtasks.reduce((sum, subtask) => sum + getTaskProgress(subtask), 0);
+    return totalProgress / task.subtasks.length;
+};
+
 
 const TaskItem = ({ task, onEdit, onAddSubtask, onToggleComplete, onDelete, level = 0 }: { task: Task, onEdit: (task: Task) => void, onAddSubtask: (parentId: string) => void, onToggleComplete: (task: Task) => void, onDelete: (taskId: string) => void, level?: number }) => {
     const [isExpanded, setIsExpanded] = useState(true);
 
     const isOverdue = task.status !== 'Concluída' && new Date(task.dueDate) < new Date();
+    const progress = useMemo(() => getTaskProgress(task), [task]);
+    const hasSubtasks = task.subtasks && task.subtasks.length > 0;
 
     return (
-        <div style={{ marginLeft: `${level * 2}rem` }}>
+        <div style={{ marginLeft: `${level * 1}rem` }} className={cn(level > 0 && "pl-4 border-l")}>
             <div className="flex items-center gap-2 group py-2">
-                {task.subtasks.length > 0 && (
+                {hasSubtasks ? (
                     <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setIsExpanded(!isExpanded)}>
                         <ChevronRight className={cn("h-4 w-4 transition-transform", isExpanded && "rotate-90")} />
                     </Button>
+                ) : (
+                     <div className="w-6 h-6 shrink-0" />
                 )}
-                {task.subtasks.length === 0 && <div className="w-6 h-6" />}
 
-                <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => onToggleComplete(task)}>
+                <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0" onClick={() => onToggleComplete(task)}>
                     <div className={cn("h-4 w-4 rounded-sm border border-primary flex items-center justify-center", task.status === 'Concluída' && "bg-primary")}>
                          {task.status === 'Concluída' && <Check className="h-3 w-3 text-primary-foreground" />}
                     </div>
                 </Button>
                 
-                <span className={cn("flex-1 cursor-pointer", task.status === 'Concluída' && "line-through text-muted-foreground")} onClick={() => onEdit(task)}>
-                    {task.title}
-                </span>
+                <div className="flex-1 cursor-pointer" onClick={() => onEdit(task)}>
+                     <span className={cn("flex-1", task.status === 'Concluída' && "line-through text-muted-foreground")}>
+                        {task.title}
+                    </span>
+                     {hasSubtasks && (
+                        <div className="flex items-center gap-2 mt-1">
+                            <Progress value={progress} className="h-1 w-24" />
+                            <span className="text-xs text-muted-foreground">{Math.round(progress)}%</span>
+                        </div>
+                    )}
+                </div>
 
-                <span className={cn("text-xs", isOverdue ? "text-red-500" : "text-muted-foreground")}>
+                <span className={cn("text-xs shrink-0", isOverdue ? "text-red-500" : "text-muted-foreground")}>
                     {format(new Date(task.dueDate), "dd MMM", { locale: ptBR })}
                 </span>
                 
@@ -214,6 +234,13 @@ export default function TasksPage() {
     }
     
     const rootTasks = useMemo(() => tasks.filter(task => !task.parentId), [tasks]);
+    
+    const currentTaskProgress = useMemo(() => {
+        if ('id' in currentTask) {
+            return getTaskProgress(currentTask as Task);
+        }
+        return 0;
+    }, [currentTask]);
 
 
     return (
@@ -289,6 +316,12 @@ export default function TasksPage() {
                         <SheetDescription>
                             Preencha os detalhes da tarefa. Clique em salvar quando terminar.
                         </SheetDescription>
+                        {'id' in currentTask && currentTask.subtasks && currentTask.subtasks.length > 0 && (
+                             <div className="flex items-center gap-2 pt-2">
+                                <Progress value={currentTaskProgress} className="h-2 flex-1" />
+                                <span className="text-sm font-semibold text-muted-foreground">{Math.round(currentTaskProgress)}%</span>
+                            </div>
+                        )}
                     </SheetHeader>
                     <div className="flex-1 overflow-y-auto -mx-6 px-6 py-6">
                         <div className="grid gap-6">
@@ -409,5 +442,3 @@ export default function TasksPage() {
         </div>
     );
 }
-
-    
