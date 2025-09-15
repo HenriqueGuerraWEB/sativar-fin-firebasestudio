@@ -3,9 +3,9 @@
 
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
-import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight';
+import { CodeBlockLowlight } from '@tiptap/extension-code-block-lowlight';
 import { lowlight } from 'lowlight/lib/common';
-import { useEffect, useRef } from 'react';
+import { useEffect } from 'react';
 
 interface EditorProps {
     initialContent: any;
@@ -26,40 +26,13 @@ const Editor = ({ initialContent, onChange }: EditorProps) => {
                 class: 'prose dark:prose-invert focus:outline-none max-w-full',
             },
         },
+        onUpdate: ({ editor }) => {
+            onChange(editor.getJSON());
+        },
     });
-
-    const timeoutRef = useRef<NodeJS.Timeout | null>(null);
-
-    useEffect(() => {
-        if (!editor) {
-            return;
-        }
-
-        const handleUpdate = () => {
-            if (timeoutRef.current) {
-                clearTimeout(timeoutRef.current);
-            }
-            timeoutRef.current = setTimeout(() => {
-                onChange(editor.getJSON());
-            }, 1000); // 1 second debounce
-        };
-
-        editor.on('update', handleUpdate);
-
-        return () => {
-            editor.off('update', handleUpdate);
-            if (timeoutRef.current) {
-                clearTimeout(timeoutRef.current);
-            }
-        };
-    }, [editor, onChange]);
-
 
     useEffect(() => {
         if (editor && initialContent && !editor.isFocused) {
-            // This is a bit of a hack to ensure the content is updated
-            // when the component re-renders with new initialContent
-            // without losing the cursor position if the user is typing.
             const { from, to } = editor.state.selection;
             editor.commands.setContent(initialContent, false);
             editor.commands.setTextSelection({ from, to });
@@ -79,3 +52,5 @@ const Editor = ({ initialContent, onChange }: EditorProps) => {
 };
 
 export default Editor;
+
+    
