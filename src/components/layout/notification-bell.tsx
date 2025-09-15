@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useEffect, useCallback } from 'react';
@@ -30,8 +31,6 @@ export function NotificationBell() {
     try {
       const tasks = await getNotificationTasks();
       setUrgentTasks(tasks);
-      // Logic to determine if there are new unseen tasks can be more sophisticated
-      // For now, if there are tasks, we consider them unseen until the popover is opened.
       if (tasks.length > 0) {
         setHasUnseen(true);
       }
