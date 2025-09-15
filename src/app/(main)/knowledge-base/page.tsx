@@ -8,10 +8,10 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger, DropdownMenuSeparator, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger } from "@/components/ui/dropdown-menu";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger, SheetFooter } from "@/components/ui/sheet";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { PlusCircle, BookText, MoreHorizontal, Trash2, Folder, FileText, Shapes, Pencil } from "lucide-react";
+import { PlusCircle, BookText, MoreHorizontal, Trash2, Folder, FileText, Shapes, Pencil, Check, ChevronsUpDown } from "lucide-react";
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { format } from 'date-fns';
@@ -20,6 +20,9 @@ import { useKnowledgeBase, KnowledgeBaseArticle } from '@/hooks/use-knowledge-ba
 import { useAuth } from '@/hooks/use-auth';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { updateCategory, deleteCategory } from '@/ai/flows/knowledge-base-categories-flow';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { cn } from '@/lib/utils';
 
 
 export default function KnowledgeBasePage() {
@@ -28,8 +31,13 @@ export default function KnowledgeBasePage() {
     const { user } = useAuth();
     const { articles, createArticle, deleteArticle, loading, refreshArticles } = useKnowledgeBase();
     
-    const [isSheetOpen, setIsSheetOpen] = useState(false);
+    const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+    const [isCategorySheetOpen, setIsCategorySheetOpen] = useState(false);
     const [sheetMode, setSheetMode] = useState<'add' | 'edit'>('add');
+    const [newArticleTitle, setNewArticleTitle] = useState("");
+    const [newArticleCategory, setNewArticleCategory] = useState("");
+    const [isCategoryPopoverOpen, setCategoryPopoverOpen] = useState(false);
+    
     const [currentCategory, setCurrentCategory] = useState('');
     const [originalCategoryName, setOriginalCategoryName] = useState('');
 
@@ -38,13 +46,25 @@ export default function KnowledgeBasePage() {
             toast({ title: "Erro de Autenticação", description: "Você precisa estar logado para criar um artigo.", variant: "destructive" });
             return;
         }
+        if (!newArticleTitle.trim()) {
+            toast({ title: "Erro", description: "O título do artigo é obrigatório.", variant: "destructive" });
+            return;
+        }
         try {
-            const newArticle = await createArticle({ authorId: user.email, category: 'Rascunhos' });
-            toast({ title: "Sucesso!", description: "Novo artigo criado em 'Rascunhos'." });
+            const newArticle = await createArticle({ 
+                authorId: user.email, 
+                title: newArticleTitle,
+                category: newArticleCategory || "Rascunhos" // Default to "Rascunhos" if empty
+            });
+            toast({ title: "Sucesso!", description: `Artigo "${newArticleTitle}" criado.` });
             router.push(`/knowledge-base/${newArticle.id}`);
         } catch (error) {
             console.error("Error creating article:", error);
             toast({ title: "Erro", description: "Não foi possível criar o artigo.", variant: "destructive" });
+        } finally {
+            setIsCreateDialogOpen(false);
+            setNewArticleTitle("");
+            setNewArticleCategory("");
         }
     };
     
@@ -74,13 +94,13 @@ export default function KnowledgeBasePage() {
         return Array.from(categorySet).sort();
     }, [articles]);
 
-    const handleOpenSheet = (mode: 'add' | 'edit', categoryName = '') => {
+    const handleOpenCategorySheet = (mode: 'add' | 'edit', categoryName = '') => {
         setSheetMode(mode);
         setCurrentCategory(categoryName);
         if (mode === 'edit') {
             setOriginalCategoryName(categoryName);
         }
-        setIsSheetOpen(true);
+        setIsCategorySheetOpen(true);
     };
 
     const handleSaveCategory = async () => {
@@ -90,18 +110,13 @@ export default function KnowledgeBasePage() {
         }
 
         try {
-            if (sheetMode === 'add') {
-                // To add a category, we create a dummy article and then delete it.
-                // This is a workaround as we don't have a direct "add category" flow yet.
-                const tempArticle = await createArticle({ authorId: user.email!, category: currentCategory });
-                await deleteArticle(tempArticle.id);
-                toast({ title: "Sucesso", description: `Categoria "${currentCategory}" criada.` });
-            } else { // 'edit'
+            if (sheetMode === 'edit') {
                 await updateCategory({ oldName: originalCategoryName, newName: currentCategory });
                 toast({ title: "Sucesso", description: `Categoria "${originalCategoryName}" renomeada para "${currentCategory}".` });
             }
+            // Add mode is handled implicitly by creating an article with the new category
             await refreshArticles();
-            setIsSheetOpen(false);
+            setIsCategorySheetOpen(false);
         } catch (error) {
             console.error("Error saving category:", error);
             toast({ title: "Erro", description: "Não foi possível salvar a categoria.", variant: "destructive" });
@@ -128,10 +143,95 @@ export default function KnowledgeBasePage() {
                     <p className="text-muted-foreground">Crie e gerencie tutoriais, documentações e anotações.</p>
                 </div>
                 <div className="flex items-center gap-2">
-                    <Button size="sm" className="gap-1 w-full sm:w-auto" onClick={handleCreateArticle} disabled={loading}>
-                        <PlusCircle className="h-4 w-4" />
-                        Novo Artigo
-                    </Button>
+                    <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+                        <DialogTrigger asChild>
+                             <Button size="sm" className="gap-1 w-full sm:w-auto" disabled={loading}>
+                                <PlusCircle className="h-4 w-4" />
+                                Novo Artigo
+                            </Button>
+                        </DialogTrigger>
+                        <DialogContent>
+                             <DialogHeader>
+                                <DialogTitle>Criar Novo Artigo</DialogTitle>
+                                <DialogDescription>
+                                    Forneça um título e uma categoria para o seu novo artigo.
+                                </DialogDescription>
+                            </DialogHeader>
+                            <div className="grid gap-4 py-4">
+                                <div className="grid grid-cols-4 items-center gap-4">
+                                    <Label htmlFor="title" className="text-right">
+                                        Título
+                                    </Label>
+                                    <Input
+                                        id="title"
+                                        value={newArticleTitle}
+                                        onChange={(e) => setNewArticleTitle(e.target.value)}
+                                        className="col-span-3"
+                                        placeholder="Título do Artigo"
+                                    />
+                                </div>
+                                <div className="grid grid-cols-4 items-center gap-4">
+                                     <Label htmlFor="category" className="text-right">
+                                        Categoria
+                                    </Label>
+                                    <div className="col-span-3">
+                                       <Popover open={isCategoryPopoverOpen} onOpenChange={setCategoryPopoverOpen}>
+                                            <PopoverTrigger asChild>
+                                                <Button
+                                                    variant="outline"
+                                                    role="combobox"
+                                                    aria-expanded={isCategoryPopoverOpen}
+                                                    className="w-full justify-between"
+                                                >
+                                                    {newArticleCategory || "Selecione ou crie uma..."}
+                                                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                                </Button>
+                                            </PopoverTrigger>
+                                            <PopoverContent className="w-[300px] p-0">
+                                                <Command onValueChange={setNewArticleCategory}>
+                                                    <CommandInput placeholder="Buscar ou criar categoria..." />
+                                                    <CommandList>
+                                                        <CommandEmpty>
+                                                             <Button 
+                                                                variant="ghost" 
+                                                                className="w-full text-left justify-start"
+                                                                onClick={() => {
+                                                                    const input = document.querySelector<HTMLInputElement>('[cmdk-input]');
+                                                                    if (input) setNewArticleCategory(input.value);
+                                                                    setCategoryPopoverOpen(false);
+                                                                }}
+                                                            >
+                                                                <PlusCircle className="mr-2 h-4 w-4" /> Criar nova categoria
+                                                            </Button>
+                                                        </CommandEmpty>
+                                                        <CommandGroup>
+                                                            {uniqueCategories.map((category) => (
+                                                                <CommandItem
+                                                                    key={category}
+                                                                    value={category}
+                                                                    onSelect={(currentValue) => {
+                                                                        setNewArticleCategory(currentValue === newArticleCategory ? "" : currentValue);
+                                                                        setCategoryPopoverOpen(false);
+                                                                    }}
+                                                                >
+                                                                    <Check className={cn("mr-2 h-4 w-4", newArticleCategory === category ? "opacity-100" : "opacity-0")} />
+                                                                    {category}
+                                                                </CommandItem>
+                                                            ))}
+                                                        </CommandGroup>
+                                                    </CommandList>
+                                                </Command>
+                                            </PopoverContent>
+                                        </Popover>
+                                    </div>
+                                </div>
+                            </div>
+                            <DialogFooter>
+                                <Button type="submit" onClick={handleCreateArticle}>Criar Artigo</Button>
+                            </DialogFooter>
+                        </DialogContent>
+                    </Dialog>
+
                      <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                             <Button size="sm" variant="outline" className="gap-1 w-full sm:w-auto">
@@ -146,9 +246,9 @@ export default function KnowledgeBasePage() {
                                 <DropdownMenuSub key={category}>
                                     <DropdownMenuSubTrigger>{category}</DropdownMenuSubTrigger>
                                     <DropdownMenuSubContent>
-                                        <DropdownMenuItem onClick={() => handleOpenSheet('edit', category)}>
+                                        <DropdownMenuItem onClick={() => handleOpenCategorySheet('edit', category)}>
                                             <Pencil className="mr-2 h-4 w-4" />
-                                            Editar
+                                            Renomear
                                         </DropdownMenuItem>
                                         <AlertDialog>
                                              <AlertDialogTrigger asChild>
@@ -176,11 +276,6 @@ export default function KnowledgeBasePage() {
                             {uniqueCategories.length === 0 && (
                                 <DropdownMenuItem disabled>Nenhuma categoria encontrada</DropdownMenuItem>
                             )}
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem onClick={() => handleOpenSheet('add')}>
-                                <PlusCircle className="mr-2 h-4 w-4" />
-                                Nova Categoria
-                            </DropdownMenuItem>
                         </DropdownMenuContent>
                     </DropdownMenu>
                 </div>
@@ -282,45 +377,100 @@ export default function KnowledgeBasePage() {
                             <BookText className="mx-auto h-12 w-12 text-muted-foreground" />
                             <h3 className="mt-4 text-lg font-semibold">Nenhum artigo encontrado</h3>
                             <p className="mt-2 text-sm text-muted-foreground">Comece a criar sua base de conhecimento.</p>
-                            <Button className="mt-6" onClick={handleCreateArticle}>
-                                <PlusCircle className="mr-2 h-4 w-4" />
-                                Criar Primeiro Artigo
-                            </Button>
+                             <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+                                <DialogTrigger asChild>
+                                    <Button className="mt-6">
+                                        <PlusCircle className="mr-2 h-4 w-4" />
+                                        Criar Primeiro Artigo
+                                    </Button>
+                                </DialogTrigger>
+                                <DialogContent>
+                                    <DialogHeader>
+                                        <DialogTitle>Criar Novo Artigo</DialogTitle>
+                                        <DialogDescription>
+                                            Forneça um título e uma categoria para o seu novo artigo.
+                                        </DialogDescription>
+                                    </DialogHeader>
+                                    <div className="grid gap-4 py-4">
+                                        <div className="grid grid-cols-4 items-center gap-4">
+                                            <Label htmlFor="title" className="text-right">
+                                                Título
+                                            </Label>
+                                            <Input
+                                                id="title"
+                                                value={newArticleTitle}
+                                                onChange={(e) => setNewArticleTitle(e.target.value)}
+                                                className="col-span-3"
+                                                placeholder="Título do Artigo"
+                                            />
+                                        </div>
+                                        <div className="grid grid-cols-4 items-center gap-4">
+                                            <Label htmlFor="category" className="text-right">
+                                                Categoria
+                                            </Label>
+                                            <div className="col-span-3">
+                                               <Popover open={isCategoryPopoverOpen} onOpenChange={setCategoryPopoverOpen}>
+                                                    <PopoverTrigger asChild>
+                                                        <Button
+                                                            variant="outline"
+                                                            role="combobox"
+                                                            aria-expanded={isCategoryPopoverOpen}
+                                                            className="w-full justify-between"
+                                                        >
+                                                            {newArticleCategory || "Selecione ou crie uma..."}
+                                                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                                        </Button>
+                                                    </PopoverTrigger>
+                                                    <PopoverContent className="w-[300px] p-0">
+                                                        <Command onValueChange={setNewArticleCategory}>
+                                                            <CommandInput placeholder="Buscar ou criar categoria..." />
+                                                            <CommandList>
+                                                                <CommandEmpty>
+                                                                    <Button 
+                                                                        variant="ghost" 
+                                                                        className="w-full text-left justify-start"
+                                                                        onClick={() => {
+                                                                            const input = document.querySelector<HTMLInputElement>('[cmdk-input]');
+                                                                            if (input) setNewArticleCategory(input.value);
+                                                                            setCategoryPopoverOpen(false);
+                                                                        }}
+                                                                    >
+                                                                        <PlusCircle className="mr-2 h-4 w-4" /> Criar nova categoria
+                                                                    </Button>
+                                                                </CommandEmpty>
+                                                                <CommandGroup>
+                                                                    {uniqueCategories.map((category) => (
+                                                                        <CommandItem
+                                                                            key={category}
+                                                                            value={category}
+                                                                            onSelect={(currentValue) => {
+                                                                                setNewArticleCategory(currentValue === newArticleCategory ? "" : currentValue);
+                                                                                setCategoryPopoverOpen(false);
+                                                                            }}
+                                                                        >
+                                                                            <Check className={cn("mr-2 h-4 w-4", newArticleCategory === category ? "opacity-100" : "opacity-0")} />
+                                                                            {category}
+                                                                        </CommandItem>
+                                                                    ))}
+                                                                </CommandGroup>
+                                                            </CommandList>
+                                                        </Command>
+                                                    </PopoverContent>
+                                                </Popover>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <DialogFooter>
+                                        <Button type="submit" onClick={handleCreateArticle}>Criar Artigo</Button>
+                                    </DialogFooter>
+                                </DialogContent>
+                            </Dialog>
                         </div>
                      )}
                 </CardContent>
             </Card>
-
-             <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
-                <SheetContent className="flex flex-col">
-                    <SheetHeader>
-                        <SheetTitle>{sheetMode === 'add' ? 'Nova Categoria' : 'Editar Categoria'}</SheetTitle>
-                        <SheetDescription>
-                           {sheetMode === 'add' ? 'Digite o nome da nova categoria.' : `Renomear a categoria "${originalCategoryName}".`}
-                        </SheetDescription>
-                    </SheetHeader>
-                    <div className="flex-1 overflow-y-auto -mx-6 px-6 py-4">
-                        <div className="grid gap-4">
-                            <div className="grid grid-cols-4 items-center gap-4">
-                                <Label htmlFor="category-name" className="text-right">
-                                    Nome
-                                </Label>
-                                <Input
-                                    id="category-name"
-                                    value={currentCategory}
-                                    onChange={(e) => setCurrentCategory(e.target.value)}
-                                    className="col-span-3"
-                                    placeholder="Ex: Documentação"
-                                />
-                            </div>
-                        </div>
-                    </div>
-                    <SheetFooter>
-                         <Button variant="outline" onClick={() => setIsSheetOpen(false)}>Cancelar</Button>
-                        <Button onClick={handleSaveCategory}>Salvar</Button>
-                    </SheetFooter>
-                </SheetContent>
-            </Sheet>
         </div>
     );
 }
+
+    
