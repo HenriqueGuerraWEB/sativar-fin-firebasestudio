@@ -4,8 +4,10 @@
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import { CodeBlockLowlight } from '@tiptap/extension-code-block-lowlight';
-import { lowlight } from 'lowlight/lib/common';
+import { createLowlight, common } from 'lowlight';
 import { useEffect } from 'react';
+
+const lowlight = createLowlight(common);
 
 interface EditorProps {
     initialContent: any;
