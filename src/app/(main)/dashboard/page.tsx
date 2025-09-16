@@ -9,7 +9,7 @@ import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts";
 import { DollarSign, Users, CreditCard, Activity } from "lucide-react";
 import { Skeleton } from '@/components/ui/skeleton';
-import { format, subMonths, getMonth, getYear, startOfMonth, endOfMonth, isWithinInterval, isToday, isPast, differenceInDays } from 'date-fns';
+import { format, subMonths, getMonth, getYear, startOfMonth, endOfMonth, isWithinInterval, isToday, isPast, differenceInDays, addDays, isFuture } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useAuth } from '@/hooks/use-auth';
 import { useClients } from '@/hooks/use-clients';
@@ -128,20 +128,33 @@ export default function DashboardPage() {
 
     const importantNotices = useMemo(() => {
         const today = new Date();
+        const upcomingLimit = addDays(today, 5);
+
         return invoices
-            .filter(inv => inv.status === 'Vencida' || (inv.status === 'Pendente' && isToday(new Date(inv.dueDate))))
+            .filter(inv => {
+                const dueDate = new Date(inv.dueDate);
+                return inv.status === 'Vencida' || (inv.status === 'Pendente' && isPast(dueDate)) || (inv.status === 'Pendente' && isWithinInterval(dueDate, { start: today, end: upcomingLimit }));
+            })
             .map(inv => {
                 const dueDate = new Date(inv.dueDate);
                 let friendlyDueDate: string;
+                let badgeVariant: 'destructive' | 'warning' | 'default' = 'default';
+
                 if (isToday(dueDate)) {
                     friendlyDueDate = "Vence Hoje";
+                    badgeVariant = 'warning';
                 } else if (isPast(dueDate)) {
                     const daysOverdue = differenceInDays(today, dueDate);
                     friendlyDueDate = `Vencida há ${daysOverdue} dia(s)`;
+                    badgeVariant = 'destructive';
+                } else if (isFuture(dueDate)) {
+                     const daysUntilDue = differenceInDays(dueDate, today);
+                     friendlyDueDate = `Vence em ${daysUntilDue} dia(s)`;
+                     badgeVariant = 'warning';
                 } else {
                     friendlyDueDate = format(dueDate, 'dd/MM/yyyy');
                 }
-                return { ...inv, friendlyDueDate };
+                return { ...inv, friendlyDueDate, badgeVariant };
             })
             .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
     }, [invoices]);
@@ -220,7 +233,7 @@ export default function DashboardPage() {
         <Card className="lg:col-span-2">
           <CardHeader>
             <CardTitle>Avisos Importantes</CardTitle>
-            <CardDescription>Faturas vencendo hoje e vencidas.</CardDescription>
+            <CardDescription>Faturas vencidas ou com vencimento nos próximos 5 dias.</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="overflow-x-auto">
@@ -243,7 +256,9 @@ export default function DashboardPage() {
                             <TableRow key={invoice.id}>
                                 <TableCell className="font-medium">{invoice.clientName}</TableCell>
                                 <TableCell>
-                                    <Badge variant={invoice.status === 'Vencida' ? 'destructive' : 'secondary'}>{invoice.friendlyDueDate}</Badge>
+                                    <Badge variant={invoice.badgeVariant === 'destructive' ? 'destructive' : invoice.badgeVariant === 'warning' ? 'secondary' : 'default'}>
+                                        {invoice.friendlyDueDate}
+                                    </Badge>
                                 </TableCell>
                                 <TableCell className="text-right">{invoice.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</TableCell>
                             </TableRow>
