@@ -9,7 +9,7 @@ import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts";
 import { DollarSign, Users, CreditCard, Activity } from "lucide-react";
 import { Skeleton } from '@/components/ui/skeleton';
-import { format, subMonths, getMonth, getYear, startOfMonth, endOfMonth, isWithinInterval, isToday, isPast, differenceInDays, addDays, isFuture } from 'date-fns';
+import { format, subMonths, getMonth, getYear, startOfMonth, endOfMonth, isWithinInterval, isToday, isPast, differenceInDays, addDays, isFuture, startOfDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useAuth } from '@/hooks/use-auth';
 import { useClients } from '@/hooks/use-clients';
@@ -127,16 +127,17 @@ export default function DashboardPage() {
     }, [invoices, expenses]);
 
     const importantNotices = useMemo(() => {
-        const today = new Date();
+        const today = startOfDay(new Date());
         const upcomingLimit = addDays(today, 5);
 
         return invoices
             .filter(inv => {
-                const dueDate = new Date(inv.dueDate);
-                return inv.status === 'Vencida' || (inv.status === 'Pendente' && isPast(dueDate)) || (inv.status === 'Pendente' && isWithinInterval(dueDate, { start: today, end: upcomingLimit }));
+                if (inv.status === 'Paga') return false;
+                const dueDate = startOfDay(new Date(inv.dueDate));
+                return isPast(dueDate) || isWithinInterval(dueDate, { start: today, end: upcomingLimit });
             })
             .map(inv => {
-                const dueDate = new Date(inv.dueDate);
+                const dueDate = startOfDay(new Date(inv.dueDate));
                 let friendlyDueDate: string;
                 let badgeVariant: 'destructive' | 'warning' | 'default' = 'default';
 
@@ -147,13 +148,12 @@ export default function DashboardPage() {
                     const daysOverdue = differenceInDays(today, dueDate);
                     friendlyDueDate = `Vencida há ${daysOverdue} dia(s)`;
                     badgeVariant = 'destructive';
-                } else if (isFuture(dueDate)) {
+                } else { // isFuture(dueDate)
                      const daysUntilDue = differenceInDays(dueDate, today);
                      friendlyDueDate = `Vence em ${daysUntilDue} dia(s)`;
                      badgeVariant = 'warning';
-                } else {
-                    friendlyDueDate = format(dueDate, 'dd/MM/yyyy');
                 }
+                
                 return { ...inv, friendlyDueDate, badgeVariant };
             })
             .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
@@ -278,5 +278,7 @@ export default function DashboardPage() {
 }
 
   
+
+    
 
     
