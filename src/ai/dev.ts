@@ -11,4 +11,6 @@ import './flows/company-settings-flow';
 import './flows/tasks-flow';
 import './flows/knowledge-base-flow';
 import './flows/knowledge-base-categories-flow';
+import './flows/notifications-flow';
+
 
