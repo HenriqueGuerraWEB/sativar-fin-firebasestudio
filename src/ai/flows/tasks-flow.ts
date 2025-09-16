@@ -64,6 +64,10 @@ export const getTasks = ai.defineFlow(
     tasks.forEach(task => {
         if (task.parentId && taskMap.has(task.parentId)) {
             const parent = taskMap.get(task.parentId)!;
+            // Ensure subtasks array exists
+            if (!parent.subtasks) {
+                parent.subtasks = [];
+            }
             parent.subtasks.push(task);
         } else {
             rootTasks.push(task);
@@ -196,16 +200,8 @@ export const deleteTask = ai.defineFlow(
   },
   async (taskId) => {
     console.log(`[TASKS_FLOW] Deleting task ${taskId} and its subtasks from database...`);
-    const connection = await executeQuery('SELECT 1'); // Simple query to get a connection from the pool
-    
-    // In a real application, you'd get the connection object itself to perform a transaction
-    // For this simplified example, we'll assume executeQuery can handle it.
-    // Let's just delete them one by one, starting from the children is safer but let's assume ON DELETE CASCADE or handle here
-    // A better approach is a transaction.
-    
-    // For simplicity without transactions in this example structure:
-    // This will recursively delete children if foreign key has ON DELETE CASCADE.
-    // If not, we need a more complex logic. Let's assume ON DELETE CASCADE.
+    // Assuming the database is set up with ON DELETE CASCADE for the parent_id foreign key.
+    // This will recursively delete all subtasks when a parent task is deleted.
     await executeQuery('DELETE FROM tasks WHERE id = ?', [taskId]);
 
     console.log(`Task ${taskId} and its subtasks (if any) deleted.`);

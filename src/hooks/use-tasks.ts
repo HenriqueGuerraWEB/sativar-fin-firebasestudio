@@ -1,13 +1,11 @@
 
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from './use-auth';
-import type { Task, AddTaskInput } from '@/lib/types/task-types';
-import { StorageService } from '@/lib/storage-service';
-import { getNotificationTasks as getNotificationTasksFlow } from '@/ai/flows/tasks-flow';
-
+import type { Task, AddTaskInput, UpdateTaskInput } from '@/lib/types/task-types';
+import { getTasks as getTasksFlow, addTask as addTaskFlow, updateTask as updateTaskFlow, deleteTask as deleteTaskFlow, getNotificationTasks as getNotificationTasksFlow } from '@/ai/flows/tasks-flow';
 
 export type { Task, AddTaskInput };
 
@@ -26,28 +24,8 @@ export function useTasks() {
         }
         setIsLoading(true);
         try {
-            const data = await StorageService.getCollection<Task>('tasks');
-            
-            // Helper to build the hierarchy
-            const buildHierarchy = (items: Task[]): Task[] => {
-                const itemMap = new Map<string, Task>();
-                items.forEach(item => itemMap.set(item.id, { ...item, subtasks: [] }));
-
-                const rootItems: Task[] = [];
-                items.forEach(item => {
-                    if (item.parentId && itemMap.has(item.parentId)) {
-                        const parent = itemMap.get(item.parentId)!;
-                        parent.subtasks.push(itemMap.get(item.id)!);
-                    } else {
-                        rootItems.push(itemMap.get(item.id)!);
-                    }
-                });
-                 // Sort root tasks by due date
-                rootItems.sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
-                return rootItems;
-            };
-
-            setTasks(buildHierarchy(data));
+            const flatTasks = await getTasksFlow();
+            setTasks(flatTasks);
         } catch (error) {
             console.error("Failed to load tasks:", error);
             toast({
@@ -69,28 +47,27 @@ export function useTasks() {
 
     const addTask = async (taskData: AddTaskInput): Promise<Task> => {
         if (!user) throw new Error("User not authenticated");
-        const newTask = await StorageService.addItem('tasks', taskData);
+        const newTask = await addTaskFlow(taskData);
         await loadTasks();
-        return newTask as Task;
+        return newTask;
     };
 
     const updateTask = async (taskId: string, updates: Partial<Omit<Task, 'id' | 'subtasks'>>): Promise<Task | null> => {
         if (!user) throw new Error("User not authenticated");
-        const updatedTask = await StorageService.updateItem('tasks', taskId, updates);
+        const input: UpdateTaskInput = { taskId, updates };
+        const updatedTask = await updateTaskFlow(input);
         await loadTasks();
-        return updatedTask as Task | null;
+        return updatedTask;
     };
 
     const deleteTask = async (taskId: string) => {
         if (!user) throw new Error("User not authenticated");
-        await StorageService.deleteItem('tasks', taskId);
+        await deleteTaskFlow(taskId);
         await loadTasks();
     };
-    
-     const getNotificationTasks = useCallback(async (): Promise<Task[]> => {
+
+    const getNotificationTasks = useCallback(async (): Promise<Task[]> => {
         if (!user) return [];
-        // This flow specifically hits the database regardless of the StorageService mode,
-        // which is correct for a "server-side" check of what's due.
         return await getNotificationTasksFlow();
     }, [user]);
 
