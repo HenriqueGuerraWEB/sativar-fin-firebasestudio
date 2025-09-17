@@ -3,14 +3,10 @@
 
 import { useEditor, EditorContent, BubbleMenu } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
-import { CodeBlockLowlight } from '@tiptap/extension-code-block-lowlight';
-import { createLowlight, common } from 'lowlight';
 import { useEffect } from 'react';
 import { Bold, Italic, Strikethrough, Code, Heading1, Heading2, Heading3 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '../ui/button';
-
-const lowlight = createLowlight(common);
 
 interface EditorProps {
     initialContent: any;
@@ -114,9 +110,6 @@ const Editor = ({ initialContent, onChange }: EditorProps) => {
     const editor = useEditor({
         extensions: [
             StarterKit,
-            CodeBlockLowlight.configure({
-                lowlight,
-            }),
         ],
         content: initialContent,
         editorProps: {

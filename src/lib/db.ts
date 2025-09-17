@@ -3,27 +3,33 @@ import mysql from 'mysql2/promise';
 
 // This function creates a connection pool. It's more efficient than creating a new connection for every query.
 const createPool = () => {
-    try {
-        const pool = mysql.createPool({
-            host: process.env.DB_HOST,
-            user: process.env.DB_USER,
-            password: process.env.DB_PASSWORD,
-            database: process.env.DB_NAME,
-            port: process.env.DB_PORT ? parseInt(process.env.DB_PORT, 10) : 3306,
-            waitForConnections: true,
-            connectionLimit: 10,
-            queueLimit: 0
-        });
-        console.log("Successfully created MySQL connection pool.");
-        return pool;
-    } catch (error) {
-        console.error("Failed to create MySQL connection pool:", error);
-        throw error;
+    // Only create a pool if all required environment variables are set.
+    if (process.env.DB_HOST && process.env.DB_USER && process.env.DB_PASSWORD && process.env.DB_NAME) {
+        try {
+            const pool = mysql.createPool({
+                host: process.env.DB_HOST,
+                user: process.env.DB_USER,
+                password: process.env.DB_PASSWORD,
+                database: process.env.DB_NAME,
+                port: process.env.DB_PORT ? parseInt(process.env.DB_PORT, 10) : 3306,
+                waitForConnections: true,
+                connectionLimit: 10,
+                queueLimit: 0
+            });
+            console.log("Successfully created MySQL connection pool.");
+            return pool;
+        } catch (error) {
+            console.error("Failed to create MySQL connection pool:", error);
+            // Return null if pool creation fails, so the app can fall back to localStorage if desired.
+            return null; 
+        }
     }
+    console.log("Database environment variables are not fully configured. Skipping pool creation.");
+    return null; // Return null if env vars are missing
 };
 
 // We only want to create the pool once.
-export const pool = process.env.DB_HOST ? createPool() : null;
+export const pool = createPool();
 
 /**
  * Executes a SQL query.
