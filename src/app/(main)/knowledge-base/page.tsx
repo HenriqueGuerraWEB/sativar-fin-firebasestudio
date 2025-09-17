@@ -374,15 +374,14 @@ export default function KnowledgeBasePage() {
                                                 {items.map(article => (
                                                     <TableRow key={article.id} className="border-t">
                                                         <TableCell 
-                                                            className="font-medium cursor-pointer hover:underline py-3" 
+                                                            className="font-medium cursor-pointer py-3" 
                                                             onClick={() => router.push(`/knowledge-base/${article.id}`)}
                                                         >
-                                                            <div className="flex items-center gap-3">
+                                                            <div className="flex items-center gap-3 hover:underline">
                                                                 {article.icon ? <span className="text-lg">{article.icon}</span> : <FileText className="h-4 w-4 text-muted-foreground" />}
                                                                 <span>{article.title}</span>
                                                             </div>
                                                         </TableCell>
-                                                        <TableCell className="hidden sm:table-cell text-muted-foreground w-[200px]">{article.authorId}</TableCell>
                                                         <TableCell className="hidden sm:table-cell text-right text-muted-foreground w-[220px]">{format(new Date(article.updatedAt), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}</TableCell>
                                                         <TableCell className="text-right w-20">
                                                             <div className="flex justify-end">
@@ -543,4 +542,3 @@ export default function KnowledgeBasePage() {
     );
 }
 
-    
