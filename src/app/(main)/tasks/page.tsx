@@ -3,7 +3,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { Button } from "@/components/ui/button";
-import { PlusCircle, ChevronRight, Check, List, Calendar as CalendarIconLucide, GitFork, CornerDownRight } from "lucide-react";
+import { PlusCircle, ChevronRight, Check, List, Calendar as CalendarIconLucide, User } from "lucide-react";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetFooter } from "@/components/ui/sheet";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -26,6 +26,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CalendarView } from './calendar-view';
 import { Separator } from '@/components/ui/separator';
 import { Progress } from '@/components/ui/progress';
+import { Badge } from '@/components/ui/badge';
 
 
 const emptyTask: Omit<Task, 'id' | 'status' | 'userId' | 'subtasks'> & { dueDate: Date } = {
@@ -45,71 +46,112 @@ const getTaskProgress = (task: Task): number => {
 };
 
 
-const TaskItem = ({ task, onEdit, onAddSubtask, onToggleComplete, onDelete, level = 0 }: { task: Task, onEdit: (task: Task) => void, onAddSubtask: (parentId: string) => void, onToggleComplete: (task: Task) => void, onDelete: (taskId: string) => void, level?: number }) => {
+const TaskItem = ({ task, onEdit, onAddSubtask, onToggleComplete, onDelete, level = 0, clientsMap }: { task: Task, onEdit: (task: Task) => void, onAddSubtask: (parentId: string) => void, onToggleComplete: (task: Task) => void, onDelete: (taskId: string) => void, level?: number, clientsMap: Map<string, string> }) => {
     const [isExpanded, setIsExpanded] = useState(true);
 
     const isOverdue = task.status !== 'Concluída' && new Date(task.dueDate) < new Date();
     const progress = useMemo(() => getTaskProgress(task), [task]);
     const hasSubtasks = task.subtasks && task.subtasks.length > 0;
+    const clientName = task.relatedClientId ? clientsMap.get(task.relatedClientId) : null;
+
+    const getStatusVariant = (status: Task['status']) => {
+        switch (status) {
+            case 'Concluída': return 'secondary';
+            case 'Em Progresso': return 'default';
+            case 'Pendente': return 'outline';
+            default: return 'outline';
+        }
+    };
+    
+    const getStatusClass = (status: Task['status']) => {
+        switch (status) {
+            case 'Concluída': return 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-400';
+            case 'Em Progresso': return 'bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-400';
+            case 'Pendente': return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-400';
+            default: return '';
+        }
+    }
+
 
     return (
-        <div style={{ marginLeft: `${level * 1}rem` }} className={cn(level > 0 && "pl-4 border-l")}>
-            <div className="flex items-center gap-2 group py-2">
-                {hasSubtasks ? (
-                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setIsExpanded(!isExpanded)}>
-                        <ChevronRight className={cn("h-4 w-4 transition-transform", isExpanded && "rotate-90")} />
+        <div style={{ marginLeft: `${level * 1}rem` }} className={cn(level > 0 && "pl-4 border-l-2 border-dashed")}>
+            <div className="flex items-start gap-2 group py-3">
+                <div className="flex items-center gap-2 h-6">
+                    {hasSubtasks ? (
+                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setIsExpanded(!isExpanded)}>
+                            <ChevronRight className={cn("h-4 w-4 transition-transform", isExpanded && "rotate-90")} />
+                        </Button>
+                    ) : (
+                        <div className="w-6 h-6 shrink-0" />
+                    )}
+                    <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0" onClick={() => onToggleComplete(task)}>
+                        <div className={cn("h-4 w-4 rounded-sm border border-primary flex items-center justify-center", task.status === 'Concluída' && "bg-primary")}>
+                            {task.status === 'Concluída' && <Check className="h-3 w-3 text-primary-foreground" />}
+                        </div>
                     </Button>
-                ) : (
-                     <div className="w-6 h-6 shrink-0" />
-                )}
+                </div>
 
-                <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0" onClick={() => onToggleComplete(task)}>
-                    <div className={cn("h-4 w-4 rounded-sm border border-primary flex items-center justify-center", task.status === 'Concluída' && "bg-primary")}>
-                         {task.status === 'Concluída' && <Check className="h-3 w-3 text-primary-foreground" />}
-                    </div>
-                </Button>
-                
-                <div className="flex-1 cursor-pointer" onClick={() => onEdit(task)}>
-                     <span className={cn("flex-1", task.status === 'Concluída' && "line-through text-muted-foreground")}>
+                <div className="flex-1">
+                    <span 
+                        className={cn("font-medium cursor-pointer", task.status === 'Concluída' && "line-through text-muted-foreground")}
+                        onClick={() => onEdit(task)}
+                    >
                         {task.title}
                     </span>
-                     {hasSubtasks && (
-                        <div className="flex items-center gap-2 mt-1">
-                            <Progress value={progress} className="h-1 w-24" />
-                            <span className="text-xs text-muted-foreground">{Math.round(progress)}%</span>
-                        </div>
+                    
+                     {task.description && (
+                        <p className="text-sm text-muted-foreground mt-1">{task.description}</p>
                     )}
+
+                    <div className="flex flex-wrap items-center gap-2 mt-2">
+                        <Badge variant={getStatusVariant(task.status)} className={cn(getStatusClass(task.status))}>
+                            {task.status}
+                        </Badge>
+                         {clientName && (
+                            <Badge variant="outline" className="flex items-center gap-1">
+                                <User className="h-3 w-3" />
+                                {clientName}
+                            </Badge>
+                        )}
+                        {hasSubtasks && (
+                            <div className="flex items-center gap-2">
+                                <Progress value={progress} className="h-1 w-20" />
+                                <span className="text-xs text-muted-foreground">{Math.round(progress)}%</span>
+                            </div>
+                        )}
+                    </div>
                 </div>
 
-                <span className={cn("text-xs shrink-0", isOverdue ? "text-red-500" : "text-muted-foreground")}>
-                    {format(new Date(task.dueDate), "dd MMM", { locale: ptBR })}
-                </span>
-                
-                <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
-                    <Button variant="ghost" size="sm" onClick={() => onAddSubtask(task.id)}>Adicionar Subtarefa</Button>
-                    <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-7 w-7">
-                                <Trash2 className="h-4 w-4 text-destructive" />
-                            </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                            <AlertDialogHeader>
-                                <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                    Essa ação não pode ser desfeita. Isso excluirá permanentemente a tarefa {task.subtasks.length > 0 && "e todas as suas subtarefas"}.
-                                </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                                <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                <AlertDialogAction onClick={() => onDelete(task.id)}>Excluir</AlertDialogAction>
-                            </AlertDialogFooter>
-                        </AlertDialogContent>
-                    </AlertDialog>
+                <div className="flex items-center gap-1">
+                    <span className={cn("text-xs shrink-0", isOverdue ? "text-red-500 font-semibold" : "text-muted-foreground")}>
+                        {format(new Date(task.dueDate), "dd MMM", { locale: ptBR })}
+                    </span>
+                    <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
+                        <Button variant="ghost" size="sm" onClick={() => onAddSubtask(task.id)}>Adicionar Subtarefa</Button>
+                        <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-7 w-7">
+                                    <Trash2 className="h-4 w-4 text-destructive" />
+                                </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                                <AlertDialogHeader>
+                                    <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                        Essa ação não pode ser desfeita. Isso excluirá permanentemente a tarefa {task.subtasks.length > 0 && "e todas as suas subtarefas"}.
+                                    </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                    <AlertDialogAction onClick={() => onDelete(task.id)}>Excluir</AlertDialogAction>
+                                </AlertDialogFooter>
+                            </AlertDialogContent>
+                        </AlertDialog>
+                    </div>
                 </div>
             </div>
-            {isExpanded && task.subtasks.map(subtask => (
-                <TaskItem key={subtask.id} task={subtask} onEdit={onEdit} onAddSubtask={onAddSubtask} onToggleComplete={onToggleComplete} onDelete={onDelete} level={level + 1} />
+            {isExpanded && task.subtasks.map((subtask, index) => (
+                <TaskItem key={subtask.id} task={subtask} onEdit={onEdit} onAddSubtask={onAddSubtask} onToggleComplete={onToggleComplete} onDelete={onDelete} level={level + 1} clientsMap={clientsMap} />
             ))}
         </div>
     );
@@ -134,6 +176,8 @@ export default function TasksPage() {
         tasks.forEach(addTaskToMap);
         return map;
     }, [tasks]);
+
+    const clientsMap = useMemo(() => new Map(clients.map(c => [c.id, c.name])), [clients]);
 
 
     const handleDueDateChange = (date: Date | undefined) => {
@@ -268,13 +312,12 @@ export default function TasksPage() {
                     </TabsTrigger>
                 </TabsList>
                 <TabsContent value="list">
-                     <div className="p-4 sm:p-6 border rounded-lg mt-4">
+                     <div className="border rounded-lg mt-4 divide-y">
                         {isLoading ? (
-                            <div className="space-y-4">
-                                <Skeleton className="h-8 w-1/3" />
-                                <Skeleton className="h-8 w-full" />
-                                <Skeleton className="h-8 w-full" />
-                                <Skeleton className="h-8 w-2/3" />
+                            <div className="space-y-4 p-6">
+                                <Skeleton className="h-10 w-full" />
+                                <Skeleton className="h-10 w-full" />
+                                <Skeleton className="h-10 w-2/3" />
                             </div>
                         ) : rootTasks.length > 0 ? (
                              rootTasks.map(task => (
@@ -285,10 +328,11 @@ export default function TasksPage() {
                                     onAddSubtask={handleAddSubtask}
                                     onToggleComplete={handleToggleComplete}
                                     onDelete={handleDeleteTask}
+                                    clientsMap={clientsMap}
                                 />
                             ))
                         ) : (
-                            <div className="text-center py-10">
+                            <div className="text-center py-16">
                                 <p className="text-muted-foreground">Nenhuma tarefa encontrada.</p>
                                 <Button variant="ghost" className="mt-4" onClick={handleAddNew}>
                                     <PlusCircle className="mr-2 h-4 w-4" />
