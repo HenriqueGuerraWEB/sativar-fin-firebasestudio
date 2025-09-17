@@ -55,7 +55,17 @@ const migrateDataFlow = ai.defineFlow(
         await connection.beginTransaction();
         console.log("Transaction started.");
 
-        // 1. Migrate Plans
+        // 1. Migrate Users (Admin)
+        if (input.users && input.users.length > 0) {
+            const userValues = input.users.map(u => [u.id, u.name, u.email, u.password]);
+            await connection.query(
+                'INSERT INTO users (id, name, email, password) VALUES ? ON DUPLICATE KEY UPDATE name=VALUES(name), email=VALUES(email), password=VALUES(password)',
+                [userValues]
+            );
+            console.log(`${input.users.length} users migrated.`);
+        }
+
+        // 2. Migrate Plans
         if (input.plans && input.plans.length > 0) {
             const planValues = input.plans.map(p => [
                 p.id, p.name, p.description, p.price, p.type, p.recurrenceValue, p.recurrencePeriod
@@ -67,7 +77,7 @@ const migrateDataFlow = ai.defineFlow(
             console.log(`${input.plans.length} plans migrated.`);
         }
 
-        // 2. Migrate Expense Categories
+        // 3. Migrate Expense Categories
         if (input.expenseCategories && input.expenseCategories.length > 0) {
             const categoryValues = input.expenseCategories.map(c => [c.id, c.name]);
             await connection.query(
@@ -77,7 +87,7 @@ const migrateDataFlow = ai.defineFlow(
             console.log(`${input.expenseCategories.length} expense categories migrated.`);
         }
 
-        // 3. Migrate Expenses
+        // 4. Migrate Expenses
         if (input.expenses && input.expenses.length > 0) {
             const expenseValues = input.expenses.map(e => [
                 e.id, e.description, e.amount, formatDateForMySQL(e.dueDate), e.status, e.categoryId
@@ -89,7 +99,7 @@ const migrateDataFlow = ai.defineFlow(
             console.log(`${input.expenses.length} expenses migrated.`);
         }
 
-        // 4. Migrate Clients
+        // 5. Migrate Clients
         if (input.clients && input.clients.length > 0) {
             const clientValues = input.clients.map(c => [
                 c.id, c.name, c.taxId, c.contactName, c.email, c.phone, c.whatsapp, c.notes, c.status, formatDateForMySQL(c.createdAt), JSON.stringify(c.plans || [])
@@ -101,7 +111,7 @@ const migrateDataFlow = ai.defineFlow(
             console.log(`${input.clients.length} clients migrated.`);
         }
         
-        // 5. Migrate Invoices
+        // 6. Migrate Invoices
         if (input.invoices && input.invoices.length > 0) {
             const invoiceValues = input.invoices.map(i => [
                 i.id, i.clientId, i.planId, i.clientName, i.planName, i.amount, formatDateForMySQL(i.issueDate), formatDateForMySQL(i.dueDate), i.status, formatDateForMySQL(i.paymentDate), i.paymentMethod, i.paymentNotes
@@ -113,7 +123,7 @@ const migrateDataFlow = ai.defineFlow(
             console.log(`${input.invoices.length} invoices migrated.`);
         }
 
-        // 6. Migrate Settings
+        // 7. Migrate Settings
         if (input.settings) {
             const s = input.settings;
             const settingsValues = [
@@ -129,7 +139,7 @@ const migrateDataFlow = ai.defineFlow(
             console.log('Company settings migrated.');
         }
 
-        // 7. Migrate Tasks
+        // 8. Migrate Tasks
         if (input.tasks && input.tasks.length > 0) {
             const taskValues = input.tasks.map(t => [
                 t.id, t.title, t.description, formatDateForMySQL(t.dueDate), t.status, t.userId, t.relatedClientId
@@ -141,7 +151,7 @@ const migrateDataFlow = ai.defineFlow(
             console.log(`${input.tasks.length} tasks migrated.`);
         }
 
-        // 8. Migrate Knowledge Base Articles
+        // 9. Migrate Knowledge Base Articles
         if (input.articles && input.articles.length > 0) {
             const articleValues = input.articles.map(a => [
                 a.id, a.title, JSON.stringify(a.content || {}), JSON.stringify(a.metadata || []), a.authorId, formatDateForMySQL(a.createdAt), formatDateForMySQL(a.updatedAt)
@@ -163,6 +173,7 @@ const migrateDataFlow = ai.defineFlow(
                         (input.expenseCategories?.length || 0) === 0 &&
                         (input.tasks?.length || 0) === 0 &&
                         (input.articles?.length || 0) === 0 &&
+                        (input.users?.length || 0) === 0 &&
                         !input.settings
                         ? 'Nenhum dado local encontrado para migrar, mas a conexão com o banco de dados foi verificada e as tabelas estão prontas.'
                         : 'Migração de dados concluída com sucesso! Todos os dados foram salvos no banco de dados.';
@@ -178,6 +189,7 @@ const migrateDataFlow = ai.defineFlow(
             categoriesMigrated: input.expenseCategories?.length || 0,
             tasksMigrated: input.tasks?.length || 0,
             articlesMigrated: input.articles?.length || 0,
+            usersMigrated: input.users?.length || 0,
         };
     } catch (error: any) {
         await connection.rollback();

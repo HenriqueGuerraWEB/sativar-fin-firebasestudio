@@ -18,6 +18,7 @@ import { migrateData } from '@/ai/flows/data-migration-flow';
 import { testDbConnection } from '@/ai/flows/test-db-connection-flow';
 import { DataMigrationInput } from '@/lib/types/migration-types';
 import type { CompanySettings } from '@/lib/types/company-settings-types';
+import { updateAdmin } from '@/ai/flows/users-flow';
 
 
 const emptySettings: CompanySettings = {
@@ -36,10 +37,14 @@ const isDbEnabled = process.env.NEXT_PUBLIC_DATABASE_ENABLED === 'true';
 
 export default function SettingsPage() {
     const { toast } = useToast();
-    const { user } = useAuth();
+    const { user, refreshUser } = useAuth();
     const [settings, setSettings] = useState<CompanySettings>(emptySettings);
+    const [adminDetails, setAdminDetails] = useState({ name: '', email: '' });
+    const [passwordFields, setPasswordFields] = useState({ newPassword: '', confirmPassword: '' });
+
     const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
+    const [isSavingAdmin, setIsSavingAdmin] = useState(false);
     const [isTesting, setIsTesting] = useState(false);
     const [dbLogs, setDbLogs] = useState('');
     const [isMigrating, setIsMigrating] = useState(false);
@@ -58,6 +63,8 @@ export default function SettingsPage() {
                     } else {
                         setSettings(emptySettings);
                     }
+                    setAdminDetails({ name: user.name, email: user.email });
+
                 } catch (error) {
                     console.error("Error loading settings: ", error);
                     toast({
@@ -76,6 +83,16 @@ export default function SettingsPage() {
         const { id, value } = e.target;
         setSettings(prev => ({ ...prev, [id]: value }));
     };
+    
+    const handleAdminInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const { id, value } = e.target;
+        setAdminDetails(prev => ({ ...prev, [id]: value }));
+    }
+    
+    const handlePasswordInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const { id, value } = e.target;
+        setPasswordFields(prev => ({ ...prev, [id]: value }));
+    }
 
     const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
@@ -104,14 +121,52 @@ export default function SettingsPage() {
         setIsSaving(true);
         try {
             await StorageService.updateItem('company-settings', 'single-settings', settings);
-            toast({ title: "Sucesso!", description: "Configurações salvas com sucesso." });
+            toast({ title: "Sucesso!", description: "Configurações da empresa salvas com sucesso." });
         } catch (error) {
              console.error("Error saving settings: ", error);
-             toast({ title: "Erro ao Salvar", description: "Não foi possível salvar as configurações.", variant: "destructive" });
+             toast({ title: "Erro ao Salvar", description: "Não foi possível salvar as configurações da empresa.", variant: "destructive" });
         } finally {
             setIsSaving(false);
         }
     };
+
+    const handleSaveAdminSettings = async () => {
+        if (!user || !user.id) {
+            toast({ title: "Erro", description: "Usuário não autenticado.", variant: "destructive" });
+            return;
+        }
+        if (passwordFields.newPassword && passwordFields.newPassword !== passwordFields.confirmPassword) {
+            toast({ title: "Erro", description: "As novas senhas não coincidem.", variant: "destructive" });
+            return;
+        }
+         if (passwordFields.newPassword && passwordFields.newPassword.length < 6) {
+            toast({ title: "Erro", description: "A nova senha deve ter pelo menos 6 caracteres.", variant: "destructive" });
+            return;
+        }
+
+        setIsSavingAdmin(true);
+        try {
+            const updates: any = {};
+            if (adminDetails.name !== user.name) updates.name = adminDetails.name;
+            if (adminDetails.email !== user.email) updates.email = adminDetails.email;
+            if (passwordFields.newPassword) updates.password = passwordFields.newPassword;
+
+            if (Object.keys(updates).length > 0) {
+                await updateAdmin({ userId: user.id, updates });
+                toast({ title: "Sucesso!", description: "Dados do administrador atualizados." });
+                await refreshUser(); // Refresh user data in the auth context
+                setPasswordFields({ newPassword: '', confirmPassword: '' });
+            } else {
+                toast({ title: "Nenhuma alteração", description: "Nenhum dado foi modificado." });
+            }
+        } catch (error: any) {
+            console.error("Error saving admin settings: ", error);
+            toast({ title: "Erro ao Salvar", description: `Não foi possível salvar os dados do administrador. ${error.message}`, variant: "destructive" });
+        } finally {
+            setIsSavingAdmin(false);
+        }
+    };
+
 
     const handleTestConnection = async () => {
         setIsTesting(true);
@@ -165,6 +220,7 @@ export default function SettingsPage() {
             const tasks = LocalStorageService.getCollection('tasks');
             const articles = LocalStorageService.getCollection('knowledge-base-articles');
             const settingsData = LocalStorageService.getItem<CompanySettings>('company-settings', 'single-settings');
+            const users = LocalStorageService.getCollection('sativar-users');
 
             const migrationData: DataMigrationInput = {
                 clients: clients.length > 0 ? clients : undefined,
@@ -175,6 +231,7 @@ export default function SettingsPage() {
                 tasks: tasks.length > 0 ? tasks : undefined,
                 articles: articles.length > 0 ? articles : undefined,
                 settings: settingsData || undefined,
+                users: users.length > 0 ? users : undefined,
             };
 
             const result = await migrateData(migrationData);
@@ -221,6 +278,41 @@ export default function SettingsPage() {
                 </Card>
             ) : (
                 <>
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Conta de Administrador</CardTitle>
+                        <CardDescription>Gerencie seus dados de acesso. Use o banco de dados para maior segurança.</CardDescription>
+                    </CardHeader>
+                    <CardContent className="grid gap-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div className="grid gap-2">
+                                <Label htmlFor="name">Nome</Label>
+                                <Input id="name" value={adminDetails.name} onChange={handleAdminInputChange} />
+                            </div>
+                            <div className="grid gap-2">
+                                <Label htmlFor="email">Email</Label>
+                                <Input id="email" type="email" value={adminDetails.email} onChange={handleAdminInputChange} />
+                            </div>
+                        </div>
+                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div className="grid gap-2">
+                                <Label htmlFor="newPassword">Nova Senha</Label>
+                                <Input id="newPassword" type="password" value={passwordFields.newPassword} onChange={handlePasswordInputChange} placeholder="Deixe em branco para não alterar" />
+                            </div>
+                            <div className="grid gap-2">
+                                <Label htmlFor="confirmPassword">Confirmar Nova Senha</Label>
+                                <Input id="confirmPassword" type="password" value={passwordFields.confirmPassword} onChange={handlePasswordInputChange} />
+                            </div>
+                        </div>
+                    </CardContent>
+                     <Card.Footer className="border-t px-6 py-4">
+                        <Button onClick={handleSaveAdminSettings} disabled={isSavingAdmin || !isDbEnabled} >
+                            {isSavingAdmin ? 'Salvando...' : 'Salvar Dados do Admin'}
+                        </Button>
+                    </Card.Footer>
+                </Card>
+
+
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                     <Card className="lg:col-span-2">
                         <CardHeader>
@@ -261,6 +353,11 @@ export default function SettingsPage() {
                                 <Input id="website" value={settings?.website ?? ''} onChange={handleInputChange} placeholder="www.suaempresa.com" />
                             </div>
                         </CardContent>
+                         <Card.Footer className="border-t px-6 py-4">
+                            <Button onClick={handleSaveSettings} disabled={isSaving}>
+                                {isSaving ? 'Salvando...' : 'Salvar Configurações da Empresa'}
+                            </Button>
+                        </Card.Footer>
                     </Card>
 
                     <Card>
@@ -322,12 +419,6 @@ export default function SettingsPage() {
 
                     </CardContent>
                 </Card>
-
-                <div className="flex justify-end mt-4">
-                    <Button onClick={handleSaveSettings} disabled={isLoading || isSaving}>
-                        {isSaving ? 'Salvando...' : 'Salvar Alterações'}
-                    </Button>
-                </div>
                 </>
             )}
              <AlertDialog open={isMigrationAlertOpen} onOpenChange={setIsMigrationAlertOpen}>

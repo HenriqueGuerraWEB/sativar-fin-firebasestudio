@@ -1,3 +1,4 @@
+
 # Guia de Instalação e Configuração Local
 
 Este guia descreve os passos necessários para configurar e executar a aplicação Sativar Manager em seu ambiente de desenvolvimento local.
@@ -52,9 +53,17 @@ USE sativar_db;
 
 ### 3.2. Criar as Tabelas
 
-Execute os scripts abaixo para criar as tabelas `plans`, `expense_categories`, `expenses`, `clients`, `invoices`, `company_settings`, `tasks` e `knowledge_base_articles`.
+Execute os scripts abaixo para criar as tabelas do sistema.
 
 ```sql
+-- Tabela de Usuários (para autenticação)
+CREATE TABLE IF NOT EXISTS `users` (
+  `id` VARCHAR(255) PRIMARY KEY,
+  `name` VARCHAR(255) NOT NULL,
+  `email` VARCHAR(255) NOT NULL UNIQUE,
+  `password` VARCHAR(255) NOT NULL
+);
+
 -- Tabela de Planos
 CREATE TABLE IF NOT EXISTS `plans` (
   `id` VARCHAR(255) PRIMARY KEY,
@@ -175,7 +184,7 @@ npm run genkit:dev
 
 ## 5. Fluxo de Uso
 
-1.  **Modo `localStorage`**: Com `NEXT_PUBLIC_DATABASE_ENABLED=false`, a aplicação usará o armazenamento local do navegador. Você pode adicionar clientes, planos, etc., e tudo funcionará normalmente.
+1.  **Modo `localStorage`**: Com `NEXT_PUBLIC_DATABASE_ENABLED=false`, a aplicação usará o armazenamento local do navegador. Você poderá adicionar clientes, planos, etc., e tudo funcionará normalmente.
 2.  **Migração para MySQL**:
     *   Quando estiver pronto para usar o banco de dados, preencha as credenciais do MySQL no arquivo `.env.local`.
     *   Mude a variável `NEXT_PUBLIC_DATABASE_ENABLED` para `true`.
