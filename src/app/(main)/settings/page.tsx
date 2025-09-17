@@ -3,7 +3,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from '@/hooks/use-toast';
@@ -305,11 +305,11 @@ export default function SettingsPage() {
                             </div>
                         </div>
                     </CardContent>
-                     <Card.Footer className="border-t px-6 py-4">
+                     <CardFooter className="border-t px-6 py-4">
                         <Button onClick={handleSaveAdminSettings} disabled={isSavingAdmin || !isDbEnabled} >
                             {isSavingAdmin ? 'Salvando...' : 'Salvar Dados do Admin'}
                         </Button>
-                    </Card.Footer>
+                    </CardFooter>
                 </Card>
 
 
@@ -353,11 +353,11 @@ export default function SettingsPage() {
                                 <Input id="website" value={settings?.website ?? ''} onChange={handleInputChange} placeholder="www.suaempresa.com" />
                             </div>
                         </CardContent>
-                         <Card.Footer className="border-t px-6 py-4">
+                         <CardFooter className="border-t px-6 py-4">
                             <Button onClick={handleSaveSettings} disabled={isSaving}>
                                 {isSaving ? 'Salvando...' : 'Salvar Configurações da Empresa'}
                             </Button>
-                        </Card.Footer>
+                        </CardFooter>
                     </Card>
 
                     <Card>
@@ -441,3 +441,5 @@ export default function SettingsPage() {
         </div>
     );
 }
+
+    
