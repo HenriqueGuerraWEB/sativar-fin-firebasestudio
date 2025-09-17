@@ -1,11 +1,14 @@
 
 'use client';
 
-import { useEditor, EditorContent } from '@tiptap/react';
+import { useEditor, EditorContent, BubbleMenu } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import { CodeBlockLowlight } from '@tiptap/extension-code-block-lowlight';
 import { createLowlight, common } from 'lowlight';
 import { useEffect } from 'react';
+import { Bold, Italic, Strikethrough, Code } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { Button } from '../ui/button';
 
 const lowlight = createLowlight(common);
 
@@ -13,6 +16,66 @@ interface EditorProps {
     initialContent: any;
     onChange: (content: any) => void;
 }
+
+const EditorToolbar = ({ editor }: { editor: any }) => {
+    if (!editor) {
+        return null;
+    }
+
+    return (
+        <BubbleMenu
+            editor={editor}
+            tippyOptions={{ duration: 100 }}
+            className="flex items-center gap-1 rounded-md bg-zinc-800 p-1"
+        >
+            <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => editor.chain().focus().toggleBold().run()}
+                className={cn(
+                    "p-2 h-auto text-white hover:bg-zinc-700 hover:text-white",
+                    editor.isActive('bold') ? 'is-active bg-zinc-700' : ''
+                )}
+            >
+                <Bold className="h-4 w-4" />
+            </Button>
+            <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => editor.chain().focus().toggleItalic().run()}
+                className={cn(
+                    "p-2 h-auto text-white hover:bg-zinc-700 hover:text-white",
+                    editor.isActive('italic') ? 'is-active bg-zinc-700' : ''
+                )}
+            >
+                <Italic className="h-4 w-4" />
+            </Button>
+            <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => editor.chain().focus().toggleStrike().run()}
+                 className={cn(
+                    "p-2 h-auto text-white hover:bg-zinc-700 hover:text-white",
+                    editor.isActive('strike') ? 'is-active bg-zinc-700' : ''
+                )}
+            >
+                <Strikethrough className="h-4 w-4" />
+            </Button>
+             <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => editor.chain().focus().toggleCode().run()}
+                 className={cn(
+                    "p-2 h-auto text-white hover:bg-zinc-700 hover:text-white",
+                    editor.isActive('code') ? 'is-active bg-zinc-700' : ''
+                )}
+            >
+                <Code className="h-4 w-4" />
+            </Button>
+        </BubbleMenu>
+    );
+};
+
 
 const Editor = ({ initialContent, onChange }: EditorProps) => {
     const editor = useEditor({
@@ -35,9 +98,13 @@ const Editor = ({ initialContent, onChange }: EditorProps) => {
 
     useEffect(() => {
         if (editor && initialContent && !editor.isFocused) {
-            const { from, to } = editor.state.selection;
-            editor.commands.setContent(initialContent, false);
-            editor.commands.setTextSelection({ from, to });
+            // Using a deep check to avoid re-rendering if content is the same
+            const isSame = JSON.stringify(editor.getJSON()) === JSON.stringify(initialContent);
+            if (!isSame) {
+                const { from, to } = editor.state.selection;
+                editor.commands.setContent(initialContent, false);
+                editor.commands.setTextSelection({ from, to });
+            }
         }
     }, [initialContent, editor]);
 
@@ -47,12 +114,11 @@ const Editor = ({ initialContent, onChange }: EditorProps) => {
     }
 
     return (
-        <div>
+        <div className="relative">
+            <EditorToolbar editor={editor} />
             <EditorContent editor={editor} />
         </div>
     );
 };
 
 export default Editor;
-
-    
