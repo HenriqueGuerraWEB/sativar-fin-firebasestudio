@@ -9,13 +9,12 @@
  * - updateAdmin: Updates an admin user's details.
  */
 
-import { ai } from '@/ai/genkit';
+import { ai, getAuth } from '@/ai/genkit';
 import { z } from 'genkit';
 import { executeQuery } from '@/lib/db';
 import { randomUUID } from 'crypto';
 import { RowDataPacket } from 'mysql2';
 import { UserSchema, User, CreateUserInputSchema, UpdateUserInputSchema } from '@/lib/types/user-types';
-import { getAuth } from 'genkit/auth';
 
 
 export const getUser = ai.defineFlow(
