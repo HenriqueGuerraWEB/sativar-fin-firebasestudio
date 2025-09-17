@@ -9,12 +9,8 @@ import React, {
   useMemo,
   useCallback,
 } from "react";
-import { LocalStorageService } from "@/lib/storage-service";
-import { adminExists as adminExistsFlow, createAdmin, getUser } from "@/ai/flows/users-flow";
+import { adminExists as adminExistsFlow } from "@/ai/flows/users-flow";
 
-const isDbEnabled = process.env.NEXT_PUBLIC_DATABASE_ENABLED === 'true';
-
-// Define a user object type that includes the ID from the database
 export type User = {
   id: string;
   name: string;
@@ -33,104 +29,86 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const SESSION_STORAGE_KEY = 'sativar-session';
-const USERS_STORAGE_KEY = 'sativar-users'; // Used only for localStorage mode
-
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [adminExists, setAdminExists] = useState<boolean | null>(null);
 
-  const checkAdminExists = useCallback(async () => {
-    if (isDbEnabled) {
-      return await adminExistsFlow();
-    } else {
-      const users = LocalStorageService.getCollection(USERS_STORAGE_KEY);
-      return users.length > 0;
+  const fetchSession = useCallback(async () => {
+    try {
+      const res = await fetch('/api/auth/session');
+      if (res.ok) {
+        const { user: sessionUser } = await res.json();
+        setUser(sessionUser);
+      } else {
+        setUser(null);
+      }
+    } catch (e) {
+      console.error("Failed to fetch session", e);
+      setUser(null);
     }
   }, []);
-  
+
   const initializeAuth = useCallback(async () => {
+    setLoading(true);
     try {
-      setAdminExists(await checkAdminExists());
-      const sessionUserJson = localStorage.getItem(SESSION_STORAGE_KEY);
-      if (sessionUserJson) {
-        setUser(JSON.parse(sessionUserJson));
+      const exists = await adminExistsFlow();
+      setAdminExists(exists);
+      if (exists) {
+        await fetchSession();
       }
     } catch (e) {
       console.error("Failed to initialize auth state", e);
     } finally {
       setLoading(false);
     }
-  }, [checkAdminExists]);
-
+  }, [fetchSession]);
 
   useEffect(() => {
     initializeAuth();
-    // No need for storage event listener, as session is the single source of truth for UI
   }, [initializeAuth]);
 
   const login = useCallback(async (email: string, pass: string): Promise<void> => {
-    let userData: Omit<User, 'password'> | null = null;
+    const res = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password: pass }),
+    });
 
-    if (isDbEnabled) {
-        userData = await getUser({ email, password });
+    if (res.ok) {
+      const { user: loggedInUser } = await res.json();
+      setUser(loggedInUser);
     } else {
-        const users = LocalStorageService.getCollection(USERS_STORAGE_KEY);
-        const userToLogin = users.find(
-            (u: any) => u.email === email && u.password === pass
-        );
-        if (userToLogin) {
-            const { password, ...rest } = userToLogin;
-            userData = rest;
-        }
-    }
-
-    if (userData) {
-      localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(userData));
-      setUser(userData as User);
-    } else {
-      throw new Error("Credenciais inválidas. Verifique seu e-mail e senha.");
+      const { error } = await res.json();
+      throw new Error(error || "Falha no login");
     }
   }, []);
 
   const signup = useCallback(async (email: string, pass: string, name: string): Promise<void> => {
-      const exists = await checkAdminExists();
-      if (exists) {
-          throw new Error("Um administrador já existe. Não é possível criar outra conta.");
-      }
-      if (!name || !email || !pass) {
-          throw new Error("Nome, email e senha são obrigatórios.");
-      }
-
-      let newUserData: Omit<User, 'password'>;
-      if (isDbEnabled) {
-          newUserData = await createAdmin({ name, email, password: pass });
-      } else {
-          const newUser = LocalStorageService.addItem(USERS_STORAGE_KEY, { name, email, password: pass });
-          const { password, ...rest } = newUser;
-          newUserData = rest;
-      }
-      
-      localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(newUserData));
-      setUser(newUserData as User);
-      setAdminExists(true);
-  }, [checkAdminExists]);
+    const res = await fetch('/api/auth/signup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password: pass, name }),
+    });
+    
+    if (res.ok) {
+        const { user: signedUpUser } = await res.json();
+        setUser(signedUpUser);
+        setAdminExists(true);
+    } else {
+        const { error } = await res.json();
+        throw new Error(error || "Falha no cadastro");
+    }
+  }, []);
 
   const logout = useCallback(async (): Promise<void> => {
-    localStorage.removeItem(SESSION_STORAGE_KEY);
+    await fetch('/api/auth/logout', { method: 'POST' });
     setUser(null);
   }, []);
   
   const refreshUser = useCallback(async (): Promise<void> => {
-     const sessionUserJson = localStorage.getItem(SESSION_STORAGE_KEY);
-     if (sessionUserJson) {
-        const sessionUser = JSON.parse(sessionUserJson) as User;
-        // In DB mode, we could re-fetch from DB to ensure data is fresh
-        // For now, just re-setting from localStorage is enough after an update.
-        setUser(sessionUser);
-     }
-  }, []);
+     await fetchSession();
+  }, [fetchSession]);
 
 
   const value = useMemo(

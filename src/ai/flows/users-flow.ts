@@ -15,6 +15,7 @@ import { executeQuery } from '@/lib/db';
 import { randomUUID } from 'crypto';
 import { RowDataPacket } from 'mysql2';
 import { UserSchema, User, CreateUserInputSchema, UpdateUserInputSchema } from '@/lib/types/user-types';
+import { getAuth } from 'genkit/auth';
 
 
 export const getUser = ai.defineFlow(
@@ -25,9 +26,11 @@ export const getUser = ai.defineFlow(
   },
   async ({ email, password }) => {
     console.log(`[USERS_FLOW] Attempting to get user by email: ${email}`);
+    // IMPORTANT: In a real app, passwords should be hashed and salted.
+    // Storing and comparing plain text passwords is a major security risk.
     const results = await executeQuery(
       'SELECT id, name, email FROM users WHERE email = ? AND password = ?',
-      [email, password] // NOTE: Storing and comparing plain text passwords.
+      [email, password] 
     ) as RowDataPacket[];
 
     if (results.length > 0) {
@@ -75,6 +78,7 @@ export const createAdmin = ai.defineFlow(
       id: randomUUID(),
     };
     
+    // IMPORTANT: In a real app, passwords should be hashed and salted.
     await executeQuery(
       'INSERT INTO users (id, name, email, password) VALUES (?, ?, ?, ?)',
       [newAdmin.id, newAdmin.name, newAdmin.email, newAdmin.password]
@@ -90,10 +94,17 @@ export const createAdmin = ai.defineFlow(
 export const updateAdmin = ai.defineFlow(
   {
     name: 'updateAdmin',
-    inputSchema: UpdateUserInputSchema,
+    inputSchema: UpdateUserInputSchema.omit({ userId: true }), // userId will come from auth context
     outputSchema: UserSchema.omit({ password: true }).nullable(),
+    authPolicy: (auth, input) => {
+        if (!auth) throw new Error("User not authenticated.");
+    }
   },
-  async ({ userId, updates }) => {
+  async (updates) => {
+    const auth = getAuth();
+    if (!auth) throw new Error("User not authenticated.");
+    
+    const userId = auth.id;
     console.log(`[USERS_FLOW] Updating admin user ${userId}...`);
     
     const fields = Object.keys(updates);

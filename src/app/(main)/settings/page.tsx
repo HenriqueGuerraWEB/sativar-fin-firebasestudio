@@ -131,7 +131,7 @@ export default function SettingsPage() {
     };
 
     const handleSaveAdminSettings = async () => {
-        if (!user || !user.id) {
+        if (!user) { // This check is mostly for client-side feedback
             toast({ title: "Erro", description: "Usuário não autenticado.", variant: "destructive" });
             return;
         }
@@ -152,7 +152,7 @@ export default function SettingsPage() {
             if (passwordFields.newPassword) updates.password = passwordFields.newPassword;
 
             if (Object.keys(updates).length > 0) {
-                await updateAdmin({ userId: user.id, updates });
+                await updateAdmin(updates);
                 toast({ title: "Sucesso!", description: "Dados do administrador atualizados." });
                 await refreshUser(); // Refresh user data in the auth context
                 setPasswordFields({ newPassword: '', confirmPassword: '' });
@@ -441,5 +441,3 @@ export default function SettingsPage() {
         </div>
     );
 }
-
-    
