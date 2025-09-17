@@ -6,7 +6,7 @@ import StarterKit from '@tiptap/starter-kit';
 import { CodeBlockLowlight } from '@tiptap/extension-code-block-lowlight';
 import { createLowlight, common } from 'lowlight';
 import { useEffect } from 'react';
-import { Bold, Italic, Strikethrough, Code } from 'lucide-react';
+import { Bold, Italic, Strikethrough, Code, Heading1, Heading2, Heading3 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '../ui/button';
 
@@ -28,6 +28,39 @@ const EditorToolbar = ({ editor }: { editor: any }) => {
             tippyOptions={{ duration: 100 }}
             className="flex items-center gap-1 rounded-md bg-zinc-800 p-1"
         >
+            <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
+                className={cn(
+                    "p-2 h-auto text-white hover:bg-zinc-700 hover:text-white",
+                    editor.isActive('heading', { level: 1 }) ? 'is-active bg-zinc-700' : ''
+                )}
+            >
+                <Heading1 className="h-4 w-4" />
+            </Button>
+            <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
+                className={cn(
+                    "p-2 h-auto text-white hover:bg-zinc-700 hover:text-white",
+                    editor.isActive('heading', { level: 2 }) ? 'is-active bg-zinc-700' : ''
+                )}
+            >
+                <Heading2 className="h-4 w-4" />
+            </Button>
+            <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}
+                className={cn(
+                    "p-2 h-auto text-white hover:bg-zinc-700 hover:text-white",
+                    editor.isActive('heading', { level: 3 }) ? 'is-active bg-zinc-700' : ''
+                )}
+            >
+                <Heading3 className="h-4 w-4" />
+            </Button>
             <Button
                 variant="ghost"
                 size="sm"
