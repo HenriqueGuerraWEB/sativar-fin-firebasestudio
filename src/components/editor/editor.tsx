@@ -9,10 +9,6 @@ import { useEffect } from 'react';
 import { Bold, Italic, Strikethrough, Code } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '../ui/button';
-import { Color } from '@tiptap/extension-color';
-import TextStyle from '@tiptap/extension-text-style';
-import { Typography } from '@tiptap/extension-typography';
-
 
 const lowlight = createLowlight(common);
 
@@ -76,12 +72,6 @@ const EditorToolbar = ({ editor }: { editor: any }) => {
             >
                 <Code className="h-4 w-4" />
             </Button>
-            <input
-                type="color"
-                className="w-8 h-8 bg-transparent border-none cursor-pointer p-1"
-                onInput={event => editor.chain().focus().setColor((event.target as HTMLInputElement).value).run()}
-                value={editor.getAttributes('textStyle').color || '#ffffff'}
-            />
         </BubbleMenu>
     );
 };
@@ -91,9 +81,6 @@ const Editor = ({ initialContent, onChange }: EditorProps) => {
     const editor = useEditor({
         extensions: [
             StarterKit,
-            Typography,
-            TextStyle,
-            Color,
             CodeBlockLowlight.configure({
                 lowlight,
             }),
