@@ -1,3 +1,4 @@
+
 'use server';
 /**
  * @fileOverview Genkit flows for managing knowledge base articles.
@@ -154,8 +155,13 @@ export const updateArticle = ai.defineFlow(
     for (const key in updatesWithTimestamp) {
       if (Object.prototype.hasOwnProperty.call(updatesWithTimestamp, key)) {
           const dbKey = key;
-          if (key === 'content' || key === 'metadata') {
-             dbUpdates[dbKey] = JSON.stringify(updatesWithTimestamp[key] || []); // Default to empty array for JSON fields
+          // For 'content' and 'metadata', stringify only if they are not already a string
+          if ((key === 'content' || key === 'metadata')) {
+              if(typeof updatesWithTimestamp[key] === 'object') {
+                  dbUpdates[dbKey] = JSON.stringify(updatesWithTimestamp[key] || {});
+              } else {
+                 dbUpdates[dbKey] = updatesWithTimestamp[key];
+              }
           } else if (key === 'createdAt' || key === 'updatedAt') {
              // Format date fields for MySQL
              dbUpdates[dbKey] = format(new Date(updatesWithTimestamp[key]), 'yyyy-MM-dd HH:mm:ss');

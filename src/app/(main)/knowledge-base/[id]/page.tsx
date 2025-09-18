@@ -43,14 +43,15 @@ const extractHeadings = (content: any): Heading[] => {
     return [];
   }
   const headings: Heading[] = [];
+  const contentToParse = typeof content === 'string' ? JSON.parse(content) : content;
 
-  content.content.forEach((node: any) => {
+
+  (contentToParse.content || []).forEach((node: any) => {
     if ((node.type === 'heading' || node.type === 'paragraph') && node.content) {
       node.content.forEach((textNode: any) => {
         if (textNode.marks) {
           const anchorMark = textNode.marks.find((mark: any) => mark.type === 'anchor');
-          // Add a check for anchorMark.attrs to prevent the error
-          if (anchorMark && anchorMark.attrs) { 
+          if (anchorMark && anchorMark.attrs && anchorMark.attrs.id) { 
             headings.push({
               level: node.attrs?.level || 4, // Fallback to a default level
               text: textNode.text,
@@ -554,7 +555,7 @@ export default function ArticlePage() {
                         </Dialog>
                    </div>
                    <div className="flex-1 overflow-y-auto">
-                        {tableOfContents.length > 0 ? <TableOfContents headings={tableOfContents} /> : null}
+                        <TableOfContents headings={tableOfContents} />
 
                         {relatedArticles.length > 0 && (
                             <div className="p-2 space-y-1">
@@ -585,5 +586,3 @@ export default function ArticlePage() {
         </div>
     );
 }
-
-    
