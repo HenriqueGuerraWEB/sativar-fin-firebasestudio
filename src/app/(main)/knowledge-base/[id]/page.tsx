@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { useKnowledgeBase } from "@/hooks/use-knowledge-base";
 import type { KnowledgeBaseArticle } from "@/lib/types/knowledge-base-types";
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, GripVertical, Trash2, Plus, Save, Smile, X, FileText, Check, ChevronsUpDown, ChevronRight, PlusCircle, Shapes, Anchor } from 'lucide-react';
+import { ArrowLeft, GripVertical, Trash2, Plus, Save, Smile, X, FileText, Check, ChevronsUpDown, ChevronRight, PlusCircle, Shapes, Anchor, Heading1, Heading2, Heading3 } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
@@ -49,10 +49,10 @@ const extractHeadings = (content: any): Heading[] => {
       node.content.forEach((textNode: any) => {
         if (textNode.marks) {
           const anchorMark = textNode.marks.find((mark: any) => mark.type === 'anchor');
-          if (anchorMark) {
+          // Add a check for anchorMark.attrs to prevent the error
+          if (anchorMark && anchorMark.attrs) { 
             headings.push({
-              // Fallback to a default level for paragraphs to prevent error
-              level: node.attrs?.level || 4, 
+              level: node.attrs?.level || 4, // Fallback to a default level
               text: textNode.text,
               id: anchorMark.attrs.id,
             });
@@ -585,3 +585,5 @@ export default function ArticlePage() {
         </div>
     );
 }
+
+    
