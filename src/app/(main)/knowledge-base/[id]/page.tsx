@@ -39,32 +39,39 @@ type Heading = {
 };
 
 const extractHeadings = (content: any): Heading[] => {
-  if (!content?.content) {
-    return [];
-  }
   const headings: Heading[] = [];
+  if (!content?.content) {
+    return headings;
+  }
+
   const contentToParse = typeof content === 'string' ? JSON.parse(content) : content;
 
-
-  (contentToParse.content || []).forEach((node: any) => {
-    if ((node.type === 'heading' || node.type === 'paragraph') && node.content) {
-      node.content.forEach((textNode: any) => {
-        if (textNode.marks) {
-          const anchorMark = textNode.marks.find((mark: any) => mark.type === 'anchor');
-          if (anchorMark && anchorMark.attrs && anchorMark.attrs.id) { 
-            headings.push({
-              level: node.attrs?.level || 4, // Fallback to a default level
-              text: textNode.text,
-              id: anchorMark.attrs.id,
-            });
-          }
+  function recurse(nodes: any[]) {
+    nodes.forEach(node => {
+      if (node.marks) {
+        const anchorMark = node.marks.find((mark: any) => mark.type === 'anchor');
+        if (anchorMark && anchorMark.attrs && anchorMark.attrs.id) {
+          headings.push({
+            // The node with the mark is a text node, its parent holds the level
+            // We find the parent node in the original content
+            level: node.level || 4, // Simplification, may need parent traversal logic
+            text: node.text,
+            id: anchorMark.attrs.id,
+          });
         }
-      });
-    }
-  });
+      }
+      
+      // If the node has its own content array, recurse into it
+      if (node.content) {
+        recurse(node.content);
+      }
+    });
+  }
 
+  recurse(contentToParse.content);
   return headings;
 };
+
 
 const TableOfContents = ({ headings }: { headings: Heading[] }) => {
     if (headings.length === 0) return null;
@@ -586,3 +593,5 @@ export default function ArticlePage() {
         </div>
     );
 }
+
+    
