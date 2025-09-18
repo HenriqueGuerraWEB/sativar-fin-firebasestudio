@@ -4,9 +4,11 @@
 import { useEditor, EditorContent, BubbleMenu } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import { useEffect } from 'react';
-import { Bold, Italic, Strikethrough, Code, Heading1, Heading2, Heading3 } from 'lucide-react';
+import { Bold, Italic, Strikethrough, Code, Heading1, Heading2, Heading3, Anchor } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '../ui/button';
+import { nanoid } from 'nanoid';
+import { AnchorMark } from './anchor';
 
 interface EditorProps {
     initialContent: any;
@@ -17,6 +19,10 @@ const EditorToolbar = ({ editor }: { editor: any }) => {
     if (!editor) {
         return null;
     }
+    
+    const addAnchor = () => {
+      editor.chain().focus().setAnchor({ id: nanoid(8) }).run();
+    };
 
     return (
         <BubbleMenu
@@ -56,6 +62,17 @@ const EditorToolbar = ({ editor }: { editor: any }) => {
                 )}
             >
                 <Heading3 className="h-4 w-4" />
+            </Button>
+            <Button
+                variant="ghost"
+                size="sm"
+                onClick={addAnchor}
+                className={cn(
+                    "p-2 h-auto text-white hover:bg-zinc-700 hover:text-white",
+                    editor.isActive('anchor') ? 'is-active bg-zinc-700' : ''
+                )}
+            >
+                <Anchor className="h-4 w-4" />
             </Button>
             <Button
                 variant="ghost"
@@ -110,6 +127,7 @@ const Editor = ({ initialContent, onChange }: EditorProps) => {
     const editor = useEditor({
         extensions: [
             StarterKit,
+            AnchorMark,
         ],
         content: initialContent,
         editorProps: {

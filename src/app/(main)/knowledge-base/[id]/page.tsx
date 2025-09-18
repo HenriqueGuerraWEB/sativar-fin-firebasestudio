@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { useKnowledgeBase } from "@/hooks/use-knowledge-base";
 import type { KnowledgeBaseArticle } from "@/lib/types/knowledge-base-types";
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, GripVertical, Trash2, Plus, Save, Smile, X, FileText, Check, ChevronsUpDown, ChevronRight, PlusCircle, Shapes } from 'lucide-react';
+import { ArrowLeft, GripVertical, Trash2, Plus, Save, Smile, X, FileText, Check, ChevronsUpDown, ChevronRight, PlusCircle, Shapes, Anchor } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
@@ -30,6 +30,69 @@ const emojis = [
     '💾', '📦', '🐛', '⚡', '🔥', '🎨', '🧩', '🤖', '🧪', '🏗️',
     '🧱', '🗄️'
 ];
+
+type Heading = {
+  id: string;
+  level: number;
+  text: string;
+};
+
+const extractHeadings = (content: any): Heading[] => {
+  if (!content?.content) {
+    return [];
+  }
+  const headings: Heading[] = [];
+
+  content.content.forEach((node: any) => {
+    if ((node.type === 'heading' || node.type === 'paragraph') && node.content) {
+      node.content.forEach((textNode: any) => {
+        if (textNode.marks) {
+          const anchorMark = textNode.marks.find((mark: any) => mark.type === 'anchor');
+          if (anchorMark) {
+            headings.push({
+              level: node.type === 'heading' ? node.attrs.level : 4, // Treat paragraphs as lower level
+              text: textNode.text,
+              id: anchorMark.attrs.id,
+            });
+          }
+        }
+      });
+    }
+  });
+
+  return headings;
+};
+
+const TableOfContents = ({ headings }: { headings: Heading[] }) => {
+    if (headings.length === 0) return null;
+
+    const handleScroll = (id: string) => {
+        const element = document.getElementById(id);
+        if (element) {
+            element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+    };
+
+    return (
+        <div className="p-4 border-b">
+            <h3 className="font-semibold text-lg mb-2">Neste Artigo</h3>
+            <ul className="space-y-1">
+                {headings.map((heading) => (
+                    <li key={heading.id}>
+                        <Button
+                            variant="ghost"
+                            className="w-full justify-start text-left h-auto p-1.5"
+                            style={{ paddingLeft: `${(heading.level - 1) * 1}rem` }}
+                            onClick={() => handleScroll(heading.id)}
+                        >
+                            <span className="truncate text-sm text-muted-foreground">{heading.text}</span>
+                        </Button>
+                    </li>
+                ))}
+            </ul>
+        </div>
+    );
+};
 
 
 export default function ArticlePage() {
@@ -60,6 +123,7 @@ export default function ArticlePage() {
     // Derived state for the currently active article based on activeTabId
     const activeArticle = useMemo(() => openTabs.find(tab => tab.id === activeTabId), [openTabs, activeTabId]);
     const originalActiveArticle = useMemo(() => originalArticles.get(activeTabId || ''), [originalArticles, activeTabId]);
+    const tableOfContents = useMemo(() => activeArticle ? extractHeadings(activeArticle.content) : [], [activeArticle]);
     
     // Derived list of articles belonging to the same category as the active one
     const relatedArticles = useMemo(() => {
@@ -392,7 +456,7 @@ export default function ArticlePage() {
                    <div className="p-4 border-b flex items-center justify-between">
                         <div>
                             <h3 className="font-semibold text-lg">{activeArticle?.category || 'Artigos'}</h3>
-                            <p className="text-sm text-muted-foreground">Artigos nesta categoria</p>
+                            <p className="text-sm text-muted-foreground">Artigos na categoria</p>
                         </div>
                         <Dialog open={isCreateArticleDialogOpen} onOpenChange={setIsCreateArticleDialogOpen}>
                             <DialogTrigger asChild>
@@ -488,8 +552,11 @@ export default function ArticlePage() {
                         </Dialog>
                    </div>
                    <div className="flex-1 overflow-y-auto">
-                        {relatedArticles.length > 0 ? (
+                        {tableOfContents.length > 0 ? <TableOfContents headings={tableOfContents} /> : null}
+
+                        {relatedArticles.length > 0 && (
                             <div className="p-2 space-y-1">
+                                <h3 className="font-semibold text-md px-2 pt-2">Outros Artigos</h3>
                                 {relatedArticles.map(article => (
                                     <Link href={`/knowledge-base/${article.id}`} key={article.id} scroll={false}>
                                         <Button 
@@ -509,8 +576,6 @@ export default function ArticlePage() {
                                     </Link>
                                 ))}
                             </div>
-                        ) : (
-                            <p className="p-4 text-sm text-muted-foreground text-center">Nenhum outro artigo nesta categoria.</p>
                         )}
                    </div>
                 </aside>
