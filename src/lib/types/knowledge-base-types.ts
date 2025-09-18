@@ -20,7 +20,8 @@ export const KnowledgeBaseArticleSchema = z.object({
 export type KnowledgeBaseArticle = z.infer<typeof KnowledgeBaseArticleSchema>;
 
 
-// A lighter version for list views
+// A lighter version for list views, but critically must include content
+// to prevent data loss on save.
 export const ArticleListItemSchema = KnowledgeBaseArticleSchema.pick({
     id: true,
     title: true,
@@ -30,6 +31,7 @@ export const ArticleListItemSchema = KnowledgeBaseArticleSchema.pick({
     createdAt: true,
     updatedAt: true,
     metadata: true,
+    content: true, // This is crucial
 });
 export type ArticleListItem = z.infer<typeof ArticleListItemSchema>;
 

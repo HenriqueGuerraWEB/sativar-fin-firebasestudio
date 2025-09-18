@@ -38,19 +38,34 @@ export const getArticles = ai.defineFlow(
         'SELECT * FROM knowledge_base_articles ORDER BY updatedAt DESC'
     ) as RowDataPacket[];
 
-    return results.map(article => ({
-        id: article.id,
-        title: article.title,
-        category: article.category,
-        icon: article.icon,
-        // Ensure metadata is always an array, even if DB returns null, string, or object
-        metadata: Array.isArray(article.metadata) 
-            ? article.metadata 
-            : (article.metadata && typeof article.metadata === 'string' ? JSON.parse(article.metadata) : []),
-        authorId: article.authorId,
-        createdAt: article.createdAt ? new Date(article.createdAt).toISOString() : '',
-        updatedAt: article.updatedAt ? new Date(article.updatedAt).toISOString() : '',
-    }));
+    return results.map(article => {
+        // The mysql2 driver automatically parses JSON fields.
+        // However, if the data was double-stringified, it will return a string.
+        let content = article.content;
+        if (typeof content === 'string') {
+            try {
+                content = JSON.parse(content);
+            } catch (e) {
+                console.warn(`[KB_FLOW] Could not parse content for article ${article.id} in getArticles, leaving as is.`);
+                content = {};
+            }
+        }
+
+        return {
+            id: article.id,
+            title: article.title,
+            category: article.category,
+            icon: article.icon,
+            content: content || {}, // Ensure content is always an object
+            // Ensure metadata is always an array, even if DB returns null, string, or object
+            metadata: Array.isArray(article.metadata) 
+                ? article.metadata 
+                : (article.metadata && typeof article.metadata === 'string' ? JSON.parse(article.metadata) : []),
+            authorId: article.authorId,
+            createdAt: article.createdAt ? new Date(article.createdAt).toISOString() : '',
+            updatedAt: article.updatedAt ? new Date(article.updatedAt).toISOString() : '',
+        };
+    });
   }
 );
 
@@ -80,6 +95,7 @@ export const getArticle = ai.defineFlow(
             content = JSON.parse(content);
         } catch (e) {
             console.warn(`[KB_FLOW] Could not parse content for article ${articleId}, leaving as is.`);
+            content = {}; // Default to empty object on parse error
         }
     }
 
@@ -88,7 +104,7 @@ export const getArticle = ai.defineFlow(
         title: article.title,
         category: article.category,
         icon: article.icon,
-        content: content,
+        content: content || {}, // Ensure content is always an object
         // Ensure metadata is always an array
         metadata: Array.isArray(article.metadata) 
             ? article.metadata 
@@ -209,5 +225,6 @@ export const deleteArticle = ai.defineFlow(
     console.log(`Article ${articleId} deleted.`);
   }
 );
+
 
 
