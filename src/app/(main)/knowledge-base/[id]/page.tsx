@@ -40,35 +40,46 @@ type Heading = {
 
 const extractHeadings = (content: any): Heading[] => {
   const headings: Heading[] = [];
-  if (!content?.content) {
+  // Ensure content exists and has a content array before proceeding
+  if (!content || !Array.isArray(content.content)) {
     return headings;
   }
 
-  const contentToParse = typeof content === 'string' ? JSON.parse(content) : content;
-
   function recurse(nodes: any[]) {
     nodes.forEach(node => {
-      if (node.marks) {
+      // Check for marks on text nodes
+      if (node.type === 'text' && node.marks) {
         const anchorMark = node.marks.find((mark: any) => mark.type === 'anchor');
         if (anchorMark && anchorMark.attrs && anchorMark.attrs.id) {
-          headings.push({
-            // The node with the mark is a text node, its parent holds the level
-            // We find the parent node in the original content
-            level: node.level || 4, // Simplification, may need parent traversal logic
-            text: node.text,
-            id: anchorMark.attrs.id,
-          });
+            // Find the parent heading to get the level
+            // This is a simplified approach. A true parent traversal would be more robust.
+            const parent = node; // In Tiptap JSON, marks are on the text node. The 'level' is on the parent block node.
+            const parentLevel = nodes.find(n => n.content?.includes(node))?.level;
+             headings.push({
+                level: parentLevel || 4, // Default to a non-heading level
+                text: node.text,
+                id: anchorMark.attrs.id,
+            });
         }
       }
       
-      // If the node has its own content array, recurse into it
+      // If the node is a heading and has an ID, it's an anchor.
+      if (node.type === 'heading' && node.attrs && node.attrs.id) {
+          headings.push({
+              level: node.attrs.level,
+              text: node.content?.[0]?.text || '',
+              id: node.attrs.id,
+          });
+      }
+
+      // Recurse into children
       if (node.content) {
         recurse(node.content);
       }
     });
   }
 
-  recurse(contentToParse.content);
+  recurse(content.content);
   return headings;
 };
 
@@ -594,4 +605,3 @@ export default function ArticlePage() {
     );
 }
 
-    

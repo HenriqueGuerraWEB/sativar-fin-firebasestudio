@@ -70,12 +70,25 @@ export const getArticle = ai.defineFlow(
       return null;
     }
     const article = results[0];
+
+    // The mysql2 driver automatically parses JSON fields.
+    // However, if the data was double-stringified, it will return a string.
+    // This logic handles both cases for resilience.
+    let content = article.content;
+    if (typeof content === 'string') {
+        try {
+            content = JSON.parse(content);
+        } catch (e) {
+            console.warn(`[KB_FLOW] Could not parse content for article ${articleId}, leaving as is.`);
+        }
+    }
+
     return {
         id: article.id,
         title: article.title,
         category: article.category,
         icon: article.icon,
-        content: article.content, // mysql2 driver handles JSON parsing
+        content: content,
         // Ensure metadata is always an array
         metadata: Array.isArray(article.metadata) 
             ? article.metadata 
@@ -157,7 +170,7 @@ export const updateArticle = ai.defineFlow(
           const dbKey = key;
           // For 'content' and 'metadata', stringify only if they are not already a string
           if ((key === 'content' || key === 'metadata')) {
-              if(typeof updatesWithTimestamp[key] === 'object') {
+              if(typeof updatesWithTimestamp[key] !== 'string') {
                   dbUpdates[dbKey] = JSON.stringify(updatesWithTimestamp[key] || {});
               } else {
                  dbUpdates[dbKey] = updatesWithTimestamp[key];
@@ -196,3 +209,4 @@ export const deleteArticle = ai.defineFlow(
     console.log(`Article ${articleId} deleted.`);
   }
 );
+
