@@ -18,6 +18,13 @@ export const AnchorMark = Mark.create({
     return {
       id: {
         default: null,
+        parseHTML: element => element.getAttribute('id'),
+        renderHTML: attributes => {
+          if (!attributes.id) {
+            return {};
+          }
+          return { id: attributes.id };
+        },
       },
     };
   },
@@ -32,7 +39,7 @@ export const AnchorMark = Mark.create({
   },
 
   renderHTML({ HTMLAttributes }) {
-    return ['span', mergeAttributes(HTMLAttributes), 0];
+    return ['span', mergeAttributes(this.options.HTMLAttributes, HTMLAttributes), 0];
   },
 
   addCommands() {

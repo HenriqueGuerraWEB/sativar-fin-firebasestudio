@@ -9,6 +9,8 @@ import { cn } from '@/lib/utils';
 import { Button } from '../ui/button';
 import { nanoid } from 'nanoid';
 import { AnchorMark } from './anchor';
+import Heading from '@tiptap/extension-heading';
+
 
 interface EditorProps {
     initialContent: any;
@@ -21,10 +23,14 @@ const EditorToolbar = ({ editor }: { editor: any }) => {
     }
     
     const toggleAnchor = () => {
-        if (editor.isActive('anchor')) {
-            editor.chain().focus().unsetAnchor().run();
+        const currentAttributes = editor.getAttributes('heading');
+        const currentId = currentAttributes.id;
+
+        // If there's an ID, unset it. Otherwise, set a new one.
+        if (currentId) {
+            editor.chain().focus().updateAttributes('heading', { id: null }).run();
         } else {
-            editor.chain().focus().setAnchor({ id: nanoid(8) }).run();
+            editor.chain().focus().updateAttributes('heading', { id: nanoid(8) }).run();
         }
     };
 
@@ -72,9 +78,10 @@ const EditorToolbar = ({ editor }: { editor: any }) => {
                 variant="ghost"
                 size="sm"
                 onClick={toggleAnchor}
+                disabled={!editor.isActive('heading')}
                 className={cn(
                     "p-2 h-auto text-white hover:bg-zinc-700 hover:text-white",
-                    editor.isActive('anchor') ? 'is-active bg-zinc-700' : ''
+                    editor.isActive('heading') && editor.getAttributes('heading').id ? 'is-active bg-zinc-700' : ''
                 )}
             >
                 <Anchor className="h-4 w-4" />
@@ -131,8 +138,21 @@ const EditorToolbar = ({ editor }: { editor: any }) => {
 const Editor = ({ initialContent, onChange }: EditorProps) => {
     const editor = useEditor({
         extensions: [
-            StarterKit,
-            AnchorMark,
+            StarterKit.configure({
+                heading: false, // Disable default heading to use the custom one below
+            }),
+            Heading.configure({
+                levels: [1, 2, 3],
+            }).extend({
+                addAttributes() {
+                    return {
+                        ...this.parent?.(),
+                        id: {
+                            default: null,
+                        },
+                    };
+                },
+            }),
         ],
         content: initialContent,
         editorProps: {

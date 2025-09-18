@@ -40,39 +40,22 @@ type Heading = {
 
 const extractHeadings = (content: any): Heading[] => {
   const headings: Heading[] = [];
-  // Ensure content exists and has a content array before proceeding
   if (!content || !Array.isArray(content.content)) {
     return headings;
   }
 
   function recurse(nodes: any[]) {
     nodes.forEach(node => {
-      // Check for marks on text nodes
-      if (node.type === 'text' && node.marks) {
-        const anchorMark = node.marks.find((mark: any) => mark.type === 'anchor');
-        if (anchorMark && anchorMark.attrs && anchorMark.attrs.id) {
-            // Find the parent heading to get the level
-            // This is a simplified approach. A true parent traversal would be more robust.
-            const parent = node; // In Tiptap JSON, marks are on the text node. The 'level' is on the parent block node.
-            const parentLevel = nodes.find(n => n.content?.includes(node))?.level;
-             headings.push({
-                level: parentLevel || 4, // Default to a non-heading level
-                text: node.text,
-                id: anchorMark.attrs.id,
+      if (node.type === 'heading') {
+        const text = node.content?.map((c: any) => c.text).join('') || '';
+        if (node.attrs && node.attrs.id) {
+            headings.push({
+                level: node.attrs.level,
+                text: text,
+                id: node.attrs.id,
             });
         }
       }
-      
-      // If the node is a heading and has an ID, it's an anchor.
-      if (node.type === 'heading' && node.attrs && node.attrs.id) {
-          headings.push({
-              level: node.attrs.level,
-              text: node.content?.[0]?.text || '',
-              id: node.attrs.id,
-          });
-      }
-
-      // Recurse into children
       if (node.content) {
         recurse(node.content);
       }
@@ -604,4 +587,5 @@ export default function ArticlePage() {
         </div>
     );
 }
+
 
