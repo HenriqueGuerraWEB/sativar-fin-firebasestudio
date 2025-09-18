@@ -31,6 +31,7 @@ const emojis = [
     '🧱', '🗄️'
 ];
 
+
 type Heading = {
   id: string;
   level: number;
@@ -50,7 +51,8 @@ const extractHeadings = (content: any): Heading[] => {
           const anchorMark = textNode.marks.find((mark: any) => mark.type === 'anchor');
           if (anchorMark) {
             headings.push({
-              level: node.type === 'heading' ? node.attrs.level : 4, // Treat paragraphs as lower level
+              // Fallback to a default level for paragraphs to prevent error
+              level: node.attrs?.level || 4, 
               text: textNode.text,
               id: anchorMark.attrs.id,
             });

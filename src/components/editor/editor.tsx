@@ -20,9 +20,14 @@ const EditorToolbar = ({ editor }: { editor: any }) => {
         return null;
     }
     
-    const addAnchor = () => {
-      editor.chain().focus().setAnchor({ id: nanoid(8) }).run();
+    const toggleAnchor = () => {
+        if (editor.isActive('anchor')) {
+            editor.chain().focus().unsetAnchor().run();
+        } else {
+            editor.chain().focus().setAnchor({ id: nanoid(8) }).run();
+        }
     };
+
 
     return (
         <BubbleMenu
@@ -66,7 +71,7 @@ const EditorToolbar = ({ editor }: { editor: any }) => {
             <Button
                 variant="ghost"
                 size="sm"
-                onClick={addAnchor}
+                onClick={toggleAnchor}
                 className={cn(
                     "p-2 h-auto text-white hover:bg-zinc-700 hover:text-white",
                     editor.isActive('anchor') ? 'is-active bg-zinc-700' : ''
